@@ -1,0 +1,14 @@
+#!/bin/sh
+
+if [ "$1" = "clean" ]; then
+    rm bootsect.bin
+    rm kernel.bin
+    rm disk.img
+    exit
+fi
+
+nasm -f bin bootsect.asm -o bootsect.bin
+nasm -f bin kernel.asm -o kernel.bin
+# dd if=bootsect.bin of=disk.img bs=512 count=1 conv=notrunc
+# dd if=kernel.bin of=disk.img bs=512 seek=1 conv=notrunc
+cat bootsect.bin kernel.bin > disk.img
