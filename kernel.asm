@@ -1,15 +1,15 @@
 kernel: jmp k_main
 
 %include "print.asm"
-SPACE: db " ", ENDS
-kernel_msg: db "Welcome to the S OS!", ENDL, ENDS
+SPACE: db " ", 0
+kernel_msg: db "Welcome to the S OS!", ENDL, 0
 
 k_main:
     push cs
     pop ds
 
     mov si, kernel_msg
-    call print
+    call print_string
 
 .k_mainloop:
     ; read key input and print
@@ -20,7 +20,7 @@ k_main:
     call print_hex
 
     mov si, SPACE
-    call print
+    call print_string
 
     mov al, dl
     int 0x10
@@ -28,5 +28,3 @@ k_main:
     call print_new_line
 
     jmp .k_mainloop
-
-times 512-($-$$) db 0

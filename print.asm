@@ -1,5 +1,4 @@
 %define ENDL 0xd, 0xa
-%define ENDS 0x0
 
 cls:
     push ax
@@ -12,7 +11,7 @@ cls:
 	ret
 
 ; print string located at the address stored in si
-print:
+print_string:
     mov ah, 0xe
 .start_loop:
     lodsb
