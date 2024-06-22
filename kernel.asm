@@ -1,10 +1,14 @@
 kernel: jmp k_main
 
 %include "print.asm"
-SPACE: db " ", 0
 kernel_msg: db "Welcome to the S OS!", ENDL, 0
+prompt: db "[kernel@sos]$ ", 0
 
-k_main:
+%include "string.asm"
+; store user line input here
+USR_INPUT: times 128 db 0, 0
+
+k_main:    
     push cs
     pop ds
 
@@ -12,19 +16,19 @@ k_main:
     call print_string
 
 .k_mainloop:
-    ; read key input and print
-    xor ax, ax
-    int 0x16
-
-    mov dx, ax
-    call print_hex
-
-    mov si, SPACE
+    mov si, prompt
     call print_string
 
-    mov al, dl
-    int 0x10
-
+    mov si, USR_INPUT
+    call get_line
     call print_new_line
 
+    ; process usr input here
+
+    mov si, USR_INPUT
+    call clear_string
+
     jmp .k_mainloop
+
+; fill up freespace to reach 512 bytes (1 sector)
+times 512 - ($ - $$) db 0

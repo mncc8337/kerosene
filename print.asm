@@ -13,14 +13,14 @@ cls:
 ; print string located at the address stored in si
 print_string:
     mov ah, 0xe
-.start_loop:
+.print:
     lodsb
     cmp al, 0x0
-    je .end_loop
+    je .end_print
 
     int 0x10
-    jmp .start_loop
-.end_loop:
+    jmp .print
+.end_print:
     ret
 
 print_new_line:
