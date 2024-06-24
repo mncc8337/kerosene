@@ -30,5 +30,4 @@ k_main:
 
     jmp .k_mainloop
 
-; fill up freespace to reach 512 bytes (1 sector)
 times 512 - ($ - $$) db 0

@@ -1,15 +1,34 @@
-[org 0x7c00]
+org 0x7c00
+bits 16
 
 boot: jmp b_main
-times 3 - ($ - $$) db 0x90   ; support 2 or 3 byte encoded JMPs before BPB.
-; fake BPB filed with 0xaa
-times 59 db 0xaa
+
+times 3-($-$$) db 0x90   ; Support 2 or 3 byte encoded JMPs before BPB.
+
+; Dos 4.0 EBPB 1.44MB floppy
+OEMname:           db    "mkfs.fat"  ; mkfs.fat is what OEMname mkdosfs uses
+bytesPerSector:    dw    512
+sectPerCluster:    db    1
+reservedSectors:   dw    1
+numFAT:            db    2
+numRootDirEntries: dw    224
+numSectors:        dw    2880
+mediaType:         db    0xf0
+numFATsectors:     dw    9
+sectorsPerTrack:   dw    18
+numHeads:          dw    2
+numHiddenSectors:  dd    0
+numSectorsHuge:    dd    0
+driveNum:          db    0
+reserved:          db    0
+signature:         db    0x29
+volumeID:          dd    0x2d7e5a1a
+volumeLabel:       db    "S_OS       "
+fileSysType:       db    "FAT12   "
 
 %include "print.asm"
 
 drive_msg: db "booted into drive ", 0
-drive_type_floppy_msg: db " (floppy)", ENDL, 0
-drive_type_hd_msg: db " (hard disk)", ENDL, 0
 
 kernel_loaded_msg: db "kernel loaded", ENDL, 0
 
@@ -37,10 +56,17 @@ disk_load:
     jmp $
 
 b_main:
-    mov [BOOT_DRIVE], dl ; remember boot drive stored in dl
+    cli
+    cld
 
-    mov bp, 0x9000 ; setup the stack.
-    mov sp, bp
+    xor ax, ax
+    mov ds, ax
+    mov es, ax
+
+    mov ss, ax
+    mov sp, 0x7c00
+
+    mov [BOOT_DRIVE], dl ; remember boot drive stored in dl
 
     mov si, drive_msg
     call print_string
@@ -48,25 +74,7 @@ b_main:
     mov dx, [BOOT_DRIVE]
     call print_hex
 
-    ; detect drive type
-    ; if BOOT_DRIVE is less than 0x80 then it is floppy
-    ; else it is hard disk
-    mov dx, [BOOT_DRIVE]
-    cmp dx, 0x80
-    jl type_floppy
-    jmp type_hd
-
-    type_floppy:
-    mov si, drive_type_floppy_msg
-    call print_string
-    jmp done_check_type
-
-    type_hd:
-    mov si, drive_type_hd_msg
-    call print_string
-
-    done_check_type:
-    [bits 16]
+    call print_new_line
 
     ; load kernel to KERNEL_OFFSET:0x0
 
