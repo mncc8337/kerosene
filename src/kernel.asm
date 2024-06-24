@@ -1,10 +1,10 @@
 kernel: jmp k_main
 
-%include "print.asm"
+%include "16-bits/print.asm"
+%include "16-bits/string.asm"
 kernel_msg: db "Welcome to the S OS!", ENDL, 0
 prompt: db "[kernel@sos]$ ", 0
 
-%include "string.asm"
 ; store user line input here
 USR_INPUT: times 128 db 0, 0
 

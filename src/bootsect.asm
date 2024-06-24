@@ -1,5 +1,5 @@
-org 0x7c00
-bits 16
+[org 0x7c00]
+[bits 16]
 
 boot: jmp b_main
 
@@ -26,7 +26,7 @@ volumeID:          dd    0x2d7e5a1a
 volumeLabel:       db    "S_OS       "
 fileSysType:       db    "FAT12   "
 
-%include "print.asm"
+%include "16-bits/print.asm"
 
 drive_msg: db "booted into drive ", 0
 
@@ -90,6 +90,8 @@ b_main:
     call print_string
 
     jmp KERNEL_OFFSET:0x0
+
+    jmp $
 
 times 510 - ($ - $$) db 0
 dw 0xaa55
