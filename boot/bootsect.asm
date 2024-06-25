@@ -40,7 +40,6 @@ boot_msg: db "booted into drive ", 0
 kernel_loaded_msg: db "kernel loaded", 0xd, 0xa, 0
 
 BOOT_DRIVE: db 0
-KERNEL_OFFSET equ 0x1000
 
 b_main:
     cli
@@ -51,9 +50,8 @@ b_main:
     mov es, ax
 
     mov ss, ax
-    mov sp, 0x7c00
 
-    mov bp, 0x9000 ; set the stack
+    mov bp, 0x7c00 ; set the stack
     mov sp, bp
 
     mov [BOOT_DRIVE], dl ; remember boot drive stored in dl
@@ -68,7 +66,7 @@ b_main:
 
     ; load kernel
     mov bx, KERNEL_OFFSET
-    mov dh, 15
+    mov dh, KERNEL_PADDING
     mov dl, [BOOT_DRIVE]
     call disk_load
 

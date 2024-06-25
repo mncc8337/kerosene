@@ -1,16 +1,21 @@
 C_SRC = $(wildcard kernel/*.c kernel/driver/*.c)
 C_OBJ = $(addsuffix .o, $(basename $(notdir $(C_SRC))))
 
+# number of sectors that the kernel will fit in
+KERNEL_PADDING = 15
+# memory address that the kernel will be loaded to
 KERNEL_OFFSET = 0x1000
 
-C_FLAGS = -ffreestanding -m32 -fno-pie
-LD_FLAGS = -m elf_i386
-NASM_FLAGS = -f elf
+DEFINES = -DKERNEL_PADDING=$(KERNEL_PADDING) -DKERNEL_OFFSET=$(KERNEL_OFFSET)
+
+C_FLAGS = $(DEFINES) -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles
+LD_FLAGS = -T linker.ld -m elf_i386
+NASM_FLAGS = $(DEFINES) -f elf
 
 all: disk.img
 
 bootsect.bin: boot/bootsect.asm
-	nasm -f bin -o $@ -I./boot/include $<
+	nasm -f bin -o $@ -I./boot/include $< $(DEFINES)
 
 kernel_entry.o: kernel/kernel_entry.asm
 	nasm $(NASM_FLAGS) -o $@ $<
@@ -20,11 +25,10 @@ kernel_entry.o: kernel/kernel_entry.asm
 	gcc $(C_FLAGS) -o $@ -I./kernel/include -c $<
 kernel.bin: kernel_entry.o $(C_OBJ)
 	ld $(LD_FLAGS) -o kernel.bin -Ttext $(KERNEL_OFFSET) $^ --oformat binary
+	dd if=/dev/zero of=$@ bs=512 count=0 seek=$(KERNEL_PADDING)
 
 disk.img: bootsect.bin kernel.bin
 	cat $^ > $@
-	# dd if=bootsect.bin of=$@ bs=512 count=1 conv=notrunc
-	# dd if=kernel.bin of=$@ bs=512 seek=1 conv=notrunc
 
 run: all
 	qemu-system-i386 disk.img
