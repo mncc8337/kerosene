@@ -1,36 +1,3 @@
-%define ENDL 0xd, 0xa
-
-cls:
-    push ax
-
-	mov al, 0x3
-	mov ah, 0x0
-	int 0x10
-
-    pop ax
-	ret
-
-; print string located at the address stored in si
-print_string:
-    mov ah, 0xe
-.print:
-    lodsb
-    cmp al, 0x0
-    je .end_print
-
-    int 0x10
-    jmp .print
-.end_print:
-    ret
-
-print_new_line:
-    mov ah, 0xe
-    mov al, 0xd
-    int 0x10
-    mov al, 0xa
-    int 0x10
-    ret
-
 ; print hex value in dx
 print_hex:
     pusha
