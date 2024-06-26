@@ -12,7 +12,7 @@ switch_to_pm:
     or eax, 0x1  ; the first bit of cr0
     mov cr0, eax
 
-    jmp CODE_SEG: init_pm ; make a far jump (i.e. to a new segment) to our 32 bit codes
+    jmp CODE_SEG: init_pm ; make a far jump to our 32 bit codes
                           ; this also forces the CPU to flush its cache of
                           ; prefetched and real mode decoded instructions, which can
                           ; cause problems

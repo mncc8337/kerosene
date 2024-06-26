@@ -1,4 +1,4 @@
-C_SRC = $(wildcard kernel/*.c kernel/driver/*.c)
+C_SRC = $(wildcard kernel/*.c kernel/driver/*.c kernel/system/*.c)
 C_OBJ = $(addsuffix .o, $(basename $(notdir $(C_SRC))))
 
 # number of sectors that the kernel will fit in
@@ -23,6 +23,9 @@ kernel_entry.o: kernel/kernel_entry.asm
 	gcc $(C_FLAGS) -o $@ -I./kernel/include -c $<
 %.o: kernel/driver/%.c
 	gcc $(C_FLAGS) -o $@ -I./kernel/include -c $<
+%.o: kernel/system/%.c
+	gcc $(C_FLAGS) -o $@ -I./kernel/include -c $<
+
 kernel.bin: kernel_entry.o $(C_OBJ)
 	ld $(LD_FLAGS) -o kernel.bin -Ttext $(KERNEL_OFFSET) $^ --oformat binary
 	dd if=/dev/zero of=$@ bs=512 count=0 seek=$(KERNEL_PADDING)
@@ -35,4 +38,4 @@ run: all
 debug: all
 	qemu-system-i386 disk.img -s -S
 clean:
-	rm *.bin *.o disk.img
+	rm *.bin *.o *.img

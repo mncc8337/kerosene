@@ -78,11 +78,7 @@ b_main:
     jmp $
 
 [bits 32]
-pm_msg: db "switched to protected mode", 0
 BEGIN_PM:
-    mov esi, pm_msg
-    call print_string_pm
-
     ; now jump to the kernel and never come back
     call KERNEL_OFFSET
 

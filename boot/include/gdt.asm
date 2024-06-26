@@ -39,5 +39,5 @@ gdt_descriptor:
 ; when we set DS = 0x10 in PM, the CPU knows that we mean it to use the
 ; segment described at offset 0x10 (i.e. 16 bytes) in our GDT, which in our
 ; case is the DATA segment (0x0 -> NULL; 0x08 -> CODE; 0x10 -> DATA)
-CODE_SEG equ gdt_code - gdt_start
-DATA_SEG equ gdt_data - gdt_start
+CODE_SEG equ gdt_code - gdt_start ; equal to 0x08
+DATA_SEG equ gdt_data - gdt_start ; equal to 0x10
