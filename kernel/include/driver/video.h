@@ -1,7 +1,5 @@
 #pragma once
 
-#define VIDEO_ADDRESS 0xb8000
-
 #define PORT_SCREEN_CTR 0x3d4
 #define PORT_SCREEN_DAT 0x3d5
 
@@ -34,4 +32,3 @@ void set_cursor(int offset);
 void cls(char attr);
 void print_char(char chr, int offset, char attr);
 void print_string(char* string, int offset, char attr);
-void video_init();

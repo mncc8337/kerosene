@@ -17,7 +17,10 @@ struct regs {
 unsigned char* memcpy(unsigned char* dest, unsigned char* src, int cnt);
 unsigned char* memset(unsigned char* dest, unsigned char val, int cnt);
 unsigned short* memsetw(unsigned short* dest, unsigned short val, int cnt);
-int strlen(const char* str);
+
+// string.h
+int string_len(const char* str);
+char* to_string(int num);
 
 // port_io.c
 unsigned char port_inb(unsigned short port);
@@ -48,3 +51,6 @@ void pic_remap(int offset1, int offset2);
 void pic_disable();
 void irq_set_mask(unsigned char irq_line);
 void irq_clear_mask(unsigned char irq_line);
+
+// pit.c
+void pit_timer_phase(int hz);

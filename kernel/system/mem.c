@@ -7,6 +7,7 @@ unsigned char* memcpy(unsigned char* dest, unsigned char* src, int cnt) {
     }
     return dest;
 }
+
 unsigned char* memset(unsigned char* dest, unsigned char val, int cnt) {
     while(cnt) {
         cnt--;
@@ -21,12 +22,3 @@ unsigned short* memsetw(unsigned short* dest, unsigned short val, int cnt) {
     }
     return dest;
 }
-int strlen(const char* str) {
-    int len = 0;
-    while(str[len] != '\0')
-        len++;
-    len--;
-    return len;
-}
-
-

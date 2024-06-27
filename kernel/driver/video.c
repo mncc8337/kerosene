@@ -1,7 +1,7 @@
 #include "driver/video.h"
 #include "system.h"
 
-unsigned char* vid_mem;
+unsigned char* vid_mem = (unsigned char*)0xb8000;
 
 int get_attr(int bg, int fg) {
     return bg * 16 + fg;
@@ -74,7 +74,4 @@ void print_string(char* string, int offset, char attr) {
         string++;
     }
     set_cursor(offset);
-}
-void video_init() {
-    vid_mem = (unsigned char*) VIDEO_ADDRESS;
 }
