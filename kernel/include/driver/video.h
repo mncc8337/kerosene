@@ -1,5 +1,7 @@
 #pragma once
 
+#include "system.h"
+
 #define PORT_SCREEN_CTR 0x3d4
 #define PORT_SCREEN_DAT 0x3d5
 
@@ -30,5 +32,6 @@ void disable_cursor();
 int get_cursor();
 void set_cursor(int offset);
 void cls(char attr);
-void print_char(char chr, int offset, char attr);
-void print_string(char* string, int offset, char attr);
+void print_char(char chr, int offset, char attr, bool move);
+void print_string(char* string, int offset, char attr, bool move);
+void scroll_screen();

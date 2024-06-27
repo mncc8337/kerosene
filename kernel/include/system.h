@@ -1,6 +1,5 @@
 #pragma once
 
-
 #define IDT_MAX_DESCRIPTORS 256
 
 // no bool in plain C so i make one
@@ -13,13 +12,8 @@ struct regs {
     unsigned int eip, cs, eflags, useresp, ss; 
 } __attribute__((packed));
 
-// mem.c
-unsigned char* memcpy(unsigned char* dest, unsigned char* src, int cnt);
-unsigned char* memset(unsigned char* dest, unsigned char val, int cnt);
-unsigned short* memsetw(unsigned short* dest, unsigned short val, int cnt);
-
 // string.h
-int string_len(const char* str);
+int string_len(char* str);
 char* to_string(int num);
 
 // port_io.c
@@ -44,13 +38,3 @@ void isr_init();
 void irq_init();
 void irq_install_handler(int irq, void (*handler)(struct regs *r));
 void irq_uninstall_handler(int irq);
-
-// pic.c
-void pic_send_eoi(unsigned char irq);
-void pic_remap(int offset1, int offset2);
-void pic_disable();
-void irq_set_mask(unsigned char irq_line);
-void irq_clear_mask(unsigned char irq_line);
-
-// pit.c
-void pit_timer_phase(int hz);

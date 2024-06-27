@@ -1,5 +1,4 @@
 #include "driver/video.h"
-#include "system.h"
 
 unsigned char* vid_mem = (unsigned char*)0xb8000;
 
@@ -42,22 +41,25 @@ void cls(char attr) {
     }
     set_cursor(0);
 }
-void print_char(char chr, int offset, char attr) {
+void print_char(char chr, int offset, char attr, bool move) {
     if(offset < 0) offset = get_cursor();
-    if(attr == 0) attr = 0x0f;
 
     if(chr == '\n') {
         int t = offset % MAX_COLS;
-        offset = MAX_COLS - t + offset;
+        offset += MAX_COLS - t;
     }
     else {
         vid_mem[offset * 2]     = chr;
-        vid_mem[offset * 2 + 1] = attr;
+        if(attr != 0) vid_mem[offset * 2 + 1] = attr;
         offset++;
     }
-    set_cursor(offset);
+
+    if(move) {
+        set_cursor(offset);
+        if(offset > MAX_ROWS * MAX_COLS - 1) scroll_screen();
+    }
 }
-void print_string(char* string, int offset, char attr) {
+void print_string(char* string, int offset, char attr, bool move) {
     if(offset < 0) offset = get_cursor();
     if(attr == 0) attr = 0x0f;
 
@@ -68,10 +70,33 @@ void print_string(char* string, int offset, char attr) {
         }
         else {
             vid_mem[offset * 2]     = *string;
-            vid_mem[offset * 2 + 1] = attr;
+            if(attr != 0) vid_mem[offset * 2 + 1] = attr;
             offset++;
         }
         string++;
     }
-    set_cursor(offset);
+
+    if(move) {
+        set_cursor(offset);
+        if(offset > MAX_ROWS * MAX_COLS - 1) scroll_screen();
+    }
+}
+void scroll_screen() {
+    int end = get_cursor();
+
+    // already on top
+    if(end < MAX_COLS) return;
+
+    int start = end - MAX_COLS;
+
+    for(int i = 0; i < start; i++) {
+        vid_mem[i * 2] = vid_mem[i * 2 + MAX_COLS * 2];
+        vid_mem[i * 2 + 1] = vid_mem[i * 2 + MAX_COLS * 2 + 1];
+    }
+    for(int i = start; i <= end; i++) {
+        vid_mem[i * 2] = ' ';
+        vid_mem[i * 2 + 1] = 0x0f;
+    }
+
+    set_cursor(start);
 }

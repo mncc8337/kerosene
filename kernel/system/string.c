@@ -1,6 +1,6 @@
 #include "system.h"
 
-int string_len(const char* str) {
+int string_len(char* str) {
     int len = 0;
     while(str[len] != '\0')
         len++;
@@ -10,6 +10,13 @@ int string_len(const char* str) {
 
 char* to_string(int num) {
     char* res;
+
+    if(num == 0) {
+        res[0] = '0';
+        res[1] = '\0';
+        return res;
+    }
+
     unsigned int cnt = 0;
 
     bool _signed = num < 0;

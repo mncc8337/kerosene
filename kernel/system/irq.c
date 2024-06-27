@@ -1,4 +1,5 @@
 #include "system.h"
+#include "driver/pic.h"
 
 void *irq_routines[16] = {
     0, 0, 0, 0, 0, 0, 0, 0,
