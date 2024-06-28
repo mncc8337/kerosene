@@ -41,18 +41,29 @@ void cls(char attr) {
     }
     set_cursor(0);
 }
-void print_char(char chr, int offset, char attr, bool move) {
-    if(offset < 0) offset = get_cursor();
 
+int _print_char(char chr, int offset, char attr) {
     if(chr == '\n') {
-        int t = offset % MAX_COLS;
-        offset += MAX_COLS - t;
+        offset += MAX_COLS - (offset % MAX_COLS);
     }
-    else {
-        vid_mem[offset * 2]     = chr;
+    else if(chr == '\b') {
+        offset--;
+        vid_mem[offset * 2] = ' ';
+    }
+    else if(chr == '\t') {
+        offset += - offset % MAX_COLS % 8 + 8;
+    }
+    else if(chr >= 0x20 && chr <= 0x7e) {
+        vid_mem[offset * 2] = chr;
         if(attr != 0) vid_mem[offset * 2 + 1] = attr;
         offset++;
     }
+    return offset;
+}
+void print_char(char chr, int offset, char attr, bool move) {
+    if(offset < 0) offset = get_cursor();
+
+    offset = _print_char(chr, offset, attr);
 
     if(move) {
         set_cursor(offset);
@@ -61,19 +72,11 @@ void print_char(char chr, int offset, char attr, bool move) {
 }
 void print_string(char* string, int offset, char attr, bool move) {
     if(offset < 0) offset = get_cursor();
-    if(attr == 0) attr = 0x0f;
 
-    while(*string != '\0') {
-        if(*string == '\n') {
-            int t = offset % MAX_COLS;
-            offset += MAX_COLS - t;
-        }
-        else {
-            vid_mem[offset * 2]     = *string;
-            if(attr != 0) vid_mem[offset * 2 + 1] = attr;
-            offset++;
-        }
-        string++;
+    int i = 0;
+    while(string[i] != '\0') {
+        offset = _print_char(string[i], offset, attr);
+        i++;
     }
 
     if(move) {

@@ -15,6 +15,9 @@ struct regs {
 // string.h
 int string_len(char* str);
 char* to_string(int num);
+bool string_cmp(char* str1, char* str2);
+char* substr(char* str, unsigned int p1, unsigned int p2);
+void tokenize(char* string, char sep, int*, int* token_count);
 
 // port_io.c
 unsigned char port_inb(unsigned short port);
@@ -38,3 +41,7 @@ void isr_init();
 void irq_init();
 void irq_install_handler(int irq, void (*handler)(struct regs *r));
 void irq_uninstall_handler(int irq);
+
+// a20
+bool check_a20();
+bool enable_a20();
