@@ -2,6 +2,8 @@
 
 #define IDT_MAX_DESCRIPTORS 256
 
+#define SYS_SLEEP asm volatile("sti; hlt; cli") 
+
 // no bool in plain C so i make one
 typedef enum {false, true} bool;
 

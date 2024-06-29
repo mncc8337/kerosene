@@ -20,19 +20,29 @@ void timer_wait(unsigned int ticks) {
     unsigned long eticks;
 
     eticks = timer_ticks + ticks;
-    while(timer_ticks < eticks)
-        asm volatile("sti; hlt; cli"); // sleep mode
+    while(timer_ticks < eticks) SYS_SLEEP;
 }
 
+char* row_str;
+char* col_str;
 void print_typed_char(struct key k) {
     if(k.released) return;
 
-    if(k.mapped == '\b') {
+    int _row = k.keycode >> 4;
+    int _col = k.keycode & 0xf;
+
+    print_string("     ", MAX_COLS * 2 - 5, 0, false);
+    print_string(to_string(_row), MAX_COLS * 2 - 5, 0, false);
+    print_string(to_string(_col), MAX_COLS * 2 - 2, 0, false);
+
+    unsigned char mapped = key_map(k.keycode, KBL_US);
+
+    if(mapped == '\b') {
         set_cursor(get_cursor() - 1); // move back
         print_char(' ', -1, 0, false); // delete printed char
     }
     else {
-        print_char(k.mapped, -1, 0, true);
+        print_char(mapped, -1, 0, true);
     }
 }
 
@@ -73,26 +83,7 @@ void main() {
     char* command;
 
     while(true) {
-        print_string(prompt, -1, GREEN, true);
         get_string(inp, '\n', print_typed_char);
-        print_char('\n', -1, 0, true);
-
-        if(string_len(inp) == 0) continue;
-
-        tokenize(inp, ' ', token_pos, &token_count);
-        command = substr(inp, token_pos[0], token_pos[1]+1);
-
-        if(string_cmp(command, "echo")) {
-            print_string(inp + token_pos[2], -1, 0, true);
-        }
-        else if(string_cmp(command, "clear")) {
-            cls(0x0f);
-        }
-        else {
-            print_string("unknown command \"", -1, WHITE, true);
-            print_string(inp, -1, RED, true);
-            print_char('"', -1, WHITE, true);
-        }
         print_char('\n', -1, 0, true);
     }
 }

@@ -51,7 +51,10 @@ int _print_char(char chr, int offset, char attr) {
         vid_mem[offset * 2] = ' ';
     }
     else if(chr == '\t') {
-        offset += - offset % MAX_COLS % 8 + 8;
+        // handle tabs like spaces
+        // change later
+        return _print_char(' ', offset, attr);
+        // offset += - offset % MAX_COLS % 8 + 8;
     }
     else if(chr >= 0x20 && chr <= 0x7e) {
         vid_mem[offset * 2] = chr;

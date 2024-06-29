@@ -1,152 +1,142 @@
 #pragma once
 
 #include "system.h"
-
-#define SCANCODE_ESCAPE               0x01
-#define SCANCODE_1                    0x02
-#define SCANCODE_2                    0x03
-#define SCANCODE_3                    0x04
-#define SCANCODE_4                    0x05
-#define SCANCODE_5                    0x06
-#define SCANCODE_6                    0x07
-#define SCANCODE_7                    0x08
-#define SCANCODE_8                    0x09
-#define SCANCODE_9                    0x0a
-#define SCANCODE_0                    0x0b
-#define SCANCODE_MINUS                0x0c
-#define SCANCODE_EQUAL                0x0d
-#define SCANCODE_BACKSPACE            0x0e
-#define SCANCODE_TAB                  0x0f
-#define SCANCODE_Q                    0x10
-#define SCANCODE_W                    0x11
-#define SCANCODE_E                    0x12
-#define SCANCODE_R                    0x13
-#define SCANCODE_T                    0x14
-#define SCANCODE_Y                    0x15
-#define SCANCODE_U                    0x16
-#define SCANCODE_I                    0x17
-#define SCANCODE_O                    0x18
-#define SCANCODE_P                    0x19
-#define SCANCODE_SQUARE_BRACKET_OPEN  0x1a
-#define SCANCODE_SQUARE_BRACKET_CLOSE 0x1b
-#define SCANCODE_ENTER                0x1c
-#define SCANCODE_LCTRL                0x1d
-#define SCANCODE_A                    0x1e
-#define SCANCODE_S                    0x1f
-#define SCANCODE_D                    0x20
-#define SCANCODE_F                    0x21
-#define SCANCODE_G                    0x22
-#define SCANCODE_H                    0x23
-#define SCANCODE_J                    0x24
-#define SCANCODE_K                    0x25
-#define SCANCODE_L                    0x26
-#define SCANCODE_SEMICOLON            0x27
-#define SCANCODE_SINGLE_QUOTE         0x28
-#define SCANCODE_BACKTICK             0x29
-#define SCANCODE_LSHIFT               0x2a
-#define SCANCODE_BACKSLASH            0x2b
-#define SCANCODE_Z                    0x2c
-#define SCANCODE_X                    0x2d
-#define SCANCODE_C                    0x2e
-#define SCANCODE_V                    0x2f
-#define SCANCODE_B                    0x30
-#define SCANCODE_N                    0x31
-#define SCANCODE_M                    0x32
-#define SCANCODE_COMMA                0x33
-#define SCANCODE_DOT                  0x34
-#define SCANCODE_SLASH                0x35
-#define SCANCODE_RSHIFT               0x36
-#define SCANCODE_ASTERICK_KPD         0x37
-#define SCANCODE_LALT                 0x38
-#define SCANCODE_SPACE                0x39
-#define SCANCODE_CAPSLOCK             0x3a
-#define SCANCODE_F1                   0x3b
-#define SCANCODE_F2                   0x3c
-#define SCANCODE_F3                   0x3d
-#define SCANCODE_F4                   0x3e
-#define SCANCODE_F5                   0x3f
-#define SCANCODE_F6                   0x40
-#define SCANCODE_F7                   0x41
-#define SCANCODE_F8                   0x42
-#define SCANCODE_F9                   0x43
-#define SCANCODE_F10                  0x44
-#define SCANCODE_NUMLOCK              0x45
-#define SCANCODE_SCROLLLOCK           0x46
-#define SCANCODE_7_KPD                0x47
-#define SCANCODE_8_KPD                0x48
-#define SCANCODE_9_KPD                0x49
-#define SCANCODE_MINUS_KPD            0x4a
-#define SCANCODE_4_KPD                0x4b
-#define SCANCODE_5_KPD                0x4c
-#define SCANCODE_6_KPD                0x4d
-#define SCANCODE_PLUS_KPD             0x4e
-#define SCANCODE_1_KPD                0x4f
-#define SCANCODE_2_KPD                0x50
-#define SCANCODE_3_KPD                0x51
-#define SCANCODE_0_KPD                0x52
-#define SCANCODE_DOT_KPD              0x53
-
-#define SCANCODE_F11 0x57
-#define SCANCODE_F12 0x58
+#include "driver/ps2.h"
 
 #define EXTENDED_BYTE 0xe0
 
-// from now on scancode are generated with EXTENDED_BYTE
-#define SCANCODE_PREV_TRACK  0x10
-#define SCANCODE_NEXT_TRACK  0x19
-
-#define SCANCODE_ENTER_KPD   0x1c
-#define SCANCODE_RCTRL       0x1d
-
-#define SCANCODE_MUTE        0x20
-#define SCANCODE_CALCULATOR  0x21
-#define SCANCODE_PLAY        0x22
-#define SCANCODE_STOP        0x24
-#define SCANCODE_VOLUME_DOWN 0x2e
-#define SCANCODE_VOLUME_UP   0x30
-#define SCANCODE_WWW         0x32
-
-#define SCANCODE_SLASH_KPD   0x35
-#define SCANCODE_RALT        0x38
-
-#define SCANCODE_HOME         0x47
-#define SCANCODE_CURSOR_UP    0x48
-#define SCANCODE_PAGE_UP      0x49
-#define SCANCODE_CURSOR_LEFT  0x4b
-#define SCANCODE_CURSOR_RIGHT 0x4d
-#define SCANCODE_END          0x4f
-#define SCANCODE_CURSOR_DOWN  0x50
-#define SCANCODE_PAGE_DOWN    0x51
-#define SCANCODE_INSERT       0x52
-#define SCANCODE_DELETE       0x53
-#define SCANCODE_LGUI         0x5b
-#define SCANCODE_RGUI         0x5c
-#define SCANCODE_APPS         0x5d
-#define SCANCODE_POWER        0x5e
-#define SCANCODE_SLEEP        0x5f
-#define SCANCODE_WAKE         0x63
-#define SCANCODE_WWW_SEARCH   0x65
-#define SCANCODE_WWW_FAVS     0x66
-#define SCANCODE_WWW_REF      0x67
-#define SCANCODE_WWW_STOP     0x68
-#define SCANCODE_WWW_FORDWARD 0x69
-#define SCANCODE_WWW_BACK     0x6a
-#define SCANCODE_MY_COMP      0x6b
-#define SCANCODE_EMAIL        0x6c
-#define SCANCODE_MEDIA_SEL    0x6d
-
-// theyre just here as a note
-#define SCANCODE_PRINTSCRN 0xe0, 0x2a, 0xe0, 0x37
-#define SCANCODE_PAUSE     0xe1, 0x1d, 0x45, 0xe1, 0x9d, 0xc5
+#define PRINTSCREEN_PRESSED_SCANCODE_2ND 0x2a
+#define PRINTSCREEN_RELEASED_SCANCODE_2ND 0xb7
+#define PAUSE_SCANCODE_1ST 0xe1
 
 // total keys: 121
 
+// keycodes
+// 4 upperbits: group (row)
+// 4 lowerbits: index (column)
+//
+// these are based on my keyboard layout
+// group | name        | keynum | keys
+// ------+-------------+--------+----------------------------------------------------------
+// 0     | Fn row      | 13     | ESC, F1 - F12
+// 1     | number row  | 14     | `, 1 - 0, -, +, BS
+// 2     | top row     | 14     | tab, qwerty, [, ], \
+// 3     | primary row | 13     | caps, asdf, ;, ', enter
+// 4     | bottow row  | 12     | lshift, zxcv, ,, ., /, rshift
+// 5     | spacebar    | 8      | lctrl, lsuper, lalt, spacebar, ralt, rsuper, menu, rctrl
+// 6     | util        | 9      | prntscrn, scrlk, pause, ins, home, pgup, del, end, pgdn
+// 7     | arrow       | 4      | up, left, down, right
+// 8     | keypad      |        | be added later
+// 9     | media       |        | be added later
+// 10    | APCI        |        | be added later
+
+#define KEYCODE_ESC (0 << 4) + 0
+#define KEYCODE_F1  (0 << 4) + 1
+#define KEYCODE_F2  (0 << 4) + 2
+#define KEYCODE_F3  (0 << 4) + 3
+#define KEYCODE_F4  (0 << 4) + 4
+#define KEYCODE_F5  (0 << 4) + 5
+#define KEYCODE_F6  (0 << 4) + 6
+#define KEYCODE_F7  (0 << 4) + 7
+#define KEYCODE_F8  (0 << 4) + 8
+#define KEYCODE_F9  (0 << 4) + 9
+#define KEYCODE_F10 (0 << 4) + 10
+#define KEYCODE_F11 (0 << 4) + 11
+#define KEYCODE_F12 (0 << 4) + 12
+
+#define KEYCODE_BACKTICK  (1 << 4) + 0
+#define KEYCODE_1         (1 << 4) + 1
+#define KEYCODE_2         (1 << 4) + 2
+#define KEYCODE_3         (1 << 4) + 3
+#define KEYCODE_4         (1 << 4) + 4
+#define KEYCODE_5         (1 << 4) + 5
+#define KEYCODE_6         (1 << 4) + 6
+#define KEYCODE_7         (1 << 4) + 7
+#define KEYCODE_8         (1 << 4) + 8
+#define KEYCODE_9         (1 << 4) + 9
+#define KEYCODE_0         (1 << 4) + 10
+#define KEYCODE_MINUS     (1 << 4) + 11
+#define KEYCODE_EQUAL     (1 << 4) + 12
+#define KEYCODE_BACKSPACE (1 << 4) + 13
+
+#define KEYCODE_TAB           (2 << 4) + 0
+#define KEYCODE_Q             (2 << 4) + 1
+#define KEYCODE_W             (2 << 4) + 2
+#define KEYCODE_E             (2 << 4) + 3
+#define KEYCODE_R             (2 << 4) + 4
+#define KEYCODE_T             (2 << 4) + 5
+#define KEYCODE_Y             (2 << 4) + 6
+#define KEYCODE_U             (2 << 4) + 7
+#define KEYCODE_I             (2 << 4) + 8
+#define KEYCODE_O             (2 << 4) + 9
+#define KEYCODE_P             (2 << 4) + 10
+#define KEYCODE_BRACKET_OPEN  (2 << 4) + 11
+#define KEYCODE_BRACKET_CLOSE (2 << 4) + 12
+#define KEYCODE_BACKSLASH     (2 << 4) + 13
+
+#define KEYCODE_CAPSLOCK     (3 << 4) + 0
+#define KEYCODE_A            (3 << 4) + 1
+#define KEYCODE_S            (3 << 4) + 2
+#define KEYCODE_D            (3 << 4) + 3
+#define KEYCODE_F            (3 << 4) + 4
+#define KEYCODE_G            (3 << 4) + 5
+#define KEYCODE_H            (3 << 4) + 6
+#define KEYCODE_J            (3 << 4) + 7
+#define KEYCODE_K            (3 << 4) + 8
+#define KEYCODE_L            (3 << 4) + 9
+#define KEYCODE_SEMICOLON    (3 << 4) + 10
+#define KEYCODE_SINGLE_QUOTE (3 << 4) + 11
+#define KEYCODE_ENTER        (3 << 4) + 12
+
+#define KEYCODE_LSHIFT (4 << 4) + 0
+#define KEYCODE_Z      (4 << 4) + 0
+#define KEYCODE_X      (4 << 4) + 0
+#define KEYCODE_C      (4 << 4) + 0
+#define KEYCODE_V      (4 << 4) + 0
+#define KEYCODE_B      (4 << 4) + 0
+#define KEYCODE_N      (4 << 4) + 0
+#define KEYCODE_M      (4 << 4) + 0
+#define KEYCODE_COMMA  (4 << 4) + 0
+#define KEYCODE_DOT    (4 << 4) + 0
+#define KEYCODE_SLASH  (4 << 4) + 0
+#define KEYCODE_RSHIFT (4 << 4) + 0
+
+#define KEYCODE_LCTRL  (5 << 4) + 0
+#define KEYCODE_LGUI (5 << 4) + 1
+#define KEYCODE_LALT   (5 << 4) + 2
+#define KEYCODE_SPACE  (5 << 4) + 3
+#define KEYCODE_RALT   (5 << 4) + 4
+#define KEYCODE_RGUI (5 << 4) + 5
+#define KEYCODE_APPS   (5 << 4) + 6
+#define KEYCODE_RCTRL  (5 << 4) + 7
+
+#define KEYCODE_PRINTSCREEN (6 << 4) + 0
+#define KEYCODE_SCROLLLOCK  (6 << 4) + 1
+#define KEYCODE_PAUSE       (6 << 4) + 2
+#define KEYCODE_INSERT      (6 << 4) + 3
+#define KEYCODE_HOME        (6 << 4) + 4
+#define KEYCODE_PAGE_UP     (6 << 4) + 5
+#define KEYCODE_DELETE      (6 << 4) + 6
+#define KEYCODE_END         (6 << 4) + 7
+#define KEYCODE_PAGE_DOWN   (6 << 4) + 8
+
+#define KEYCODE_UP    (7 << 4) + 0
+#define KEYCODE_LEFT  (7 << 4) + 1
+#define KEYCODE_DOWN  (7 << 4) + 2
+#define KEYCODE_RIGHT (7 << 4) + 3
+
 struct key {
-    unsigned char scancode;
     unsigned char keycode;
-    char mapped;
     bool released;
 };
+
+enum KEYBOARD_LAYOUT {
+    KBL_US
+};
+
+unsigned char get_keycode(unsigned char group, unsigned char no);
+unsigned char key_map(unsigned char keycode, unsigned int layout);
+bool is_key_pressed(unsigned char keycode);
 
 bool is_capslock_on(); 
 bool is_scrolllock_on();
