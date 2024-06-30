@@ -47,11 +47,7 @@ void print_typed_char(struct key k) {
 }
 
 void main() {
-    cls(0x0f);
-
-    bool a20_enabled = enable_a20();
-    if(a20_enabled) print_string("A20 enabled\n", -1, 0, true);
-    else print_string("failed to enable A20, giving up\n", -1, 0, true);
+    // cls(0x0f);
 
     gdt_init();
     idt_init();

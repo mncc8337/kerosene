@@ -31,6 +31,4 @@ init_pm:
     mov ebp, 0x90000  ; update the stack position so it is right
     mov esp, ebp      ; at the top of the free space
 
-    call BEGIN_PM     ; finally, call some well-known label
-
-    jmp $
+    jmp BEGIN_PM     ; finally, call some well-known label

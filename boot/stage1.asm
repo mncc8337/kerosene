@@ -1,6 +1,6 @@
 [org 0x7c00]
 
-boot: jmp b_main
+jmp first_stage
 
 times 3 - ($ - $$) db 0x90   ; Support 2 or 3 byte encoded JMPs before BPB.
 
@@ -25,23 +25,17 @@ volumeID:          dd    0x2d7e5a1a
 volumeLabel:       db    "S_OS       "
 fileSysType:       db    "FAT12   "
 
-
 %include "print_string.asm"
 %include "print_hex.asm"
 %include "disk_load.asm"
-%include "switch_to_pm.asm"
-%include "print_string_pm.asm"
 
-[bits 16]
-
-new_line: db 0xd, 0xa, 0
-
-boot_msg: db "booted into drive ", 0
-kernel_loaded_msg: db "kernel loaded", 0xd, 0xa, 0
+boot_stage1_msg: db "first stage loaded", 0xd, 0xa, 0
+stage2_loaded_msg: db "second stage loaded", 0xd, 0xa, 0
 
 BOOT_DRIVE: db 0
 
-b_main:
+[bits 16]
+first_stage:
     cli
     cld
 
@@ -56,33 +50,30 @@ b_main:
 
     mov [BOOT_DRIVE], dl ; remember boot drive stored in dl
 
-    mov si, boot_msg
-    call print_string
-    mov dx, [BOOT_DRIVE]
-    xor dh, dh
-    call print_hex
-    mov si, new_line
+    ; clear screen
+    mov ah, 0x00
+    mov al, 0x03
+    int 0x10
+
+    mov si, boot_stage1_msg
     call print_string
 
-    ; load kernel
-    mov bx, KERNEL_OFFSET
-    mov dh, KERNEL_PADDING
+    ; load second stage
+    mov bx, SECOND_STAGE_OFFSET
+    mov cl, 0x2
+    mov dh, 2
     mov dl, [BOOT_DRIVE]
     call disk_load
 
-    mov si, kernel_loaded_msg
+    mov si, stage2_loaded_msg
     call print_string
 
-    call switch_to_pm
+    mov ax, [BOOT_DRIVE]
+    mov ah, 0
+    mov [SECOND_STAGE_OFFSET], ax
 
-    jmp $
-
-[bits 32]
-BEGIN_PM:
-    ; now jump to the kernel and never come back
-    call KERNEL_OFFSET
-
-    jmp $
+    ; now jump to stage 2
+    jmp 0x0:SECOND_STAGE_OFFSET + 2
 
 times 510 - ($ - $$) db 0
 dw 0xaa55

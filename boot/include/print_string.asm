@@ -1,4 +1,5 @@
-; print string pointed by si
+; in
+;   si, string to print
 print_string:
     pusha
     mov ah, 0xe

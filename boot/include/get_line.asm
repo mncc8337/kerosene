@@ -1,5 +1,7 @@
-; set string whose memory address is stored in si to user string input
-; return char count cx
+; in
+;   si: store address
+; out
+;   cx: string length
 get_line:
     mov cx, 0
 .get_char:

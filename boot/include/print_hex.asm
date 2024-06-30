@@ -1,4 +1,5 @@
-; print hex value in dx
+; in
+;   dx: hex to print
 print_hex:
     pusha
     mov ah, 0xe
