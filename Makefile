@@ -1,49 +1,82 @@
-C_SRC = $(wildcard kernel/*.c kernel/driver/*.c kernel/system/*.c)
-C_OBJ = $(addsuffix .o, $(basename $(notdir $(C_SRC))))
+CC = gcc
+ASM = nasm
+QEMU = qemu-system-i386
+
+C_SRC = kernel/*.c \
+		kernel/utils/*.c \
+		kernel/system/*.c \
+		kernel/driver/*.c \
+		kernel/mem/*.c \
+
+C_SRC_WILDCARD = $(wildcard $(C_SRC))
+A_SRC_WILDCARD = $(wildcard $(A_SRC))
+OBJ = $(addsuffix .o, $(basename $(notdir $(C_SRC_WILDCARD))))
 
 # number of sectors that the kernel will fit in
-KERNEL_PADDING = 15
-# memory address that the kernel will be loaded to
-KERNEL_OFFSET = 0x1000
+KERNEL_SECTOR_COUNT = 30
 # memory address that second stage bootloader will be loaded to
-SECOND_STAGE_OFFSET= 0x7e00
+SECOND_STAGE_ADDR = 0x7e00
+# memory address that memmap entry count will be loaded to
+MMAP_ENTRY_CNT_ADDR = 0x8000
+# memory address that memmap will be loaded to
+MMAP_ADDR = 0xB00
+# memory address that the kernel will be loaded to
+KERNEL_ADDR = 0x1000
 
-DEFINES = -DKERNEL_PADDING=$(KERNEL_PADDING) \
-		  -DKERNEL_OFFSET=$(KERNEL_OFFSET) \
-		  -DSECOND_STAGE_OFFSET=$(SECOND_STAGE_OFFSET)
+DEFINES = -DKERNEL_SECTOR_COUNT=$(KERNEL_SECTOR_COUNT) \
+		  -DSECOND_STAGE_ADDR=$(SECOND_STAGE_ADDR) \
+		  -DMMAP_ENTRY_CNT_ADDR=$(MMAP_ENTRY_CNT_ADDR) \
+		  -DMMAP_ADDR=$(MMAP_ADDR) \
+		  -DKERNEL_ADDR=$(KERNEL_ADDR)
+
+C_INCLUDES = -I./kernel/include
 
 C_FLAGS = $(DEFINES) -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles
-LD_FLAGS = -T linker.ld -m elf_i386
-NASM_FLAGS = $(DEFINES) -f elf
+LD_FLAGS = -T linker.ld -m elf_i386 -nostdlib --nmagic
+NASM_FLAGS = $(DEFINES) -f elf32 -F dwarf
+
+QEMU_FLAGS = -m 64M
 
 all: disk.img
 
 stage1.bin: boot/stage1.asm
-	nasm -f bin -o $@ -I./boot/include $< $(DEFINES)
+	$(ASM) -f bin -o $@ -I./boot/include $< $(DEFINES)
 stage2.bin: boot/stage2.asm
-	nasm -f bin -o $@ -I./boot/include $< $(DEFINES)
-bootsect.bin: stage1.bin stage2.bin
+	$(ASM) -f bin -o $@ -I./boot/include $< $(DEFINES)
+bootloader.bin: stage1.bin stage2.bin
 	cat $^ > $@
 
 kernel_entry.o: kernel/kernel_entry.asm
-	nasm $(NASM_FLAGS) -o $@ $<
+	$(ASM) $(NASM_FLAGS) -o $@ $<
 %.o: kernel/%.c
-	gcc $(C_FLAGS) -o $@ -I./kernel/include -c $<
+	$(CC) $(C_FLAGS) -o $@ $(C_INCLUDES) -c $<
 %.o: kernel/driver/%.c
-	gcc $(C_FLAGS) -o $@ -I./kernel/include -c $<
+	$(CC) $(C_FLAGS) -o $@ $(C_INCLUDES) -c $<
 %.o: kernel/system/%.c
-	gcc $(C_FLAGS) -o $@ -I./kernel/include -c $<
+	$(CC) $(C_FLAGS) -o $@ $(C_INCLUDES) -c $<
+%.o: kernel/utils/%.c
+	$(CC) $(C_FLAGS) -o $@ $(C_INCLUDES) -c $<
+%.o: kernel/mem/%.c
+	$(CC) $(C_FLAGS) -o $@ $(C_INCLUDES) -c $<
 
-kernel.bin: kernel_entry.o $(C_OBJ)
-	ld $(LD_FLAGS) -o kernel.bin -Ttext $(KERNEL_OFFSET) $^ --oformat binary
-	dd if=/dev/zero of=$@ bs=512 count=0 seek=$(KERNEL_PADDING)
+kernel.elf: kernel_entry.o $(OBJ)
+	ld $(LD_FLAGS) -o $@ -Ttext $(KERNEL_ADDR) $^
+kernel.bin: kernel.elf
+	objcopy -O binary $< $@
+	dd if=/dev/zero of=$@ bs=512 count=0 seek=$(KERNEL_SECTOR_COUNT)
 
-disk.img: bootsect.bin kernel.bin
+disk.img: bootloader.bin kernel.bin
 	cat $^ > $@
 
 run: all
-	qemu-system-i386 disk.img
+	$(QEMU) disk.img $(QEMU_FLAGS)
 debug: all
-	qemu-system-i386 disk.img -s -S
+	$(QEMU) disk.img $(QEMU_FLAGS) -s -S &
+	gdb kernel.elf  \
+        -ex 'target remote localhost:1234' \
+        -ex 'layout src' \
+        -ex 'layout reg' \
+        -ex 'break main' \
+        -ex 'continue'
 clean:
-	rm *.bin *.o *.img
+	rm *.bin *.o *.elf *.img

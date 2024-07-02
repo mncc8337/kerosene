@@ -36,7 +36,7 @@ unsigned char *exception_message[] = {
     "Reserved"
 };
 
-void exception_handler(struct regs* r) {
+void exception_handler(regs* r) {
     print_string("Exception: ", 0, WHITE, true);
     print_string(exception_message[r->int_no], -1, LIGHT_RED, true);
     print_string(".\nSystem Halted!", -1, WHITE, true);

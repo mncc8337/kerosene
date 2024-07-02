@@ -221,7 +221,7 @@ char* kbd_input;
 unsigned int kbd_input_len = 0;
 char endding_char = 0;
 bool has_job = false;
-void (*callback)(struct key);
+void (*callback)(key);
 
 void emit_end() {
     // reset
@@ -234,7 +234,7 @@ void emit_end() {
 }
 
 // TODO: handle print screen and pause
-void kbd_handler(struct regs* r) {
+void kbd_handler(regs* r) {
     ps2_wait_for_reading_data();
     unsigned char scancode = ps2_read_data();
     bool extended_byte = false;
@@ -299,7 +299,7 @@ void kbd_handler(struct regs* r) {
     else if(capslock_on && mapped >= 0x61 && mapped <= 0x7a)
         mapped -= 32;
 
-    struct key k;
+    key k;
     k.keycode = kcode;
     k.released = released;
 
@@ -357,7 +357,7 @@ void get_char(char* dest) {
     // block process until done
     while(!input_end) SYS_SLEEP;
 }
-void get_string(char* dest, char _endding_char, void (*_callback)(struct key)) {
+void get_string(char* dest, char _endding_char, void (*_callback)(key)) {
     input_end = false;
     kbd_input = dest;
     endding_char = _endding_char;

@@ -12,3 +12,4 @@ to test it just run `make run`
 - http://www.osdever.net/bkerndev/Docs/gettingstarted.htm
 - https://github.com/garciart/hello-os
 - http://wiki.osdev.org/Expanded_Main_Page
+- http://www.brokenthorn.com/Resources/OSDev17.html

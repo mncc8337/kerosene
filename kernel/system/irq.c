@@ -7,7 +7,7 @@ void *irq_routines[16] = {
 };
 
 // install custom handler
-void irq_install_handler(int irq, void (*handler)(struct regs *r)) {
+void irq_install_handler(int irq, void (*handler)(regs *r)) {
     irq_routines[irq] = handler;
 }
 void irq_uninstall_handler(int irq) {
@@ -23,9 +23,9 @@ void irq_init() {
         idt_set_descriptor(vector + 32, irq_table[vector], 0x8e);
 }
 
-void irq_handler(struct regs *r) {
+void irq_handler(regs *r) {
     // blank function
-    void (*handler)(struct regs *r);
+    void (*handler)(regs *r);
 
     handler = irq_routines[r->int_no - 32];
     if(handler)

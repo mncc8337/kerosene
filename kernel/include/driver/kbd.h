@@ -125,10 +125,10 @@
 #define KEYCODE_DOWN  (7 << 4) + 2
 #define KEYCODE_RIGHT (7 << 4) + 3
 
-struct key {
+typedef struct {
     unsigned char keycode;
     bool released;
-};
+} key;
 
 enum KEYBOARD_LAYOUT {
     KBL_US
@@ -143,6 +143,6 @@ bool is_scrolllock_on();
 bool is_numlock_on();
 
 void get_char(char* dest);
-void get_string(char* dest, char end, void (*_callback)(struct key));
+void get_string(char* dest, char end, void (*_callback)(key));
 
 void kbd_init();

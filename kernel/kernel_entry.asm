@@ -7,13 +7,12 @@ DATA_SEG equ 0x10
 extern main
 jmp main
 
-; some asm function to be used in C
+;;;;;;;;;;;;;;;;;
 
-; GDT
-global gdt_flush ; allow the C code to link to this
-extern gp
+global gdt_flush
+extern gdtr
 gdt_flush:
-    lgdt [gp]
+    lgdt [gdtr]
     jmp CODE_SEG:.flush ; far jump to flush all caches
 .flush:
     mov ax, DATA_SEG
@@ -22,7 +21,7 @@ gdt_flush:
     mov fs, ax
     mov gs, ax
     mov ss, ax
-    ret ; return to C
+    ret
 
 ; IDT
 global load_idt
@@ -113,7 +112,7 @@ isr_table:
 %assign i i+1
 %endrep
 
-;IRQ
+; IRQ
 %assign i 0 
 %rep 16
 irq_stub_%+i:

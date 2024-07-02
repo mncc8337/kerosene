@@ -4,22 +4,15 @@
 
 #define SYS_SLEEP asm volatile("sti; hlt; cli") 
 
-// no bool in plain C so i make one
-typedef enum {false, true} bool;
+#include <stdint.h>
+#include <stdbool.h>
 
-struct regs {
+typedef struct {
     unsigned int gs, fs, es, ds;
     unsigned int edi, esi, ebp, esp, ebx, edx, ecx, eax;
     unsigned int int_no, err_code;
     unsigned int eip, cs, eflags, useresp, ss; 
-} __attribute__((packed));
-
-// string.h
-int string_len(char* str);
-char* to_string(int num);
-bool string_cmp(char* str1, char* str2);
-char* substr(char* str, unsigned int p1, unsigned int p2);
-void tokenize(char* string, char sep, int*, int* token_count);
+} __attribute__((packed)) regs;
 
 // port_io.c
 unsigned char port_inb(unsigned short port);
@@ -29,17 +22,17 @@ void port_outw(unsigned short port, unsigned short data);
 void io_wait();
 
 // gdt.c
-void gdt_set_gate(int num, unsigned long base, unsigned long limit, unsigned char access, unsigned char gran);
+void gdt_set_gate(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran);
 void gdt_init();
 
 // idt.c
 void idt_init();
-void idt_set_descriptor(unsigned char vector, void* isr, unsigned char flags);
+void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags);
 
 // isr.c
 void isr_init();
 
 // irq.c
 void irq_init();
-void irq_install_handler(int irq, void (*handler)(struct regs *r));
+void irq_install_handler(int irq, void (*handler)(regs *r));
 void irq_uninstall_handler(int irq);

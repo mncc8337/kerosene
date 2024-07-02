@@ -25,28 +25,27 @@ volumeID:          dd    0x2d7e5a1a
 volumeLabel:       db    "S_OS       "
 fileSysType:       db    "FAT12   "
 
-%include "print_string.asm"
-%include "print_hex.asm"
-%include "disk_load.asm"
+%include "rm/print_string.asm"
+%include "rm/disk_load.asm"
 
 boot_stage1_msg: db "first stage loaded", 0xd, 0xa, 0
-stage2_loaded_msg: db "second stage loaded", 0xd, 0xa, 0
+kernel_loaded_msg: db "kernel loaded", 0xd, 0xa, 0
 
 BOOT_DRIVE: db 0
 
 [bits 16]
 first_stage:
-    cli
-    cld
 
     xor ax, ax
     mov ds, ax
     mov es, ax
 
-    mov ss, ax
-
-    mov bp, 0x7c00 ; set the stack
-    mov sp, bp
+    mov bx, 0x7c00 ; set the stack
+    cli
+    mov ss, bx
+    mov sp, ax
+    sti
+    cld
 
     mov [BOOT_DRIVE], dl ; remember boot drive stored in dl
 
@@ -59,21 +58,24 @@ first_stage:
     call print_string
 
     ; load second stage
-    mov bx, SECOND_STAGE_OFFSET
+    mov bx, SECOND_STAGE_ADDR
     mov cl, 0x2
     mov dh, 2
     mov dl, [BOOT_DRIVE]
     call disk_load
 
-    mov si, stage2_loaded_msg
+    ; load kernel
+    mov bx, KERNEL_ADDR
+    mov cl, 4 ; kernel start in sector 4
+    mov dh, KERNEL_SECTOR_COUNT
+    mov dl, [BOOT_DRIVE]
+    call disk_load
+
+    mov si, kernel_loaded_msg
     call print_string
 
-    mov ax, [BOOT_DRIVE]
-    mov ah, 0
-    mov [SECOND_STAGE_OFFSET], ax
-
     ; now jump to stage 2
-    jmp 0x0:SECOND_STAGE_OFFSET + 2
+    jmp SECOND_STAGE_ADDR
 
 times 510 - ($ - $$) db 0
 dw 0xaa55
