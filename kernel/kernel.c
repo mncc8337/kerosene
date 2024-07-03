@@ -41,14 +41,12 @@ void print_typed_char(key k) {
     print_string(itoa(_row, freebuff, 10), MAX_COLS * 2 - 5, 0, false);
     print_string(itoa(_col, freebuff, 10), MAX_COLS * 2 - 2, 0, false);
 
-    unsigned char mapped = key_map(k.keycode, KBL_US);
-
-    if(mapped == '\b') {
+    if(k.mapped == '\b') {
         set_cursor(get_cursor() - 1); // move back
         print_char(' ', -1, 0, false); // delete printed char
     }
     else {
-        print_char(mapped, -1, 0, true);
+        print_char(k.mapped, -1, 0, true);
     }
 }
 

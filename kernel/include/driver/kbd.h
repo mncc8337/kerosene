@@ -89,24 +89,24 @@
 #define KEYCODE_ENTER        (3 << 4) + 12
 
 #define KEYCODE_LSHIFT (4 << 4) + 0
-#define KEYCODE_Z      (4 << 4) + 0
-#define KEYCODE_X      (4 << 4) + 0
-#define KEYCODE_C      (4 << 4) + 0
-#define KEYCODE_V      (4 << 4) + 0
-#define KEYCODE_B      (4 << 4) + 0
-#define KEYCODE_N      (4 << 4) + 0
-#define KEYCODE_M      (4 << 4) + 0
-#define KEYCODE_COMMA  (4 << 4) + 0
-#define KEYCODE_DOT    (4 << 4) + 0
-#define KEYCODE_SLASH  (4 << 4) + 0
-#define KEYCODE_RSHIFT (4 << 4) + 0
+#define KEYCODE_Z      (4 << 4) + 1
+#define KEYCODE_X      (4 << 4) + 2
+#define KEYCODE_C      (4 << 4) + 3
+#define KEYCODE_V      (4 << 4) + 4
+#define KEYCODE_B      (4 << 4) + 5
+#define KEYCODE_N      (4 << 4) + 6
+#define KEYCODE_M      (4 << 4) + 7
+#define KEYCODE_COMMA  (4 << 4) + 8
+#define KEYCODE_DOT    (4 << 4) + 9
+#define KEYCODE_SLASH  (4 << 4) + 10
+#define KEYCODE_RSHIFT (4 << 4) + 11
 
 #define KEYCODE_LCTRL  (5 << 4) + 0
-#define KEYCODE_LGUI (5 << 4) + 1
+#define KEYCODE_LGUI   (5 << 4) + 1
 #define KEYCODE_LALT   (5 << 4) + 2
 #define KEYCODE_SPACE  (5 << 4) + 3
 #define KEYCODE_RALT   (5 << 4) + 4
-#define KEYCODE_RGUI (5 << 4) + 5
+#define KEYCODE_RGUI   (5 << 4) + 5
 #define KEYCODE_APPS   (5 << 4) + 6
 #define KEYCODE_RCTRL  (5 << 4) + 7
 
@@ -127,6 +127,7 @@
 
 typedef struct {
     unsigned char keycode;
+    unsigned char mapped;
     bool released;
 } key;
 
@@ -135,7 +136,9 @@ enum KEYBOARD_LAYOUT {
 };
 
 unsigned char get_keycode(unsigned char group, unsigned char no);
+unsigned char key_shift_map(unsigned char keycode, unsigned int layout);
 unsigned char key_map(unsigned char keycode, unsigned int layout);
+
 bool is_key_pressed(unsigned char keycode);
 
 bool is_capslock_on(); 

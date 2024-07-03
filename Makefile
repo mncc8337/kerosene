@@ -35,7 +35,7 @@ C_FLAGS = $(DEFINES) -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostart
 LD_FLAGS = -T linker.ld -m elf_i386 -nostdlib --nmagic
 NASM_FLAGS = $(DEFINES) -f elf32 -F dwarf
 
-QEMU_FLAGS = -m 64M
+QEMU_FLAGS = -m 64M -debugcon stdio -no-reboot
 
 all: disk.img
 
@@ -69,10 +69,10 @@ disk.img: bootloader.bin kernel.bin
 	cat $^ > $@
 
 run: all
-	$(QEMU) disk.img $(QEMU_FLAGS)
+	$(QEMU) -drive file=disk.img,format=raw $(QEMU_FLAGS)
 debug: all
-	$(QEMU) disk.img $(QEMU_FLAGS) -s -S &
-	gdb kernel.elf  \
+	$(QEMU) -drive file=disk.img,format=raw $(QEMU_FLAGS) -s -S &
+	gdb kernel.elf \
         -ex 'target remote localhost:1234' \
         -ex 'layout src' \
         -ex 'layout reg' \

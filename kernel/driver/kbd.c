@@ -233,11 +233,12 @@ void emit_end() {
     input_end = true;
 }
 
-// TODO: handle print screen and pause
+// should i send EOI before calling ps2_read_data()?
 void kbd_handler(regs* r) {
     ps2_wait_for_reading_data();
     unsigned char scancode = ps2_read_data();
     bool extended_byte = false;
+
     if(scancode == EXTENDED_BYTE) {
         ps2_wait_for_reading_data();
         scancode = ps2_read_data();
@@ -293,14 +294,17 @@ void kbd_handler(regs* r) {
     if(input_end) return;
 
     char mapped = keymap[kcode];
-    if((key_pressed[KEYCODE_LSHIFT] || key_pressed[KEYCODE_RSHIFT]) && !capslock_on)
-        mapped = keymap_shift[kcode];
+    if(key_pressed[KEYCODE_LSHIFT] || key_pressed[KEYCODE_RSHIFT])
+        if(mapped < 0x61 || mapped > 0x7a)
+            mapped = keymap_shift[kcode];
+        else if(!capslock_on) mapped = keymap_shift[kcode];
     // convert to uppercase if only capslock is on
-    else if(capslock_on && mapped >= 0x61 && mapped <= 0x7a)
+    if(capslock_on && mapped >= 0x61 && mapped <= 0x7a && !key_pressed[KEYCODE_LSHIFT] && !key_pressed[KEYCODE_RSHIFT])
         mapped -= 32;
 
     key k;
     k.keycode = kcode;
+    k.mapped = mapped;
     k.released = released;
 
     if(!released) {
@@ -338,6 +342,14 @@ unsigned char key_map(unsigned char keycode, unsigned int layout) {
             return keymap[keycode];
         default:
             return keymap[keycode];
+    }
+}
+unsigned char key_shift_map(unsigned char keycode, unsigned int layout) {
+    switch(layout) {
+        case KBL_US:
+            return keymap_shift[keycode];
+        default:
+            return keymap_shift[keycode];
     }
 }
 
