@@ -7,6 +7,11 @@
 
 #include "utils.h"
 
+typedef struct {
+    uint32_t memmap_ptr;
+    size_t memmap_entry_count;
+} __attribute__((packed)) bootinfo_t;
+
 const unsigned int TIMER_PHASE = 100;
 
 // free mem everyone
@@ -50,9 +55,9 @@ void print_typed_char(key k) {
     }
 }
 
-void mem_init() {
-    unsigned int memmap_cnt = *(int*)MMAP_ENTRY_CNT_ADDR;
-    memmap_entry_t* entry = (memmap_entry_t*)MMAP_ADDR;
+void mem_init(bootinfo_t bootinfo) {
+    size_t memmap_cnt = bootinfo.memmap_entry_count;
+    memmap_entry_t* entry = (memmap_entry_t*)bootinfo.memmap_ptr;
 
     // spent way too much time on this table
     print_string("--[MEMORY]-+------------+-------------------\n", -1, 0, true);
@@ -135,13 +140,13 @@ void mem_init() {
     pmmngr_deinit_region(KERNEL_ADDR + KERNEL_SECTOR_COUNT * 512, 0x40000);
 }
 
-void main() {
+void main(bootinfo_t bootinfo) {
     // greeting msg to let us know we are in the kernel
     print_string("hello\n", -1, LIGHT_CYAN, true);
     print_string("this is ", -1, LIGHT_GREEN, true);
     print_string("the kernel\n", -1, LIGHT_RED, true);
 
-    mem_init();
+    mem_init(bootinfo);
 
     gdt_init();
     idt_init();

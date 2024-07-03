@@ -74,6 +74,14 @@ BEGIN_PM:
     mov ebx, 400
     call print_string_pm
 
+    ; preparing boot info
+    ; entry cnt
+    mov edx, [MMAP_ENTRY_CNT_ADDR]
+    push edx
+
+    ; memmap entry ptr
+    push MMAP_ADDR
+
     call KERNEL_ADDR
     cli
 loopend:                ; infinite loop when finished
