@@ -1,3 +1,7 @@
+# my cross compiler
+cross
+
+# various bins
 *.o
 *.elf
 *.bin

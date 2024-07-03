@@ -145,7 +145,6 @@ bool is_capslock_on();
 bool is_scrolllock_on();
 bool is_numlock_on();
 
-void get_char(char* dest);
-void get_string(char* dest, char end, void (*_callback)(key));
+void set_key_listener(void (*klis)(key));
 
 void kbd_init();

@@ -166,10 +166,7 @@ void main(bootinfo_t bootinfo) {
     // make cursor slimmer
     enable_cursor(13, 14);
 
-    char inp[512];
+    set_key_listener(print_typed_char);
 
-    while(true) {
-        get_string(inp, '\n', print_typed_char);
-        print_char('\n', -1, 0, true);
-    }
+    while(true);
 }

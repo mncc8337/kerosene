@@ -216,61 +216,56 @@ bool capslock_on = false;
 bool scrolllock_on = false;
 bool numlock_on = false;
 
-bool input_end = false;
-char* kbd_input;
-unsigned int kbd_input_len = 0;
-char endding_char = 0;
-bool has_job = false;
-void (*callback)(key);
+key current_key;
+void (*key_listener)(key);
 
-void emit_end() {
-    // reset
-    kbd_input = 0;
-    kbd_input_len = 0;
-    endding_char = 0;
-    callback = 0;
-    // toggle flag
-    input_end = true;
+// predefined it here to be used in trash interrupt handler
+void kbd_handler(regs* r);
+
+unsigned char interrupt_progress_cnt = 0;
+unsigned char interrupt_loop_cnt = 0;
+void kbd_trash_int_handler() {
+    ps2_wait_for_reading_data();
+    ps2_read_data();
+    interrupt_progress_cnt++;
+    // loop for sometime to discard useless interrupts
+    if(interrupt_progress_cnt == interrupt_loop_cnt) {
+        interrupt_progress_cnt = 0;
+        // reinstall the default handler
+        irq_install_handler(1, kbd_handler);
+    }
 }
 
-// should i send EOI before calling ps2_read_data()?
+bool extended_byte = false;
 void kbd_handler(regs* r) {
     ps2_wait_for_reading_data();
     unsigned char scancode = ps2_read_data();
-    bool extended_byte = false;
 
     if(scancode == EXTENDED_BYTE) {
-        ps2_wait_for_reading_data();
-        scancode = ps2_read_data();
+        // turn on the flag 
         extended_byte = true;
-
-        // if printscreen pressed or released
-        if(scancode == PRINTSCREEN_PRESSED_SCANCODE_2ND) {
-            // trash other interrupt
-            ps2_wait_for_reading_data(); ps2_read_data();
-            ps2_wait_for_reading_data(); ps2_read_data();
-            // change to 0x6e so that it is matched
-            // to the defined position in keycode_extended_byte
-            scancode = 0x6e;
-        }
-        else if(scancode == PRINTSCREEN_RELEASED_SCANCODE_2ND) {
-            // trash other interrupt
-            ps2_wait_for_reading_data(); ps2_read_data();
-            ps2_wait_for_reading_data(); ps2_read_data();
-            // add 0x80 because it is released
-            scancode = 0x6e + 0x80;
-        }
+        // skip
+        return;
     }
-    // if pause
     else if(scancode == PAUSE_SCANCODE_1ST) {
-        extended_byte = true;
-        // trash other interrupts
-        ps2_wait_for_reading_data(); ps2_read_data();
-        ps2_wait_for_reading_data(); ps2_read_data();
-        ps2_wait_for_reading_data(); ps2_read_data();
-        ps2_wait_for_reading_data(); ps2_read_data();
-        ps2_wait_for_reading_data(); ps2_read_data();
-        scancode = 0x6f;
+        interrupt_loop_cnt = 5;
+        irq_install_handler(1, kbd_trash_int_handler);
+
+        current_key.keycode = keycode_extended_byte[0x6f];
+        current_key.mapped = 0;
+        current_key.released = false;
+        goto call_key_listener;
+    }
+
+    if(extended_byte && scancode == PRINTSCREEN_PRESSED_SCANCODE_2ND || scancode == PRINTSCREEN_RELEASED_SCANCODE_2ND) {
+        key_pressed[0x6e] = (scancode == PRINTSCREEN_PRESSED_SCANCODE_2ND);
+        interrupt_loop_cnt = 2;
+        irq_install_handler(1, kbd_trash_int_handler);
+
+        current_key.keycode = keycode_extended_byte[0x6e];
+        current_key.mapped = 0;
+        current_key.released = (scancode == PRINTSCREEN_RELEASED_SCANCODE_2ND);
+        goto call_key_listener;
     }
 
     bool released = (scancode & 0x80) == 0x80;
@@ -291,8 +286,6 @@ void kbd_handler(regs* r) {
     // if(kcode == KEYCODE_NUMLOCK && !released)
     //     numlock_on = !numlock_on;
 
-    if(input_end) return;
-
     char mapped = keymap[kcode];
     if(key_pressed[KEYCODE_LSHIFT] || key_pressed[KEYCODE_RSHIFT])
         if(mapped < 0x61 || mapped > 0x7a)
@@ -302,34 +295,15 @@ void kbd_handler(regs* r) {
     if(capslock_on && mapped >= 0x61 && mapped <= 0x7a && !key_pressed[KEYCODE_LSHIFT] && !key_pressed[KEYCODE_RSHIFT])
         mapped -= 32;
 
-    key k;
-    k.keycode = kcode;
-    k.mapped = mapped;
-    k.released = released;
+    current_key.keycode = kcode;
+    current_key.mapped = mapped;
+    current_key.released = released;
+    
+call_key_listener:
+    key_listener(current_key);
 
-    if(!released) {
-        if(mapped != endding_char) {
-            if(mapped != '\b' || endding_char == 0) {
-                kbd_input[kbd_input_len] = mapped;
-                kbd_input_len++;
-
-                 // if get_char then end
-                if(endding_char == 0) emit_end();
-                else callback(k);
-            }
-            else if(kbd_input_len > 0) {
-                kbd_input_len--;
-                kbd_input[kbd_input_len] = ' ';
-                callback(k);
-            }
-            // dont send callback when cannot erase more
-        }
-        else {
-            // add null terminator
-            kbd_input[kbd_input_len] = '\0';
-            emit_end();
-        }
-    }
+    // reset extended_byte status
+    extended_byte = false;
 }
 
 unsigned char get_keycode(unsigned char group, unsigned char no) {
@@ -361,22 +335,8 @@ bool is_capslock_on() { return capslock_on; }
 bool is_scrolllock_on() { return scrolllock_on; }
 bool is_numlock_on() { return numlock_on; }
 
-void get_char(char* dest) {
-    input_end = false;
-    kbd_input = dest;
-    endding_char = 0;
-
-    // block process until done
-    while(!input_end) SYS_SLEEP;
-}
-void get_string(char* dest, char _endding_char, void (*_callback)(key)) {
-    input_end = false;
-    kbd_input = dest;
-    endding_char = _endding_char;
-    callback = _callback;
-
-    // block process until done
-    while(!input_end) SYS_SLEEP;
+void set_key_listener(void (*klis)(key)) {
+    key_listener = klis;
 }
 
 void kbd_init() {

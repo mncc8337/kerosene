@@ -1,4 +1,9 @@
-CC = gcc
+TARGET = i686-elf
+CROSS_COMPILER_LOC = ./cross/bin/
+
+CC = $(CROSS_COMPILER_LOC)$(TARGET)-gcc
+# LD = $(CROSS_COMPILER_LOC)$(TARGET)-ld
+GDB = gdb
 ASM = nasm
 QEMU = qemu-system-i386
 
@@ -31,11 +36,13 @@ DEFINES = -DKERNEL_SECTOR_COUNT=$(KERNEL_SECTOR_COUNT) \
 
 C_INCLUDES = -I./kernel/include
 
-C_FLAGS = $(DEFINES) -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles
-LD_FLAGS = -T linker.ld -m elf_i386 -nostdlib --nmagic
-NASM_FLAGS = $(DEFINES) -f elf32 -F dwarf
+# CFLAGS = $(DEFINES) -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles
+# LDFLAGS = -T linker.ld -m elf_i386 -nostdlib --nmagic
+CFLAGS = $(DEFINES) -ffreestanding -O3 -Wall -Wextra -std=gnu99
+LDFLAGS = -T linker.ld -nostdlib -lgcc
+NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
 
-QEMU_FLAGS = -m 64M -debugcon stdio -no-reboot
+QEMUFLAGS = -m 64M -debugcon stdio -no-reboot
 
 all: disk.img
 
@@ -47,20 +54,21 @@ bootloader.bin: stage1.bin stage2.bin
 	cat $^ > $@
 
 kernel_entry.o: kernel/kernel_entry.asm
-	$(ASM) $(NASM_FLAGS) -o $@ $<
+	$(ASM) $(NASMFLAGS) -o $@ $<
 %.o: kernel/%.c
-	$(CC) $(C_FLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 %.o: kernel/driver/%.c
-	$(CC) $(C_FLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 %.o: kernel/system/%.c
-	$(CC) $(C_FLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 %.o: kernel/utils/%.c
-	$(CC) $(C_FLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 %.o: kernel/mem/%.c
-	$(CC) $(C_FLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
 kernel.elf: kernel_entry.o $(OBJ)
-	ld $(LD_FLAGS) -o $@ -Ttext $(KERNEL_ADDR) $^
+	# im using GCC to link instead of LD because LD cannot find the libgcc
+	$(CC) $(LDFLAGS) -o $@ -Ttext $(KERNEL_ADDR) $^
 kernel.bin: kernel.elf
 	objcopy -O binary $< $@
 	dd if=/dev/zero of=$@ bs=512 count=0 seek=$(KERNEL_SECTOR_COUNT)
@@ -69,10 +77,10 @@ disk.img: bootloader.bin kernel.bin
 	cat $^ > $@
 
 run: all
-	$(QEMU) -drive file=disk.img,format=raw $(QEMU_FLAGS)
+	$(QEMU) -drive file=disk.img,format=raw $(QEMUFLAGS)
 debug: all
-	$(QEMU) -drive file=disk.img,format=raw $(QEMU_FLAGS) -s -S &
-	gdb kernel.elf \
+	$(QEMU) -drive file=disk.img,format=raw $(QEMUFLAGS) -s -S &
+	$(GDB) kernel.elf \
         -ex 'target remote localhost:1234' \
         -ex 'layout src' \
         -ex 'layout reg' \
