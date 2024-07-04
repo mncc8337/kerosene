@@ -1,7 +1,7 @@
 #include "system.h"
 #include "driver/pic.h"
 
-void *irq_routines[16] = {
+static void *irq_routines[16] = {
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0
 };
@@ -13,7 +13,6 @@ void irq_install_handler(int irq, void (*handler)(regs *r)) {
 void irq_uninstall_handler(int irq) {
     irq_routines[irq] = 0;
 }
-
 
 extern void* irq_table[];
 void irq_init() {

@@ -1,6 +1,6 @@
 #include "driver/kbd.h"
 
-unsigned char keycode[] = {
+static unsigned char keycode[] = {
     0, // nothing
     // escape
     (0 << 4) + 0,
@@ -106,7 +106,7 @@ unsigned char keycode[] = {
     (0 << 4) + 12
 };
 
-unsigned char keycode_extended_byte[] = {
+static unsigned char keycode_extended_byte[] = {
     // null
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 
@@ -207,24 +207,24 @@ unsigned char keycode_extended_byte[] = {
     (6 << 4) + 2
 };
 
-unsigned char keymap[175];
-unsigned char keymap_shift[175];
+static unsigned char keymap[175];
+static unsigned char keymap_shift[175];
 
-bool key_pressed[175];
+static bool key_pressed[175];
 
-bool capslock_on = false;
-bool scrolllock_on = false;
-bool numlock_on = false;
+static bool capslock_on = false;
+static bool scrolllock_on = false;
+static bool numlock_on = false;
 
-key current_key;
-void (*key_listener)(key);
+static key current_key;
+static void (*key_listener)(key);
 
 // predefined it here to be used in trash interrupt handler
-void kbd_handler(regs* r);
+static void kbd_handler(regs* r);
 
-unsigned char interrupt_progress_cnt = 0;
-unsigned char interrupt_loop_cnt = 0;
-void kbd_trash_int_handler() {
+static unsigned char interrupt_progress_cnt = 0;
+static unsigned char interrupt_loop_cnt = 0;
+static void kbd_trash_int_handler() {
     ps2_wait_for_reading_data();
     ps2_read_data();
     interrupt_progress_cnt++;
@@ -236,8 +236,8 @@ void kbd_trash_int_handler() {
     }
 }
 
-bool extended_byte = false;
-void kbd_handler(regs* r) {
+static bool extended_byte = false;
+static void kbd_handler() {
     ps2_wait_for_reading_data();
     unsigned char scancode = ps2_read_data();
 
@@ -257,7 +257,8 @@ void kbd_handler(regs* r) {
         goto call_key_listener;
     }
 
-    if(extended_byte && scancode == PRINTSCREEN_PRESSED_SCANCODE_2ND || scancode == PRINTSCREEN_RELEASED_SCANCODE_2ND) {
+    if(extended_byte &&
+       (scancode == PRINTSCREEN_PRESSED_SCANCODE_2ND || scancode == PRINTSCREEN_RELEASED_SCANCODE_2ND)) {
         key_pressed[0x6e] = (scancode == PRINTSCREEN_PRESSED_SCANCODE_2ND);
         interrupt_loop_cnt = 2;
         irq_install_handler(1, kbd_trash_int_handler);
@@ -287,10 +288,11 @@ void kbd_handler(regs* r) {
     //     numlock_on = !numlock_on;
 
     char mapped = keymap[kcode];
-    if(key_pressed[KEYCODE_LSHIFT] || key_pressed[KEYCODE_RSHIFT])
+    if(key_pressed[KEYCODE_LSHIFT] || key_pressed[KEYCODE_RSHIFT]) {
         if(mapped < 0x61 || mapped > 0x7a)
             mapped = keymap_shift[kcode];
         else if(!capslock_on) mapped = keymap_shift[kcode];
+    }
     // convert to uppercase if only capslock is on
     if(capslock_on && mapped >= 0x61 && mapped <= 0x7a && !key_pressed[KEYCODE_LSHIFT] && !key_pressed[KEYCODE_RSHIFT])
         mapped -= 32;

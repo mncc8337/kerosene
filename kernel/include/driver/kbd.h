@@ -20,7 +20,7 @@
 // ------+-------------+--------+----------------------------------------------------------
 // 0     | Fn row      | 13     | ESC, F1 - F12
 // 1     | number row  | 14     | `, 1 - 0, -, +, BS
-// 2     | top row     | 14     | tab, qwerty, [, ], \
+// 2     | top row     | 14     | tab, qwerty, [, ], '\'
 // 3     | primary row | 13     | caps, asdf, ;, ', enter
 // 4     | bottow row  | 12     | lshift, zxcv, ,, ., /, rshift
 // 5     | spacebar    | 8      | lctrl, lsuper, lalt, spacebar, ralt, rsuper, menu, rctrl

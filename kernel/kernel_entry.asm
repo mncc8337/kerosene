@@ -1,14 +1,17 @@
 [bits 32]
+
+; jump straight to main after loading the kernel
+; skip all codes prior to main
+global _start
+_start:
+extern kmain
+jmp kmain
+
+;;;;;;;;;;;;;;;;;
 CODE_SEG equ 0x08
 DATA_SEG equ 0x10
 
-; jump straight to main after loaded the kernel
-; skip all codes prior to main
-extern main
-jmp main
-
-;;;;;;;;;;;;;;;;;
-
+; GDT
 global gdt_flush
 extern gdtr
 gdt_flush:

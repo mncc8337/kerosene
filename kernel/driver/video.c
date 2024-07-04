@@ -1,6 +1,6 @@
 #include "driver/video.h"
 
-unsigned char* vid_mem = (unsigned char*)0xb8000;
+static unsigned char* vid_mem = (unsigned char*)0xb8000;
 
 int get_attr(int bg, int fg) {
     return bg * 16 + fg;
@@ -42,7 +42,7 @@ void cls(char attr) {
     set_cursor(0);
 }
 
-int _print_char(char chr, int offset, char attr) {
+static int _print_char(char chr, int offset, char attr) {
     if(chr == '\n') {
         offset += MAX_COLS - (offset % MAX_COLS);
     }

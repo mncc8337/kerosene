@@ -69,7 +69,7 @@ char* substr(char* str, unsigned int p1, unsigned int p2) {
     char* ret = 0;
 
     int p = 0;
-    for(int i = p1; i < p2; i++) {
+    for(unsigned int i = p1; i < p2; i++) {
         ret[p++] = str[i];
     }
     ret[p] = '\0';

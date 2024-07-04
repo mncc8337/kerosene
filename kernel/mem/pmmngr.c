@@ -1,13 +1,13 @@
 #include "mem.h"
 
 // size of physical memory
-uint32_t memsize = 0;
+static uint32_t memsize = 0;
 // number of blocks currently in use
-uint32_t used_blocks = 0;
+static uint32_t used_blocks = 0;
 // maximum number of available memory blocks
-uint32_t max_blocks = 0;
+static uint32_t max_blocks = 0;
 // memory map bit array. Each bit represents a memory block
-uint32_t* memmap = 0;
+static uint32_t* memmap = 0;
 
 uint32_t pmmngr_get_block_count() {
     return max_blocks;
@@ -108,6 +108,6 @@ void pmmngr_init(size_t msize, uint32_t* bitmap) {
     used_blocks = max_blocks;
 
     // by default all memory is in use to avoid errors
-    for(int i = 0; i < max_blocks / PMMNGR_BLOCKS_PER_BYTE; i++)
+    for(unsigned int i = 0; i < max_blocks / PMMNGR_BLOCKS_PER_BYTE; i++)
         memmap[i] = 0xf;
 }

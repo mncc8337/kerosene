@@ -15,7 +15,7 @@ typedef struct {
 const unsigned int TIMER_PHASE = 100;
 
 // free mem everyone
-unsigned char freebuff[512];
+char freebuff[512];
 
 volatile unsigned int timer_ticks = 0;
 char* sec_msg = "seconds elapsed";
@@ -24,7 +24,7 @@ void timer_handler() {
 
     itoa(timer_ticks/TIMER_PHASE, freebuff, 10);
 
-    print_string(freebuff, MAX_COLS - strlen(freebuff) - 17, 0x04, false);
+    print_string(freebuff, MAX_COLS - (int)strlen(freebuff) - 17, 0x04, false);
     print_string(sec_msg, MAX_COLS - 15, 0x04, false);
 }
 void timer_wait(unsigned int ticks) {
@@ -73,13 +73,13 @@ void mem_init(bootinfo_t bootinfo) {
         print_string("0x", -1, 0, true);
         itoa(base, freebuff, 16);
         print_string(freebuff, -1, 0, true);
-        for(int i = 0; i < 8 - strlen(freebuff); i++) print_char(' ', -1, 0, true);
+        for(int i = 0; i < 8 - (int)strlen(freebuff); i++) print_char(' ', -1, 0, true);
         print_string(" | ", -1, 0, true);
 
         print_string("0x", -1, 0, true);
         itoa(length, freebuff, 16);
         print_string(freebuff, -1, 0, true);
-        for(int i = 0; i < 8 - strlen(freebuff); i++) print_char(' ', -1, 0, true);
+        for(int i = 0; i < 8 - (int)strlen(freebuff); i++) print_char(' ', -1, 0, true);
         print_string(" | ", -1, 0, true);
 
         switch(entry[i].type) {
@@ -140,7 +140,7 @@ void mem_init(bootinfo_t bootinfo) {
     pmmngr_deinit_region(KERNEL_ADDR + KERNEL_SECTOR_COUNT * 512, 0x40000);
 }
 
-void main(bootinfo_t bootinfo) {
+void kmain(bootinfo_t bootinfo) {
     // greeting msg to let us know we are in the kernel
     print_string("hello\n", -1, LIGHT_CYAN, true);
     print_string("this is ", -1, LIGHT_GREEN, true);

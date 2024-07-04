@@ -14,10 +14,10 @@ typedef struct {
 } __attribute__((packed)) idtr_t;
 
 __attribute__((aligned(0x10))) 
-idt_entry_t idt[IDT_MAX_DESCRIPTORS]; // create an array of IDT entries; aligned for performance
+static idt_entry_t idt[IDT_MAX_DESCRIPTORS]; // create an array of IDT entries; aligned for performance
 idtr_t idtr;
 
-bool vectors[IDT_MAX_DESCRIPTORS];
+static bool vectors[IDT_MAX_DESCRIPTORS];
 
 void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags) {
     idt_entry_t* descriptor = &idt[vector];

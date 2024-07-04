@@ -18,10 +18,9 @@ typedef struct {
     uint32_t base;
 } __attribute__((packed)) gdtr_t;
 
-gdt_entry_t gdt[3];
+static gdt_entry_t gdt[3];
 gdtr_t gdtr;
 
-// will exist in kernel_entry.asm to reload new segment registers
 extern void gdt_flush();
 
 void gdt_set_gate(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran) {
