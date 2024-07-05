@@ -24,28 +24,31 @@ void* pmmngr_malloc(size_t byte) {
 
     for(unsigned int i = 1; i < block_cnt; i++) {
         if(block[i].used) continue;
+        if(block[i].size < byte) continue;
         block_id = i;
         break;
     }
     if(block_id == 0) return 0x0;
 
+    block[block_id].used = true;
     used_size += byte;
 
-    // split the block into 2
-    mem_block_t splitted;
-    splitted.used = false;
-    splitted.base = block[block_id].base + byte;
-    splitted.size = block[block_id].size - byte;
-    // set the original block
-    block[block_id].used = true;
-    block[block_id].size = byte;
+    if(block[id].size > byte) {
+        // split the block into 2
+        mem_block_t splitted;
+        splitted.used = false;
+        splitted.base = block[block_id].base + byte;
+        splitted.size = block[block_id].size - byte;
+        // set the original block
+        block[block_id].size = byte;
 
-    // shift the other blocks to the right
-    for(unsigned int i = block_cnt-1; i > block_id; i--)
-        block[i+1] = block[i];
-    block_cnt++;
-    // append the new block
-    block[block_id+1] = splitted;
+        // shift the other blocks to the right
+        for(unsigned int i = block_cnt-1; i > block_id; i--)
+            block[i+1] = block[i];
+        block_cnt++;
+        // append the new block
+        block[block_id+1] = splitted;
+    }
 
     return (void*)(block[block_id].base);
 }
@@ -71,8 +74,12 @@ void pmmngr_free(void* ptr) {
     used_size -= block[block_id].size;
 
     // check if the next block is free
+    // and adjacent to the current block
     // if yes then merge them
-    if(block_id < block_cnt-1 && block[block_id+1].used == false) {
+    if(block_id+1 < block_cnt
+            && !block[block_id+1].used
+            && block[block_id].base + block[block_id].size == block[block_id+1].base
+    ) {
         block[block_id].size += block[block_id+1].size;
 
         // shift the other blocks to the left
@@ -82,8 +89,12 @@ void pmmngr_free(void* ptr) {
     }
 
     // check if the prev block is free
+    // and adjacent to the current block
     // if yes then merge
-    if(block_id > 1 && block[block_id-1].used == false) {
+    if(block_id-1 > 0
+            && !block[block_id-1].used
+            && block[block_id-1].base + block[block_id-1].size == block[block_id].base
+    ) {
         block[block_id-1].size += block[block_id].size;
 
         // shift the other blocks to the left
