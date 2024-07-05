@@ -16,6 +16,52 @@ uint32_t pmmngr_get_used_size() {
     return used_size;
 }
 
+static unsigned int find_block_with_base(void* ptr) {
+    // binary search because the array is sorted
+    unsigned int block_id = 0;
+    unsigned int l = 1;
+    unsigned int r = block_cnt-1;
+    while(l < r) {
+        block_id = (l + r)/2;
+        if(block[block_id].base == (uint32_t)ptr) break;
+        if(block[block_id].base < (uint32_t)ptr) l = block_id;
+        else r = block_id;
+    }
+
+    return block_id;
+}
+
+// merge 2 adjacent blocks: block_id and block_id+1
+static void merge_block(unsigned int block_id) {
+    if(block_id+1 < block_cnt
+            && !block[block_id+1].used
+            && block[block_id].base + block[block_id].size == block[block_id+1].base
+    ) {
+        block[block_id].size += block[block_id+1].size;
+
+        // shift the other blocks to the left
+        for(unsigned int i = block_id+2; i < block_cnt; i++)
+            block[i-1] = block[i];
+        block_cnt--;
+    }
+}
+static void split_block(unsigned int block_id, size_t first_block_size) {
+    // split the block into 2
+    mem_block_t splitted;
+    splitted.used = false;
+    splitted.base = block[block_id].base + first_block_size;
+    splitted.size = block[block_id].size - first_block_size;
+    // set the original block
+    block[block_id].size = first_block_size;
+
+    // shift the other blocks to the right
+    for(unsigned int i = block_cnt-1; i > block_id; i--)
+        block[i+1] = block[i];
+    block_cnt++;
+    // append the new block
+    block[block_id+1] = splitted;
+}
+
 void* pmmngr_malloc(size_t byte) {
     // out of mem
     if(used_size + byte > total_size) return 0;
@@ -33,22 +79,8 @@ void* pmmngr_malloc(size_t byte) {
     block[block_id].used = true;
     used_size += byte;
 
-    if(block[id].size > byte) {
-        // split the block into 2
-        mem_block_t splitted;
-        splitted.used = false;
-        splitted.base = block[block_id].base + byte;
-        splitted.size = block[block_id].size - byte;
-        // set the original block
-        block[block_id].size = byte;
-
-        // shift the other blocks to the right
-        for(unsigned int i = block_cnt-1; i > block_id; i--)
-            block[i+1] = block[i];
-        block_cnt++;
-        // append the new block
-        block[block_id+1] = splitted;
-    }
+    if(block[block_id].size > byte)
+        split_block(block_id, byte);
 
     return (void*)(block[block_id].base);
 }
@@ -57,51 +89,38 @@ void pmmngr_free(void* ptr) {
     // do not free the 0x0
     if((uint32_t)ptr == 0) return;
 
-    // binary search because the array is sorted
-    unsigned int block_id = 0;
-    unsigned int l = 1;
-    unsigned int r = block_cnt-1;
-    while(l < r) {
-        block_id = (l + r)/2;
-        if(block[block_id].base == (uint32_t)ptr) break;
-        if(block[block_id].base < (uint32_t)ptr) l = block_id;
-        else r = block_id;
-    }
-
+    unsigned int block_id = find_block_with_base(ptr); 
     if(block_id == 0) return;
 
     block[block_id].used = false;
     used_size -= block[block_id].size;
 
-    // check if the next block is free
-    // and adjacent to the current block
-    // if yes then merge them
-    if(block_id+1 < block_cnt
-            && !block[block_id+1].used
-            && block[block_id].base + block[block_id].size == block[block_id+1].base
-    ) {
-        block[block_id].size += block[block_id+1].size;
+    // merge with the next block
+    merge_block(block_id);
+    // merge with the prev block
+    merge_block(block_id-1);
+}
 
-        // shift the other blocks to the left
-        for(unsigned int i = block_id+2; i < block_cnt; i++)
-            block[i-1] = block[i];
-        block_cnt--;
-    }
+bool pmmngr_extend_block(void* ptr, size_t ammount) {
+    if((int)ptr == 0) return false;
 
-    // check if the prev block is free
-    // and adjacent to the current block
-    // if yes then merge
-    if(block_id-1 > 0
-            && !block[block_id-1].used
-            && block[block_id-1].base + block[block_id-1].size == block[block_id].base
-    ) {
-        block[block_id-1].size += block[block_id].size;
+    unsigned int block_id = find_block_with_base(ptr);
+    if(block_id == 0
+            || block_id+1 >= block_cnt
+            || block[block_id+1].used
+            || block[block_id+1].size < ammount
+            || block[block_id].base + block[block_id].size != block[block_id+1].base)
+        return false;
 
-        // shift the other blocks to the left
-        for(unsigned int i = block_id+1; i < block_cnt; i++)
-            block[i-1] = block[i];
-        block_cnt--;
-    }
+    block[block_id].size += ammount;
+    block[block_id+1].size -= ammount;
+
+    used_size += ammount;
+
+    if(block[block_id].size == 0)
+        merge_block(block_id);
+
+    return true;
 }
 
 void pmmngr_init(memmap_entry_t* mmptr, size_t entry_cnt) {

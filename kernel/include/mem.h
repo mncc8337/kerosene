@@ -38,11 +38,12 @@ typedef struct {
     bool used;
     uint32_t base;
     uint32_t size;
-} __attribute__((packed)) mem_block_t;
+} mem_block_t;
 
 // pmmngr.c
 uint32_t pmmngr_get_free_size();
 uint32_t pmmngr_get_used_size();
 void* pmmngr_malloc(size_t byte);
 void pmmngr_free(void* ptr);
+bool pmmngr_extend_block(void* ptr, size_t ammount);
 void pmmngr_init(memmap_entry_t* mmptr, size_t entry_cnt);
