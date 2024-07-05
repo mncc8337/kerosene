@@ -65,16 +65,18 @@ static int _print_char(char chr, int offset, char attr) {
 }
 void print_char(char chr, int offset, char attr, bool move) {
     if(offset < 0) offset = get_cursor();
+    if(attr == 0) attr = LIGHT_GREY;
 
     offset = _print_char(chr, offset, attr);
 
     if(move) {
         set_cursor(offset);
-        if(offset > MAX_ROWS * MAX_COLS - 1) scroll_screen();
+        if(offset > MAX_ROWS * MAX_COLS - 1) scroll_screen(1);
     }
 }
 void print_string(char* string, int offset, char attr, bool move) {
     if(offset < 0) offset = get_cursor();
+    if(attr == 0) attr = LIGHT_GREY;
 
     int i = 0;
     while(string[i] != '\0') {
@@ -84,20 +86,20 @@ void print_string(char* string, int offset, char attr, bool move) {
 
     if(move) {
         set_cursor(offset);
-        if(offset > MAX_ROWS * MAX_COLS - 1) scroll_screen();
+        if(offset > MAX_ROWS * MAX_COLS - 1)
+            scroll_screen((offset + (MAX_COLS - offset % MAX_COLS))/MAX_COLS - MAX_ROWS);
     }
 }
-void scroll_screen() {
+void scroll_screen(unsigned int ammount) {
     int end = get_cursor();
 
+    int start = end - MAX_COLS * ammount;
     // already on top
-    if(end < MAX_COLS) return;
-
-    int start = end - MAX_COLS;
+    if(end < MAX_COLS) start = 0;
 
     for(int i = 0; i < start; i++) {
-        vid_mem[i * 2] = vid_mem[i * 2 + MAX_COLS * 2];
-        vid_mem[i * 2 + 1] = vid_mem[i * 2 + MAX_COLS * 2 + 1];
+        vid_mem[i * 2] = vid_mem[i * 2 + MAX_COLS * 2 * ammount];
+        vid_mem[i * 2 + 1] = vid_mem[i * 2 + MAX_COLS * 2 * ammount + 1];
     }
     for(int i = start; i <= end; i++) {
         vid_mem[i * 2] = ' ';

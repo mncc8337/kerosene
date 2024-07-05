@@ -216,8 +216,8 @@ static bool capslock_on = false;
 static bool scrolllock_on = false;
 static bool numlock_on = false;
 
-static key current_key;
-static void (*key_listener)(key);
+static key_t current_key;
+static void (*key_listener)(key_t);
 
 // predefined it here to be used in trash interrupt handler
 static void kbd_handler(regs* r);
@@ -337,7 +337,7 @@ bool is_capslock_on() { return capslock_on; }
 bool is_scrolllock_on() { return scrolllock_on; }
 bool is_numlock_on() { return numlock_on; }
 
-void set_key_listener(void (*klis)(key)) {
+void set_key_listener(void (*klis)(key_t)) {
     key_listener = klis;
 }
 

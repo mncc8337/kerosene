@@ -34,4 +34,4 @@ void set_cursor(int offset);
 void cls(char attr);
 void print_char(char chr, int offset, char attr, bool move);
 void print_string(char* string, int offset, char attr, bool move);
-void scroll_screen();
+void scroll_screen(unsigned int ammount);

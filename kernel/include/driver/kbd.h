@@ -129,7 +129,7 @@ typedef struct {
     unsigned char keycode;
     unsigned char mapped;
     bool released;
-} key;
+} key_t;
 
 enum KEYBOARD_LAYOUT {
     KBL_US
@@ -145,6 +145,6 @@ bool is_capslock_on();
 bool is_scrolllock_on();
 bool is_numlock_on();
 
-void set_key_listener(void (*klis)(key));
+void set_key_listener(void (*klis)(key_t));
 
 void kbd_init();

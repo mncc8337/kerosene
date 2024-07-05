@@ -1,113 +1,127 @@
 #include "mem.h"
 
-// size of physical memory
-static uint32_t memsize = 0;
-// number of blocks currently in use
-static uint32_t used_blocks = 0;
-// maximum number of available memory blocks
-static uint32_t max_blocks = 0;
-// memory map bit array. Each bit represents a memory block
-static uint32_t* memmap = 0;
+// a physical memory manager that allocate
+// memory with dynamic size block
+// block info are stored in the array block (below)
 
-uint32_t pmmngr_get_block_count() {
-    return max_blocks;
+static mem_block_t block[1024];
+static size_t block_cnt;
+static size_t total_size = 0;
+static size_t used_size = 0;
+
+uint32_t pmmngr_get_free_size() {
+    return total_size - used_size;
 }
-uint32_t pmmngr_get_free_block_count() {
-    return max_blocks - used_blocks;
+uint32_t pmmngr_get_used_size() {
+    return used_size;
 }
 
-void pmmngr_mmap_set(int bit) {
-    memmap[bit / 32] |= (1 << (bit % 32));
+void* pmmngr_malloc(size_t byte) {
+    // out of mem
+    if(used_size + byte > total_size) return 0;
+
+    unsigned int block_id = 0;
+
+    for(unsigned int i = 1; i < block_cnt; i++) {
+        if(block[i].used) continue;
+        block_id = i;
+        break;
+    }
+    if(block_id == 0) return 0x0;
+
+    used_size += byte;
+
+    // split the block into 2
+    mem_block_t splitted;
+    splitted.used = false;
+    splitted.base = block[block_id].base + byte;
+    splitted.size = block[block_id].size - byte;
+    // set the original block
+    block[block_id].used = true;
+    block[block_id].size = byte;
+
+    // shift the other blocks to the right
+    for(unsigned int i = block_cnt-1; i > block_id; i--)
+        block[i+1] = block[i];
+    block_cnt++;
+    // append the new block
+    block[block_id+1] = splitted;
+
+    return (void*)(block[block_id].base);
 }
-void pmmngr_mmap_unset(int bit) {
-    memmap[bit / 32] &= ~(1 << (bit % 32));
+
+void pmmngr_free(void* ptr) {
+    // do not free the 0x0
+    if((uint32_t)ptr == 0) return;
+
+    // binary search because the array is sorted
+    unsigned int block_id = 0;
+    unsigned int l = 1;
+    unsigned int r = block_cnt-1;
+    while(l < r) {
+        block_id = (l + r)/2;
+        if(block[block_id].base == (uint32_t)ptr) break;
+        if(block[block_id].base < (uint32_t)ptr) l = block_id;
+        else r = block_id;
+    }
+
+    if(block_id == 0) return;
+
+    block[block_id].used = false;
+    used_size -= block[block_id].size;
+
+    // check if the next block is free
+    // if yes then merge them
+    if(block_id < block_cnt-1 && block[block_id+1].used == false) {
+        block[block_id].size += block[block_id+1].size;
+
+        // shift the other blocks to the left
+        for(unsigned int i = block_id+2; i < block_cnt; i++)
+            block[i-1] = block[i];
+        block_cnt--;
+    }
+
+    // check if the prev block is free
+    // if yes then merge
+    if(block_id > 1 && block[block_id-1].used == false) {
+        block[block_id-1].size += block[block_id].size;
+
+        // shift the other blocks to the left
+        for(unsigned int i = block_id+1; i < block_cnt; i++)
+            block[i-1] = block[i];
+        block_cnt--;
+    }
 }
-bool pmmngr_mmap_test(int bit) {
-    return memmap[bit / 32] &  (1 << (bit % 32));
-}
-int pmmngr_mmap_first_free() {
-    // find the first free bit
-    for(uint32_t i = 0; i< pmmngr_get_block_count() / 32; i++) {
-        if(memmap[i] != 0xffffffff) {
-            for(int j = 0; j < 32; j++) {
-                int bit = 1 << j;
-                if(!(memmap[i] & bit)) return i * 32 + j;
-            }
+
+void pmmngr_init(memmap_entry_t* mmptr, size_t entry_cnt) {
+    // add a block with address 0x0 and set it to used
+    // so that it wont be touched
+    // and we can use 0x0 as error code
+    // to return in malloc
+    block[0].used = true;
+    block[0].size = 1;
+    block_cnt = 1;
+
+    for(unsigned int i = 0; i < entry_cnt; i++) {
+        // if not usable or not apci reclaimable then skip
+        if(mmptr[i].type != MMER_TYPE_USABLE && mmptr[i].type != MMER_TYPE_ACPI)
+            continue;
+
+        // ignore memory higher than 4GiB
+        // the map is sorted so we can break to ignore all data next to it
+        if(mmptr[i].base_high > 0 || mmptr[i].length_high > 0) break;
+
+        // avoid address 0x0 as explained above
+        if(mmptr[i].base_low == 0x0) {
+            mmptr[i].base_low = 0x1;
+            mmptr[i].length_low -= 1;
         }
+
+        total_size += mmptr[i].length_low;
+
+        block[block_cnt].used = false;
+        block[block_cnt].base = mmptr[i].base_low;
+        block[block_cnt].size = mmptr[i].length_low;
+        block_cnt++;
     }
-    return -1;
-}
-
-void pmmngr_init_region(uint32_t base, size_t size) {
-    // round up to 4k align
-    if(base & 0xfff) {
-        base += 4096;
-        base &= ~0xfff;
-    }
-    if(size & 0xfff) {
-        size += 4096;
-        size &= ~0xfff;
-    }
-
-    uint32_t start = base / PMMNGR_BLOCK_SIZE;
-    uint32_t blocks = size / PMMNGR_BLOCK_SIZE;
-
-    for(; blocks > 0; blocks--) {
-        pmmngr_mmap_unset(start++);
-        used_blocks--;
-    }
-
-    pmmngr_mmap_set(0); // first block is always set
-}
-void pmmngr_deinit_region(uint32_t base, size_t size) {
-    // round up to 4k align
-    if(base & 0xfff) {
-        base += 4096;
-        base &= ~0xfff;
-    }
-    if(size & 0xfff) {
-        size += 4096;
-        size &= ~0xfff;
-    }
-
-    int start = base / PMMNGR_BLOCK_SIZE;
-    int blocks = size / PMMNGR_BLOCK_SIZE;
-
-    for(; blocks > 0; blocks--) {
-        pmmngr_mmap_set(start++);
-        used_blocks++;
-    }
-}
-
-void* pmmngr_alloc_block() {
-    if(pmmngr_get_free_block_count() <= 0)
-        return 0; //out of memory
-
-    int frame =pmmngr_mmap_first_free();
-
-    if(frame == -1)
-        return 0; //out of memory
-
-    pmmngr_mmap_set(frame);
-
-    void* addr = (void*)(frame * PMMNGR_BLOCK_SIZE);
-    used_blocks++;
-
-    return addr;
-}
-void pmmngr_free_block(uint32_t addr) {
-    int frame = addr / PMMNGR_BLOCK_SIZE;
-    pmmngr_mmap_unset(frame);
-    used_blocks--;
-}
-
-void pmmngr_init(size_t msize, uint32_t* bitmap) {
-    memsize = msize;
-    memmap  = bitmap;
-    max_blocks  = memsize / PMMNGR_BLOCK_SIZE;
-    used_blocks = max_blocks;
-
-    // by default all memory is in use to avoid errors
-    for(unsigned int i = 0; i < max_blocks / PMMNGR_BLOCKS_PER_BYTE; i++)
-        memmap[i] = 0xf;
 }

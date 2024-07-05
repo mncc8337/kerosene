@@ -3,7 +3,6 @@
 
 #include "driver/video.h"
 #include "driver/kbd.h"
-#include "driver/pit.h"
 
 #include "utils.h"
 
@@ -14,37 +13,10 @@ typedef struct {
 
 const unsigned int TIMER_PHASE = 100;
 
-// free mem everyone
 char freebuff[512];
 
-volatile unsigned int timer_ticks = 0;
-char* sec_msg = "seconds elapsed";
-void timer_handler() {
-    timer_ticks++;
-
-    itoa(timer_ticks/TIMER_PHASE, freebuff, 10);
-
-    print_string(freebuff, MAX_COLS - (int)strlen(freebuff) - 17, 0x04, false);
-    print_string(sec_msg, MAX_COLS - 15, 0x04, false);
-}
-void timer_wait(unsigned int ticks) {
-    unsigned long eticks;
-
-    eticks = timer_ticks + ticks;
-    while(timer_ticks < eticks) SYS_SLEEP;
-}
-
-char* row_str;
-char* col_str;
-void print_typed_char(key k) {
+void print_typed_char(key_t k) {
     if(k.released) return;
-
-    int _row = k.keycode >> 4;
-    int _col = k.keycode & 0xf;
-
-    print_string("     ", MAX_COLS * 2 - 5, 0, false);
-    print_string(itoa(_row, freebuff, 10), MAX_COLS * 2 - 5, 0, false);
-    print_string(itoa(_col, freebuff, 10), MAX_COLS * 2 - 2, 0, false);
 
     if(k.mapped == '\b') {
         set_cursor(get_cursor() - 1); // move back
@@ -57,7 +29,25 @@ void print_typed_char(key k) {
 
 void mem_init(bootinfo_t bootinfo) {
     size_t memmap_cnt = bootinfo.memmap_entry_count;
-    memmap_entry_t* entry = (memmap_entry_t*)bootinfo.memmap_ptr;
+    memmap_entry_t* mmptr = (memmap_entry_t*)bootinfo.memmap_ptr;
+
+    // sort the map
+    bool sorted = false;
+    memmap_entry_t temp;
+    while(!sorted) {
+        sorted = true;
+        for(unsigned int i = 1; i < memmap_cnt; i++) {
+            uint64_t prev_base = ((uint64_t)mmptr[i-1].base_high << 32) | mmptr[i-1].base_low;
+            uint64_t curr_base = ((uint64_t)mmptr[i].base_high << 32) | mmptr[i].base_low;
+
+            if(prev_base > curr_base) {
+                sorted = false;
+                temp = mmptr[i];
+                mmptr[i] = mmptr[i-1];
+                mmptr[i-1] = temp;
+            }
+        }
+    }
 
     // spent way too much time on this table
     print_string("--[MEMORY]-+------------+-------------------\n", -1, 0, true);
@@ -67,8 +57,8 @@ void mem_init(bootinfo_t bootinfo) {
     uint64_t base = 0;
     uint64_t length = 0;
     for(uint32_t i = 0; i < memmap_cnt; i++) {
-        length = (entry[i].length_high << 31) + entry[i].length_low;
-        base = (entry[i].base_high << 31) + entry[i].base_low;
+        length = ((uint64_t)mmptr[i].length_high << 32) | mmptr[i].length_low;
+        base = ((uint64_t)mmptr[i].base_high << 32) | mmptr[i].base_low;
 
         print_string("0x", -1, 0, true);
         itoa(base, freebuff, 16);
@@ -82,7 +72,7 @@ void mem_init(bootinfo_t bootinfo) {
         for(int i = 0; i < 8 - (int)strlen(freebuff); i++) print_char(' ', -1, 0, true);
         print_string(" | ", -1, 0, true);
 
-        switch(entry[i].type) {
+        switch(mmptr[i].type) {
             case MMER_TYPE_USABLE:
                 print_string("usable", -1, 0, true);
                 break;
@@ -104,40 +94,11 @@ void mem_init(bootinfo_t bootinfo) {
     }
     print_string("-----------+------------+-------------------\n", -1, 0, true);
 
-    size_t memsize = 0;
-    for(uint32_t i = 0; i < memmap_cnt; i++) {
-        // reuse variable above
-        length = entry[i].length_low + (entry[i].length_high << 31);
-        // ignore empty entry
-        if(length == 0) continue;
+    pmmngr_init(mmptr, memmap_cnt);
 
-        // any mem that is above 4GiB is ignored
-        if(entry[i].base_high == 0)
-            memsize += entry[i].length_low;
-    }
-    print_string("detected ", -1, 0, true);
-    print_string(itoa(memsize/1024/1024, freebuff, 10), -1, 0, true);
-    print_string(" MiB of mem\n", -1, 0, true);
-
-    // place pmmngr after kernel
-    uint32_t* bitmap = (uint32_t*)(KERNEL_ADDR + KERNEL_SECTOR_COUNT * 512);
-    pmmngr_init(memsize, bitmap);
-    print_string("physical memory manager initialized\n", -1, 0, true);
-
-    for(uint32_t i = 0; i < memmap_cnt; i++) {        
-        // init free for use or reclaimable ACPI mem
-        if(entry[i].type == MMER_TYPE_USABLE || entry[i].type == MMER_TYPE_ACPI)
-            pmmngr_init_region(entry[i].base_low, entry[i].length_low);
-    }
-
-    size_t usable_mem = pmmngr_get_free_block_count() * PMMNGR_BLOCK_SIZE /1024/1024;
     print_string("initialized ", -1, 0, true);
-    print_string(itoa(usable_mem, freebuff, 10), -1, 0, true);
-    print_string(" MiB of free mem\n", -1, 0, true);
-
-    // disable all mem below pmmngr and it self
-    pmmngr_deinit_region(0x0, KERNEL_ADDR + KERNEL_SECTOR_COUNT * 512);
-    pmmngr_deinit_region(KERNEL_ADDR + KERNEL_SECTOR_COUNT * 512, 0x40000);
+    print_string(itoa(pmmngr_get_free_size()/1024/1024, freebuff, 10), -1, 0, true);
+    print_string(" MiB memory\n", -1, 0, true);
 }
 
 void kmain(bootinfo_t bootinfo) {
@@ -155,9 +116,6 @@ void kmain(bootinfo_t bootinfo) {
     // start receiving interrupts
     // after initialize all interrupt handlers
     asm volatile("sti");
-
-    pit_timer_phase(TIMER_PHASE);
-    irq_install_handler(0, timer_handler);
 
     kbd_init();
 

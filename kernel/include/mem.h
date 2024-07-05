@@ -4,13 +4,6 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-// 8 blocks per byte
-#define PMMNGR_BLOCKS_PER_BYTE 8
-// block size (4k)
-#define PMMNGR_BLOCK_SIZE 4096
-// block alignment
-#define PMMNGR_BLOCK_ALIGN PMMNGR_BLOCK_SIZE
-
 typedef struct {
 	uint32_t base_low;   uint32_t base_high;
 	uint32_t length_low; uint32_t length_high;
@@ -41,15 +34,15 @@ enum MEMMAP_ENTRY_REGION_TYPE {
     
 };
 
+typedef struct {
+    bool used;
+    uint32_t base;
+    uint32_t size;
+} __attribute__((packed)) mem_block_t;
+
 // pmmngr.c
-uint32_t pmmngr_get_block_count();
-uint32_t pmmngr_get_free_block_count();
-void pmmngr_mmap_set(int bit);
-void pmmngr_mmap_unset(int bit);
-bool pmmngr_mmap_test(int bit);
-int pmmngr_mmap_first_free();
-void pmmngr_init_region(uint32_t base, size_t size);
-void pmmngr_deinit_region(uint32_t base, size_t size);
-void* pmmngr_alloc_block();
-void pmmngr_free_block (uint32_t addr);
-void pmmngr_init(size_t msize, uint32_t* bitmap);
+uint32_t pmmngr_get_free_size();
+uint32_t pmmngr_get_used_size();
+void* pmmngr_malloc(size_t byte);
+void pmmngr_free(void* ptr);
+void pmmngr_init(memmap_entry_t* mmptr, size_t entry_cnt);
