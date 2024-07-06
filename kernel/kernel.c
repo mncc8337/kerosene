@@ -95,10 +95,13 @@ void mem_init(bootinfo_t bootinfo) {
     print_string("-----------+------------+-------------------\n", -1, 0, true);
 
     pmmngr_init(mmptr, memmap_cnt);
+    
+    // remove mem region of kernel and other stuff from the manager
+    pmmngr_remove_region(0x0, KERNEL_ADDR + KERNEL_SECTOR_COUNT * 512);
 
     print_string("initialized ", -1, 0, true);
-    print_string(itoa(pmmngr_get_free_size()/1024/1024, freebuff, 10), -1, 0, true);
-    print_string(" MiB memory\n", -1, 0, true);
+    print_string(itoa(pmmngr_get_free_size()/1024, freebuff, 10), -1, 0, true);
+    print_string(" KiB memory\n", -1, 0, true);
 }
 
 void kmain(bootinfo_t bootinfo) {

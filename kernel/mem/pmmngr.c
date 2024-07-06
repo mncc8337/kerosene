@@ -5,7 +5,7 @@
 // block info are stored in the array block (below)
 
 static mem_block_t block[1024];
-static size_t block_cnt;
+static size_t block_cnt = 0;
 static size_t total_size = 0;
 static size_t used_size = 0;
 
@@ -67,14 +67,13 @@ void* pmmngr_malloc(size_t byte) {
     if(used_size + byte > total_size) return 0;
 
     unsigned int block_id = 0;
-
     for(unsigned int i = 1; i < block_cnt; i++) {
         if(block[i].used) continue;
         if(block[i].size < byte) continue;
         block_id = i;
         break;
     }
-    if(block_id == 0) return 0x0;
+    if(block_id == 0) return 0;
 
     block[block_id].used = true;
     used_size += byte;
@@ -90,7 +89,7 @@ void pmmngr_free(void* ptr) {
     if((uint32_t)ptr == 0) return;
 
     unsigned int block_id = find_block_with_base(ptr); 
-    if(block_id == 0) return;
+    if(block_id == 0 || !block[block_id].used) return;
 
     block[block_id].used = false;
     used_size -= block[block_id].size;
@@ -115,12 +114,45 @@ bool pmmngr_extend_block(void* ptr, size_t ammount) {
     block[block_id].size += ammount;
     block[block_id+1].size -= ammount;
 
-    used_size += ammount;
+    if(block[block_id].used)
+        used_size += ammount;
 
     if(block[block_id].size == 0)
         merge_block(block_id);
 
     return true;
+}
+
+// once lock a region cannot be unlocked or used
+void pmmngr_remove_region(void* base, size_t size) {
+    uint32_t addr = (uint32_t)base;
+
+    unsigned int block_id = 0;
+    for(block_id = 1; block_id < block_cnt; block_id++) {
+        if(addr >= block[block_id].base
+                && addr < block[block_id].base + block[block_id].size)
+            break;
+    }
+
+    if(addr > block[block_id].base) {
+        split_block(block_id, addr - block[block_id].base);
+        block_id++;
+    }
+    bool additional_block = false;
+    if(size > block[block_id].size) {
+        additional_block = true;
+        split_block(block_id+1, size - block[block_id].size);
+    }
+
+    // update total size
+    total_size -= block[block_id].size;
+    if(additional_block)
+        total_size -= block[block_id+1].size;
+
+    // remove region
+    for(unsigned int i = block_id + 1 + additional_block; i < block_cnt; i++)
+        block[i-1-additional_block] = block[i];
+    block_cnt -= 1 + additional_block;
 }
 
 void pmmngr_init(memmap_entry_t* mmptr, size_t entry_cnt) {

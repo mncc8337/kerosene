@@ -31,7 +31,6 @@ enum MEMMAP_ENTRY_REGION_TYPE {
     MMER_TYPE_ACPI,
     MMER_TYPE_ACPI_NVS,
     MMER_TYPE_BADMEM,
-    
 };
 
 typedef struct {
@@ -46,4 +45,5 @@ uint32_t pmmngr_get_used_size();
 void* pmmngr_malloc(size_t byte);
 void pmmngr_free(void* ptr);
 bool pmmngr_extend_block(void* ptr, size_t ammount);
+void pmmngr_remove_region(void* base, size_t size);
 void pmmngr_init(memmap_entry_t* mmptr, size_t entry_cnt);
