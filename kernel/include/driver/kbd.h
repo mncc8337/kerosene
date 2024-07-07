@@ -5,11 +5,10 @@
 
 #define EXTENDED_BYTE 0xe0
 
+// i know it's long
 #define PRINTSCREEN_PRESSED_SCANCODE_2ND 0x2a
 #define PRINTSCREEN_RELEASED_SCANCODE_2ND 0xb7
 #define PAUSE_SCANCODE_1ST 0xe1
-
-// total keys: 121
 
 // keycodes
 // 4 upperbits: group (row)

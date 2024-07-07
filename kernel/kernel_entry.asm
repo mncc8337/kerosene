@@ -1,5 +1,8 @@
 [bits 32]
 
+; TODO
+; split this into multiple files
+
 ; jump straight to main after loading the kernel
 ; skip all codes prior to main
 global _start
@@ -7,7 +10,6 @@ _start:
 extern kmain
 jmp kmain
 
-;;;;;;;;;;;;;;;;;
 CODE_SEG equ 0x08
 DATA_SEG equ 0x10
 
@@ -158,3 +160,25 @@ irq_table:
     dd irq_stub_%+i
 %assign i i+1 
 %endrep
+
+; paging
+global load_page_directory
+load_page_directory:
+    push ebp
+    mov ebp, esp
+    mov eax, [ebp + 8]
+    mov cr3, eax
+    mov esp, ebp
+    pop ebp
+    ret
+
+global enable_paging
+enable_paging:
+    push ebp
+    mov ebp, esp
+    mov eax, cr0
+    or eax, 0x80000000
+    mov cr0, eax
+    mov esp, ebp
+    pop ebp
+    ret

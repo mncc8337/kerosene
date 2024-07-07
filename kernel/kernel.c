@@ -102,6 +102,9 @@ void mem_init(bootinfo_t bootinfo) {
     print_string("initialized ", -1, 0, true);
     print_string(itoa(pmmngr_get_free_size()/1024, freebuff, 10), -1, 0, true);
     print_string(" KiB memory\n", -1, 0, true);
+
+    vmmngr_init();
+    print_string("paging enabled\n", -1, 0, true);
 }
 
 void kmain(bootinfo_t bootinfo) {

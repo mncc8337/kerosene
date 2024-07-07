@@ -108,3 +108,7 @@ void scroll_screen(unsigned int ammount) {
 
     set_cursor(start);
 }
+
+void set_vidmem_ptr(uint32_t ptr) {
+    vid_mem = (unsigned char*)ptr;
+}

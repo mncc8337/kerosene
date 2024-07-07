@@ -164,6 +164,9 @@ void pmmngr_remove_region(void* base, size_t size) {
         split_block(block_id, addr - block[block_id].base);
         block_id++;
     }
+    // TODO:
+    // this is only true if the next block is adjacent to the current block
+    // so pls add some code to check if the spare part is in anothe block or not
     bool additional_block = false;
     if(size > block[block_id].size) {
         additional_block = true;

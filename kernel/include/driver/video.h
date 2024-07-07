@@ -35,3 +35,4 @@ void cls(char attr);
 void print_char(char chr, int offset, char attr, bool move);
 void print_string(char* string, int offset, char attr, bool move);
 void scroll_screen(unsigned int ammount);
+void set_vidmem_ptr(uint32_t ptr);

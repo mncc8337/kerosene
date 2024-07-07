@@ -50,3 +50,6 @@ bool pmmngr_extend_block(void* ptr, size_t ammount);
 bool pmmngr_shrink_block(void* ptr, size_t ammount);
 void pmmngr_remove_region(void* base, size_t size);
 void pmmngr_init(memmap_entry_t* mmptr, size_t entry_cnt);
+
+// vmmngr.c
+void vmmngr_init();
