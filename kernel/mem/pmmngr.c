@@ -1,10 +1,15 @@
 #include "mem.h"
 
+// TODO:
+// fix block size to 512 byte
+// remove the size entry in block info
+
 // a physical memory manager that allocate
 // memory with dynamic size block
 // block info are stored in the array block (below)
 
-static mem_block_t block[1024];
+// 4 * 1024 * 1024 * 1024 / 512 = 4 * 1024 * 1024 * 2
+static mem_block_t block[4 * 1024 * 1024 * 2];
 static size_t block_cnt = 0;
 static size_t total_size = 0;
 static size_t used_size = 0;
@@ -62,7 +67,7 @@ static void split_block(unsigned int block_id, size_t first_block_size) {
     block[block_id+1] = splitted;
 }
 
-void* pmmngr_malloc(size_t byte) {
+void* pmmngr_alloc(size_t byte) {
     // out of mem
     if(used_size + byte > total_size) return 0;
 
@@ -123,7 +128,6 @@ bool pmmngr_extend_block(void* ptr, size_t ammount) {
     return true;
 }
 
-// once lock a region cannot be unlocked or used
 void pmmngr_remove_region(void* base, size_t size) {
     uint32_t addr = (uint32_t)base;
 

@@ -9,7 +9,7 @@ typedef struct {
 	uint32_t length_low; uint32_t length_high;
 	uint32_t type;
 	uint32_t acpi;
- 
+
 } __attribute__((packed)) memmap_entry_t;
 
 // still unsure which one is correct so i left another one here
@@ -42,7 +42,7 @@ typedef struct {
 // pmmngr.c
 uint32_t pmmngr_get_free_size();
 uint32_t pmmngr_get_used_size();
-void* pmmngr_malloc(size_t byte);
+void* pmmngr_alloc(size_t byte);
 void pmmngr_free(void* ptr);
 bool pmmngr_extend_block(void* ptr, size_t ammount);
 void pmmngr_remove_region(void* base, size_t size);

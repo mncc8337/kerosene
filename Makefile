@@ -18,7 +18,7 @@ A_SRC_WILDCARD = $(wildcard $(A_SRC))
 OBJ = $(addsuffix .o, $(basename $(notdir $(C_SRC_WILDCARD))))
 
 # number of sectors that the kernel will fit in
-KERNEL_SECTOR_COUNT = 30
+KERNEL_SECTOR_COUNT = 50
 # memory address that second stage bootloader will be loaded to
 SECOND_STAGE_ADDR = 0x7e00
 # memory address that memmap entry count will be loaded to
@@ -42,7 +42,7 @@ CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -std=gnu99
 LDFLAGS = -nostdlib -lgcc
 NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
 
-QEMUFLAGS = -m 64M -debugcon stdio -no-reboot
+QEMUFLAGS = -m 128M -debugcon stdio -no-reboot
 
 all: disk.img
 
@@ -70,7 +70,7 @@ kernel.elf: kernel_entry.o $(OBJ)
 	# im using GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(LDFLAGS) -o $@ -Ttext $(KERNEL_ADDR) $^
 kernel.bin: kernel.elf
-	objcopy -O binary $< $@
+	$(CROSS_COMPILER_LOC)$(TARGET)-objcopy -O binary $< $@
 	dd if=/dev/zero of=$@ bs=512 count=0 seek=$(KERNEL_SECTOR_COUNT)
 
 disk.img: bootloader.bin kernel.bin

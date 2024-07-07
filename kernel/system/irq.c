@@ -30,5 +30,5 @@ void irq_handler(regs *r) {
     if(handler)
         handler(r);
 
-    pic_send_eoi(r->int_no);
+    pic_send_eoi(r->int_no - 32);
 }
