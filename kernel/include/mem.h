@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+#define MMNGR_PAGE_SIZE 4096
+
 typedef struct {
 	uint32_t base_low;   uint32_t base_high;
 	uint32_t length_low; uint32_t length_high;
@@ -45,5 +47,6 @@ uint32_t pmmngr_get_used_size();
 void* pmmngr_alloc(size_t byte);
 void pmmngr_free(void* ptr);
 bool pmmngr_extend_block(void* ptr, size_t ammount);
+bool pmmngr_shrink_block(void* ptr, size_t ammount);
 void pmmngr_remove_region(void* base, size_t size);
 void pmmngr_init(memmap_entry_t* mmptr, size_t entry_cnt);

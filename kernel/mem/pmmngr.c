@@ -1,7 +1,7 @@
 #include "mem.h"
 
 // TODO:
-// fix block size to 512 byte
+// fix block size to 4096 byte
 // remove the size entry in block info
 
 // a physical memory manager that allocate
@@ -105,6 +105,8 @@ void pmmngr_free(void* ptr) {
     merge_block(block_id-1);
 }
 
+// TODO:
+// add the ability to extend to 2/3 adjacent blocks
 bool pmmngr_extend_block(void* ptr, size_t ammount) {
     if((int)ptr == 0) return false;
 
@@ -118,12 +120,32 @@ bool pmmngr_extend_block(void* ptr, size_t ammount) {
 
     block[block_id].size += ammount;
     block[block_id+1].size -= ammount;
+    block[block_id+1].base += ammount;
 
     if(block[block_id].used)
         used_size += ammount;
 
-    if(block[block_id].size == 0)
+    if(block[block_id+1].size == 0)
         merge_block(block_id);
+
+    return true;
+}
+bool pmmngr_shrink_block(void* ptr, size_t ammount) {
+    if((int)ptr == 0) return false;
+
+    unsigned int block_id = find_block_with_base(ptr);
+    if(block_id == 0
+            || block[block_id].size <= ammount
+            || block_id+1 >= block_cnt
+            || block[block_id+1].used // avoid creating small block in between 2 used one
+            || block[block_id].base + block[block_id].size != block[block_id+1].base)
+        return false;
+
+    block[block_id].size -= ammount;
+    block[block_id+1].size += ammount;
+    block[block_id+1].base -= ammount;
+
+    used_size -= ammount;
 
     return true;
 }

@@ -122,8 +122,6 @@ void kmain(bootinfo_t bootinfo) {
 
     kbd_init();
 
-    // some io stuff to demo
-
     // make cursor slimmer
     enable_cursor(13, 14);
 
