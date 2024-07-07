@@ -5,7 +5,7 @@ it's a working-in-progress project and should not be used as references for osde
 ## features
 - a (bad/suck/horrible) custom 2-stage bootloader
 - a proper keyboard driver (which lacks of LED indicating, shortcuts support lol)
-- it can print text! (with color!)
+- it can print text! (with colors!)
 - yeah that's all
 ## build and run
 to compile and run the project you will need:
@@ -53,6 +53,7 @@ to build and test it just run `make run`. make sure to correct the location of y
     + [ ] render fonts
 - [ ] sound
 - [ ] video
+- [ ] im not gonna touch networking
 - [ ] port some program
     + [ ] GNU GCC
 ## learning resources
