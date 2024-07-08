@@ -59,17 +59,8 @@ void pmmngr_init_region(uint32_t base, size_t size) {
     set_bit(0); 
 }
 void pmmngr_deinit_region(uint32_t base, size_t size) {
-    //round base up to 4k align
-    if(base & MMNGR_BLOCK_SIZE) {
-        base += MMNGR_BLOCK_SIZE;
-        base &= ~MMNGR_BLOCK_SIZE;
-    }
-    if(size & MMNGR_BLOCK_SIZE) {
-        size += MMNGR_BLOCK_SIZE;
-        size &= ~MMNGR_BLOCK_SIZE;
-    }
-    uint32_t start = base / MMNGR_BLOCK_SIZE;
-    uint32_t block = size / MMNGR_BLOCK_SIZE;
+    uint32_t start = (base / MMNGR_BLOCK_SIZE - 0.5);
+    uint32_t block = (size / MMNGR_BLOCK_SIZE + 0.5);
 
     for (;block > 0; block--) {
         set_bit(start++);
