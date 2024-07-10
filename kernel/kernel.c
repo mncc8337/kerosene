@@ -109,7 +109,8 @@ void mem_init(bootinfo_t bootinfo) {
 
         memsize += mmptr[i].length_low;
     }
-    pmmngr_init(0xc0000000 + KERNEL_SECTOR_COUNT*512, memsize);
+    // pmmngr_init(0xc0000000 + KERNEL_SECTOR_COUNT*512, memsize);
+    pmmngr_init(KERNEL_ADDR + KERNEL_SECTOR_COUNT*512 + 1, memsize);
 
     // init regions
     for(unsigned int i = 0; i < entry_cnt; i++) {
@@ -120,11 +121,13 @@ void mem_init(bootinfo_t bootinfo) {
 
         pmmngr_init_region(mmptr[i].base_low, mmptr[i].length_low);
     }
-    // deinit regions
+    // pmmngr
+    pmmngr_deinit_region(KERNEL_ADDR + KERNEL_SECTOR_COUNT*512, pmmngr_get_free_size()/MMNGR_BLOCK_SIZE);
+    // kernel
     pmmngr_deinit_region(KERNEL_ADDR, KERNEL_SECTOR_COUNT*512);
 
     print_string("initialized ", -1, 0, true);
-    print_string(itoa(memsize/1024/1024, freebuff, 10), -1, 0, true);
+    print_string(itoa(pmmngr_get_free_size()/1024/1024, freebuff, 10), -1, 0, true);
     print_string(" MiB memory\n", -1, 0, true);
 
     vmmngr_init();

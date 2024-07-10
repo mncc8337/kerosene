@@ -1,6 +1,9 @@
 # my cross compiler
 cross
 
+# wip
+wip
+
 # various bins
 *.o
 *.elf

@@ -39,7 +39,7 @@ C_INCLUDES = -I./kernel/include
 # CFLAGS = $(DEFINES) -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles
 # LDFLAGS = -T linker.ld -m elf_i386 -nostdlib --nmagic
 CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -std=gnu99
-LDFLAGS = -T link.ld -nostdlib -lgcc
+LDFLAGS = -nostdlib -lgcc
 NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
 
 QEMUFLAGS = -m 128M -debugcon stdio -no-reboot

@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 // string.c
+void* memset(void* ptr, int value, size_t num);
 size_t strlen(char* str);
 char* strrev(char* str);
 char* itoa(int num, char* buff, int radix);

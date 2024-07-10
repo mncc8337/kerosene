@@ -1,5 +1,11 @@
 #include "utils.h"
 
+void* memset(void* ptr, int value, size_t num) {
+    unsigned char* tmp = (unsigned char*)ptr;
+    for(; num != 0; tmp[--num] = value);
+    return ptr;
+}
+
 size_t strlen(char* str) {
     unsigned int len = 0;
     while(str[len] != '\0')
