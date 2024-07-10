@@ -1,7 +1,7 @@
 #pragma once
 
 #include "system.h"
-#include "driver/ps2.h"
+#include "ps2.h"
 
 #define EXTENDED_BYTE 0xe0
 

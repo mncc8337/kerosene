@@ -3,10 +3,14 @@
 extern void load_page_directory(uint32_t*);
 extern void enable_paging();
 
+// commented because qemu will freeze if i do so
+// pdir* page_directory = (pdir*)pmmngr_alloc_multi_block(3);
+// ptable* page_table = (ptable*)pmmngr_alloc_block();
+
+pdir page_directory[1];
+ptable page_table[1];
+
 void vmmngr_init() {
-    // commented because qemu will freeze if i do so
-    pdir* page_directory /* = (pdir*)pmmngr_alloc_multi_block(3) */;
-    ptable* page_table /* = (ptable*)pmmngr_alloc_block() */;
 
     for(int i = 0; i < 1024; i++)
         page_directory->entry[i] = 0x00000002;

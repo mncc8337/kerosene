@@ -25,14 +25,14 @@
 #define LIGHT_BROWN   0xe
 #define WHITE         0xf
 
-int get_attr(int bg, int fg);
-int get_offset(int row, int col);
-void enable_cursor(unsigned char cursor_scanline_start, unsigned char cursor_scanline_end);
-void disable_cursor();
-int get_cursor();
-void set_cursor(int offset);
-void cls(char attr);
-void print_char(char chr, int offset, char attr, bool move);
-void print_string(char* string, int offset, char attr, bool move);
-void scroll_screen(unsigned int ammount);
-void set_vidmem_ptr(uint32_t ptr);
+int tty_get_attr(int bg, int fg);
+int tty_get_offset(int row, int col);
+void tty_enable_cursor(unsigned char cursor_scanline_start, unsigned char cursor_scanline_end);
+void tty_disable_cursor();
+int tty_get_cursor();
+void tty_set_cursor(int offset);
+void tty_cls(char attr);
+void tty_print_char(char chr, int offset, char attr, bool move);
+void tty_print_string(char* string, int offset, char attr, bool move);
+void tty_scroll_screen(unsigned int ammount);
+void tty_set_vidmem_ptr(uint32_t ptr);

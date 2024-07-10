@@ -7,15 +7,18 @@ GDB = gdb
 ASM = nasm
 QEMU = qemu-system-i386
 
-C_SRC = kernel/*.c \
-		kernel/utils/*.c \
-		kernel/system/*.c \
-		kernel/driver/*.c \
-		kernel/mem/*.c \
+LIBC_SRC = libc/stdio/*.c \
+		   libc/stdlib/*.c \
+		   libc/string/*.c \
 
-C_SRC_WILDCARD = $(wildcard $(C_SRC))
-A_SRC_WILDCARD = $(wildcard $(A_SRC))
-OBJ = $(addsuffix .o, $(basename $(notdir $(C_SRC_WILDCARD))))
+C_SRC = kernel/src/*.c \
+		kernel/src/utils/*.c \
+		kernel/src/system/*.c \
+		kernel/src/driver/*.c \
+		kernel/src/mem/*.c \
+
+OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(C_SRC)))))
+LIBC_OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
 
 # number of sectors that the kernel will fit in
 KERNEL_SECTOR_COUNT = 50
@@ -28,13 +31,14 @@ MMAP_ADDR = 0xB00
 # memory address that the kernel will be loaded to
 KERNEL_ADDR = 0x1000
 
-DEFINES = -DKERNEL_SECTOR_COUNT=$(KERNEL_SECTOR_COUNT) \
+DEFINES = -D__is_libk \
+		  -DKERNEL_SECTOR_COUNT=$(KERNEL_SECTOR_COUNT) \
 		  -DSECOND_STAGE_ADDR=$(SECOND_STAGE_ADDR) \
 		  -DMMAP_ENTRY_CNT_ADDR=$(MMAP_ENTRY_CNT_ADDR) \
 		  -DMMAP_ADDR=$(MMAP_ADDR) \
 		  -DKERNEL_ADDR=$(KERNEL_ADDR)
 
-C_INCLUDES = -I./kernel/include
+C_INCLUDES = -I./kernel/include -I./libc/include
 
 # CFLAGS = $(DEFINES) -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles
 # LDFLAGS = -T linker.ld -m elf_i386 -nostdlib --nmagic
@@ -43,6 +47,7 @@ LDFLAGS = -nostdlib -lgcc
 NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
 
 QEMUFLAGS = -m 128M -debugcon stdio -no-reboot
+
 
 all: disk.img
 
@@ -53,21 +58,30 @@ stage2.bin: boot/stage2.asm
 bootloader.bin: stage1.bin stage2.bin
 	cat $^ > $@
 
-kernel_entry.o: kernel/kernel_entry.asm
+kernel_entry.o: kernel/src/kernel_entry.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
-%.o: kernel/%.c
+
+# i dont know how to compile a library lol
+%.o: libc/stdio/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/driver/%.c
+%.o: libc/stdlib/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/system/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/utils/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/mem/%.c
+%.o: libc/string/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
-kernel.elf: kernel_entry.o $(OBJ)
-	# im using GCC to link instead of LD because LD cannot find the libgcc
+%.o: kernel/src/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+%.o: kernel/src/driver/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+%.o: kernel/src/system/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+%.o: kernel/src/utils/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+%.o: kernel/src/mem/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+
+kernel.elf: kernel_entry.o $(LIBC_OBJ) $(OBJ)
+	# use GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(LDFLAGS) -o $@ -Ttext $(KERNEL_ADDR) $^
 kernel.bin: kernel.elf
 	$(CROSS_COMPILER_LOC)$(TARGET)-objcopy -O binary $< $@

@@ -1,4 +1,4 @@
-#include "driver/kbd.h"
+#include "kbd.h"
 
 static unsigned char keycode[] = {
     0, // nothing

@@ -7,8 +7,8 @@
 ; skip all codes prior to main
 global _start
 _start:
-extern kmain
-jmp kmain
+    extern kmain
+    jmp kmain
 
 CODE_SEG equ 0x08
 DATA_SEG equ 0x10

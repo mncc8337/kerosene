@@ -1,4 +1,4 @@
-#include "driver/pic.h"
+#include "pic.h"
 
 void pic_send_eoi(unsigned char irq) {
     if(irq >= 8)

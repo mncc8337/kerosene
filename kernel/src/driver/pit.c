@@ -1,4 +1,4 @@
-#include "driver/pit.h"
+#include "pit.h"
 
 void pit_timer_phase(int hz) {
     unsigned short divisor = 1193180 / hz; // this number will later be the divisor of 1193180

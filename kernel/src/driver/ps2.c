@@ -1,4 +1,4 @@
-#include "driver/ps2.h"
+#include "ps2.h"
 
 unsigned char ps2_read_data() {
     return port_inb(PORT_PS2_DATA);
