@@ -2,13 +2,11 @@
 
 static unsigned char* vid_mem = (unsigned char*)0xb8000;
 
-int tty_get_attr(int bg, int fg) {
-    return bg * 16 + fg;
-}
-int tty_get_offset(int row, int col) {
-    return row * MAX_COLS + col;
-}
+static unsigned char current_attr = LIGHT_GREY;
 
+void tty_set_attr(unsigned char attr) {
+    current_attr = attr;
+}
 void tty_enable_cursor(unsigned char cursor_scanline_start, unsigned char cursor_scanline_end) {
 	port_outb(PORT_SCREEN_CTR, 0x0a);
 	port_outb(PORT_SCREEN_DAT, (port_inb(PORT_SCREEN_DAT) & 0xc0) | cursor_scanline_start);
@@ -58,14 +56,14 @@ static int _print_char(char chr, int offset, char attr) {
     }
     else if(chr >= 0x20 && chr <= 0x7e) {
         vid_mem[offset * 2] = chr;
-        if(attr != 0) vid_mem[offset * 2 + 1] = attr;
+        vid_mem[offset * 2 + 1] = attr;
         offset++;
     }
     return offset;
 }
 void tty_print_char(char chr, int offset, char attr, bool move) {
     if(offset < 0) offset = tty_get_cursor();
-    if(attr == 0) attr = LIGHT_GREY;
+    if(attr == 0) attr = current_attr;
 
     offset = _print_char(chr, offset, attr);
 
@@ -76,7 +74,7 @@ void tty_print_char(char chr, int offset, char attr, bool move) {
 }
 void tty_print_string(char* string, int offset, char attr, bool move) {
     if(offset < 0) offset = tty_get_cursor();
-    if(attr == 0) attr = LIGHT_GREY;
+    if(attr == 0) attr = current_attr;
 
     int i = 0;
     while(string[i] != '\0') {

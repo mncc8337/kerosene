@@ -10,17 +10,16 @@ static void set_bit(uint32_t bit) {
 static void unset_bit(uint32_t bit) {
     mem_addr[bit/32] &= ~(1 << (bit % 32));
 }
-// static bool test_bit(uint32_t bit) {
-//     return mem_addr[bit/32] & (1 << (bit % 32));
-// }
+static bool test_bit(uint32_t bit) {
+    return (mem_addr[bit/32] >> (bit % 32)) & 1;
+}
 
 static int find_first_free_block() {
     for(unsigned int i = 0; i < total_block/32; i++) {
         if(mem_addr[i] == 0xffffffff) continue;
         for(int j = 0; j < 32;j++) {
             int bit = 1 << j;
-            if(!(mem_addr[i] & bit))
-                return i * 32 + j;
+            if(!(mem_addr[i] & bit)) return i * 32 + j;
         }
     }
     return -1;
@@ -48,6 +47,22 @@ static int find_first_free(size_t frame_cnt) {
     return -1;
 }
 
+// update used_block
+// must be run after done initializing regions
+void pmmngr_update_usage() {
+    used_block = 0;
+    for(unsigned int i = 0; i < total_block/32; i++) {
+        if(mem_addr[i] == 0xffffffff) {
+            used_block += 32;
+            continue;
+        }
+        for(int j = 0; j < 32;j++) {
+            int bit = 1 << j;
+            if((mem_addr[i] & bit)) used_block++;
+        }
+    }
+    if(used_block > total_block) used_block = total_block;
+}
 size_t pmmngr_get_size() {
     return total_block * MMNGR_BLOCK_SIZE;
 }
@@ -63,30 +78,25 @@ void pmmngr_init_region(uint32_t base, size_t size) {
         base += MMNGR_BLOCK_SIZE;
         base &= ~MMNGR_BLOCK_SIZE;
     }
+    int start = base / MMNGR_BLOCK_SIZE;
+    int block = size / MMNGR_BLOCK_SIZE;
 
-    uint32_t start = base / MMNGR_BLOCK_SIZE;
-    uint32_t block = size / MMNGR_BLOCK_SIZE;
-
-    for (; block > 0; block--) {
+    for (; block > 0; block--)
         unset_bit(start++);
-        used_block--;
-    }
 
     set_bit(0); 
 }
+
 void pmmngr_deinit_region(uint32_t base, size_t size) {
     if(base & MMNGR_BLOCK_SIZE) {
         base += MMNGR_BLOCK_SIZE;
         base &= ~MMNGR_BLOCK_SIZE;
     }
+    int start = base / MMNGR_BLOCK_SIZE;
+    int block = size / MMNGR_BLOCK_SIZE;
 
-    uint32_t start = base / MMNGR_BLOCK_SIZE;
-    uint32_t block = size / MMNGR_BLOCK_SIZE;
-
-    for (;block > 0; block--) {
+    for (;block > 0; block--)
         set_bit(start++);
-        used_block++;
-    }
 }
 
 void* pmmngr_alloc_block() {

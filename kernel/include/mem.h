@@ -36,6 +36,7 @@ enum MEMMAP_ENTRY_REGION_TYPE {
 };
 
 // pmmngr.c
+void pmmngr_update_usage();
 size_t pmmngr_get_size();
 size_t pmmngr_get_used_size();
 size_t pmmngr_get_free_size();
@@ -48,4 +49,4 @@ void pmmngr_free_multi_block(void* base, size_t cnt);
 void pmmngr_init(uint32_t base, size_t size);
 
 // vmmngr.c
-void vmmngr_init();
+int vmmngr_init();

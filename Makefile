@@ -32,11 +32,12 @@ MMAP_ADDR = 0xB00
 KERNEL_ADDR = 0x1000
 
 DEFINES = -D__is_libk \
-		  -DKERNEL_SECTOR_COUNT=$(KERNEL_SECTOR_COUNT) \
-		  -DSECOND_STAGE_ADDR=$(SECOND_STAGE_ADDR) \
-		  -DMMAP_ENTRY_CNT_ADDR=$(MMAP_ENTRY_CNT_ADDR) \
-		  -DMMAP_ADDR=$(MMAP_ADDR) \
-		  -DKERNEL_ADDR=$(KERNEL_ADDR)
+			-DKERNEL_SECTOR_COUNT=$(KERNEL_SECTOR_COUNT) \
+			-DKERNEL_ADDR=$(KERNEL_ADDR) \
+			-DAFTER_KERNEL_ADDR="$(KERNEL_ADDR) + $(KERNEL_SECTOR_COUNT)*512" \
+			-DSECOND_STAGE_ADDR=$(SECOND_STAGE_ADDR) \
+			-DMMAP_ENTRY_CNT_ADDR=$(MMAP_ENTRY_CNT_ADDR) \
+			-DMMAP_ADDR=$(MMAP_ADDR) \
 
 C_INCLUDES = -I./kernel/include -I./libc/include
 
@@ -46,10 +47,22 @@ CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -std=gnu99
 LDFLAGS = -nostdlib -lgcc
 NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
 
-QEMUFLAGS = -m 128M -debugcon stdio -no-reboot
+QEMUFLAGS = -m 128M \
+			-debugcon stdio \
+			-no-reboot \
+			-accel tcg,thread=single \
+			-usb \
 
+.PHONY: all run debug libc bootloader kernel disk
 
 all: disk.img
+
+%.o: libc/stdio/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+%.o: libc/stdlib/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+%.o: libc/string/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
 stage1.bin: boot/stage1.asm
 	$(ASM) -f bin -o $@ -I./boot/include $< $(DEFINES)
@@ -60,14 +73,6 @@ bootloader.bin: stage1.bin stage2.bin
 
 kernel_entry.o: kernel/src/kernel_entry.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
-
-# i dont know how to compile a library lol
-%.o: libc/stdio/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: libc/stdlib/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: libc/string/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
 %.o: kernel/src/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
@@ -80,7 +85,7 @@ kernel_entry.o: kernel/src/kernel_entry.asm
 %.o: kernel/src/mem/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
-kernel.elf: kernel_entry.o $(LIBC_OBJ) $(OBJ)
+kernel.elf: kernel_entry.o $(OBJ) $(LIBC_OBJ)
 	# use GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(LDFLAGS) -o $@ -Ttext $(KERNEL_ADDR) $^
 kernel.bin: kernel.elf
@@ -90,15 +95,23 @@ kernel.bin: kernel.elf
 disk.img: bootloader.bin kernel.bin
 	cat $^ > $@
 
-run: all
+libc: $(LIBC_OBJ)
+
+bootloader: bootloader.bin
+
+kernel: kernel_entry.o $(OBJ)
+
+disk: disk.img
+
+run: disk.img
 	$(QEMU) -drive file=disk.img,format=raw $(QEMUFLAGS)
-debug: all
+debug: disk.img
 	$(QEMU) -drive file=disk.img,format=raw $(QEMUFLAGS) -s -S &
 	$(GDB) kernel.elf \
-        -ex 'target remote localhost:1234' \
-        -ex 'layout src' \
-        -ex 'layout reg' \
-        -ex 'break main' \
-        -ex 'continue'
+		-ex 'target remote localhost:1234' \
+		-ex 'layout src' \
+		-ex 'layout reg' \
+		-ex 'break main' \
+		-ex 'continue'
 clean:
 	rm *.bin *.o *.elf *.img

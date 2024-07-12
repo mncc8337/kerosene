@@ -3,13 +3,11 @@
 #include "tty.h"
 #include "kbd.h"
 
+#include "errorcode.h"
+
 #include "stdio.h"
 #include "stdlib.h"
 #include "string.h"
-
-// printing string using tty_print_string
-// is faster than printing string using printf
-// so use printf if you want raw speed
 
 typedef struct {
     uint32_t memmap_ptr;
@@ -28,7 +26,7 @@ void print_typed_char(key_t k) {
         tty_print_char(' ', -1, 0, false); // delete printed char
     }
     else {
-        tty_print_char(k.mapped, -1, 0, true);
+        putchar(k.mapped);
     }
 }
 
@@ -37,6 +35,7 @@ void mem_init(bootinfo_t bootinfo) {
     memmap_entry_t* mmptr = (memmap_entry_t*)bootinfo.memmap_ptr;
 
     // sort the map
+    ///////////////////////////////////////////////////////////
     bool sorted = false;
     memmap_entry_t temp;
     while(!sorted) {
@@ -53,11 +52,14 @@ void mem_init(bootinfo_t bootinfo) {
             }
         }
     }
+    ///////////////////////////////////////////////////////////
 
+    // print mem info
+    ///////////////////////////////////////////////////////////
     // spent way too much time on this table
-    tty_print_string("--[MEMORY]-+--------------------+-------------------\n", -1, 0, true);
-    tty_print_string("base addr  | length             | type\n", -1, 0, true);
-    tty_print_string("-----------+--------------------+-------------------\n", -1, 0, true);
+    printf("--[MEMORY]-+--------------------+-------------------\n");
+    printf("base addr  | length             | type\n");
+    printf("-----------+--------------------+-------------------\n");
 
     uint64_t base = 0;
     uint64_t length = 0;
@@ -65,41 +67,39 @@ void mem_init(bootinfo_t bootinfo) {
         length = ((uint64_t)mmptr[i].length_high << 32) | mmptr[i].length_low;
         base = ((uint64_t)mmptr[i].base_high << 32) | mmptr[i].base_low;
 
-        tty_print_string("0x", -1, 0, true);
-        itoa(base, freebuff, 16);
-        tty_print_string(freebuff, -1, 0, true);
-        for(int i = 0; i < 8 - (int)strlen(freebuff); i++) tty_print_char(' ', -1, 0, true);
-        tty_print_string(" | ", -1, 0, true);
+        printf("0x%s", itoa(base, freebuff, 16));
+        for(int i = 0; i < 8 - (int)strlen(freebuff); i++) putchar(' ');
+        printf(" | ");
 
-        itoa(length/1024, freebuff, 10);
-        tty_print_string(freebuff, -1, 0, true);
-        tty_print_string(" KiB", -1, 0, true);
-        for(int i = 0; i < 14 - (int)strlen(freebuff); i++) tty_print_char(' ', -1, 0, true);
-        tty_print_string(" | ", -1, 0, true);
+        printf("%s KiB", itoa(length/1024, freebuff, 10));
+        for(int i = 0; i < 14 - (int)strlen(freebuff); i++) putchar(' ');
+        printf(" | ");
 
         switch(mmptr[i].type) {
             case MMER_TYPE_USABLE:
-                tty_print_string("usable", -1, 0, true);
+                printf("usable");
                 break;
             case MMER_TYPE_RESERVED:
-                tty_print_string("reserved", -1, 0, true);
+                printf("reserved");
                 break;
             case MMER_TYPE_ACPI:
-                tty_print_string("ACPI reclamable", -1, 0, true);
+                printf("ACPI reclamable");
                 break;
             case MMER_TYPE_ACPI_NVS:
-                tty_print_string("ACPI non-volatile", -1, 0, true);
+                printf("ACPI non-volatile");
                 break;
             case MMER_TYPE_BADMEM:
-                tty_print_string("bad mem", -1, 0, true);
+                printf("bad mem");
                 break;
         }
 
-        tty_print_char('\n', -1, 0, true);
+        putchar('\n');
     }
-    tty_print_string("-----------+--------------------+-------------------\n", -1, 0, true);
+    printf("-----------+--------------------+-------------------\n");
+    ///////////////////////////////////////////////////////////
 
     // get memsize
+    ///////////////////////////////////////////////////////////
     size_t memsize = 0;
     for(unsigned int i = 0; i < entry_cnt; i++) {
         // ignore memory higher than 4GiB
@@ -108,42 +108,53 @@ void mem_init(bootinfo_t bootinfo) {
         // probaly bugs
         if(i > 0 && mmptr[i].base_low == 0) continue;
 
-        // if not usable or not apci reclaimable then skip
-        if(mmptr[i].type != MMER_TYPE_USABLE && mmptr[i].type != MMER_TYPE_ACPI)
-            continue;
-
         memsize += mmptr[i].length_low;
     }
-    // pmmngr_init(0xc0000000 + KERNEL_SECTOR_COUNT*512, memsize);
-    pmmngr_init(KERNEL_ADDR + KERNEL_SECTOR_COUNT*512 + 1, memsize);
+    pmmngr_init(AFTER_KERNEL_ADDR + 1, memsize);
+    ///////////////////////////////////////////////////////////
 
     // init regions
+    ///////////////////////////////////////////////////////////
     for(unsigned int i = 0; i < entry_cnt; i++) {
         if(mmptr[i].base_high > 0 || mmptr[i].length_high > 0) break;
         if(i > 0 && mmptr[i].base_low == 0) continue;
+        // if not usable or ACPI reclaimable then skip
         if(mmptr[i].type != MMER_TYPE_USABLE && mmptr[i].type != MMER_TYPE_ACPI)
             continue;
 
         pmmngr_init_region(mmptr[i].base_low, mmptr[i].length_low);
     }
-    // pmmngr
-    pmmngr_deinit_region(KERNEL_ADDR + KERNEL_SECTOR_COUNT*512, pmmngr_get_free_size()/MMNGR_BLOCK_SIZE);
+    ///////////////////////////////////////////////////////////
+
+    // deinit regions
+    ///////////////////////////////////////////////////////////
     // kernel
     pmmngr_deinit_region(KERNEL_ADDR, KERNEL_SECTOR_COUNT*512);
+    // physical mem manager
+    pmmngr_deinit_region(AFTER_KERNEL_ADDR, pmmngr_get_size()/MMNGR_BLOCK_SIZE);
+    ///////////////////////////////////////////////////////////
 
-    tty_print_string("initialized ", -1, 0, true);
-    tty_print_string(itoa(pmmngr_get_free_size()/1024/1024, freebuff, 10), -1, 0, true);
-    tty_print_string(" MiB memory\n", -1, 0, true);
+    pmmngr_update_usage();
+    printf("initialized ");
+    printf(itoa(pmmngr_get_free_size()/1024/1024, freebuff, 10));
+    printf(" MiB\n");
 
-    vmmngr_init();
-    tty_print_string("paging enabled\n", -1, 0, true);
+    // vmmngr init
+    ///////////////////////////////////////////////////////////
+    if(vmmngr_init() == ERR_OUT_OF_MEM) {
+        printf("cannot enable paging because there is not enough memory, system halted\n");
+        SYS_HALT();
+    }
+    printf("paging enabled\n");
+    ///////////////////////////////////////////////////////////
 }
 
 void kmain(bootinfo_t bootinfo) {
     // greeting msg to let us know we are in the kernel
-    tty_print_string("hello\n", -1, LIGHT_CYAN, true);
-    tty_print_string("this is ", -1, LIGHT_GREEN, true);
-    tty_print_string("the kernel\n", -1, LIGHT_RED, true);
+    tty_set_attr(LIGHT_CYAN);  printf("hello\n");
+    tty_set_attr(LIGHT_GREEN); printf("this is ");
+    tty_set_attr(LIGHT_RED);   printf("the kernel\n");
+    tty_set_attr(LIGHT_GREY);
 
     mem_init(bootinfo);
 
@@ -161,8 +172,6 @@ void kmain(bootinfo_t bootinfo) {
     tty_enable_cursor(13, 14);
 
     set_key_listener(print_typed_char);
-
-    printf("ngu %d heeh\n", 12);
 
     while(true);
 }

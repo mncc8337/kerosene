@@ -25,8 +25,10 @@
 #define LIGHT_BROWN   0xe
 #define WHITE         0xf
 
-int tty_get_attr(int bg, int fg);
-int tty_get_offset(int row, int col);
+#define TTY_ATTR(bg, fg) (bg) * 16 + (fg)
+#define TTY_OFFSET(r, c) (r) * MAX_COLS + (c)
+
+void tty_set_attr(unsigned char attr);
 void tty_enable_cursor(unsigned char cursor_scanline_start, unsigned char cursor_scanline_end);
 void tty_disable_cursor();
 int tty_get_cursor();
