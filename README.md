@@ -32,10 +32,10 @@ to build and test it just run `make run`. make sure to correct the location of y
 - [x] play with the PIT
 - [ ] memory manager
     + [x] physical memory manager
-    + [ ] virtual memory manager
+    + [x] virtual memory manager
     + [ ] the heap
 - [ ] better organizing
-    + [ ] libc
+    + [x] libc
     + [ ] split kernel_entry.asm
 - [ ] get current datetime
 - [ ] support multiboot

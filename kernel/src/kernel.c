@@ -173,5 +173,7 @@ void kmain(bootinfo_t bootinfo) {
 
     set_key_listener(print_typed_char);
 
+    printf("done initializing\n");
+
     while(true);
 }
