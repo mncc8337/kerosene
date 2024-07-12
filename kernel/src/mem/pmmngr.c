@@ -10,9 +10,9 @@ static void set_bit(uint32_t bit) {
 static void unset_bit(uint32_t bit) {
     mem_addr[bit/32] &= ~(1 << (bit % 32));
 }
-static bool test_bit(uint32_t bit) {
-    return (mem_addr[bit/32] >> (bit % 32)) & 1;
-}
+// static bool test_bit(uint32_t bit) {
+//     return (mem_addr[bit/32] >> (bit % 32)) & 1;
+// }
 
 static int find_first_free_block() {
     for(unsigned int i = 0; i < total_block/32; i++) {
@@ -74,10 +74,6 @@ size_t pmmngr_get_free_size() {
 }
 
 void pmmngr_init_region(uint32_t base, size_t size) {
-    if(base & MMNGR_BLOCK_SIZE) {
-        base += MMNGR_BLOCK_SIZE;
-        base &= ~MMNGR_BLOCK_SIZE;
-    }
     int start = base / MMNGR_BLOCK_SIZE;
     int block = size / MMNGR_BLOCK_SIZE;
 
@@ -88,10 +84,6 @@ void pmmngr_init_region(uint32_t base, size_t size) {
 }
 
 void pmmngr_deinit_region(uint32_t base, size_t size) {
-    if(base & MMNGR_BLOCK_SIZE) {
-        base += MMNGR_BLOCK_SIZE;
-        base &= ~MMNGR_BLOCK_SIZE;
-    }
     int start = base / MMNGR_BLOCK_SIZE;
     int block = size / MMNGR_BLOCK_SIZE;
 
