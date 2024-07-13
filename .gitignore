@@ -6,6 +6,8 @@ wip
 
 # various bins
 *.o
+*.a
+*.d
 *.elf
 *.bin
 *.img

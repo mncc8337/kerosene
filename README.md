@@ -12,7 +12,9 @@ to compile and run the project you will need:
 - a [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a normal x86_64 elf GCC will compile it without any errors (by adding some flags, see the commented CFLAGS lines in Makefile), the osdev wiki said we should use a cross compiler to avoid any unexpected errors
 - nasm
 - qemu  
-to build and test it just run `make run`. make sure to correct the location of your cross compiler `CROSS_COMPILER_LOC` in the first few lines in `Makefile`  
+  
+- to build run `make all`
+- to test run `make run`.  
 > [!WARNING]  
 > YOU SHOULD NOT RUN THE OS ON REAL HARDWARE.  
 > right now it's pretty safe to run the os on real hardware because it hasn't done anything like writting to hard drive, but by the time i implement the filesystem it should be dangerous to do so.

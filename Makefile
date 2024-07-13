@@ -17,8 +17,8 @@ C_SRC = kernel/src/*.c \
 		kernel/src/driver/*.c \
 		kernel/src/mem/*.c \
 
-OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(C_SRC)))))
 LIBC_OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
+OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(C_SRC)))))
 
 # number of sectors that the kernel will fit in
 KERNEL_SECTOR_COUNT = 50
@@ -53,16 +53,22 @@ QEMUFLAGS = -m 128M \
 			-accel tcg,thread=single \
 			-usb \
 
-.PHONY: all run debug libc bootloader kernel disk
+.PHONY: all run debug libc libk bootloader kernel disk
 
 all: disk.img
 
 %.o: libc/stdio/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(CFLAGS) -MD -o $@ $(C_INCLUDES) -c $<
 %.o: libc/stdlib/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(CFLAGS) -MD -o $@ $(C_INCLUDES) -c $<
 %.o: libc/string/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(CFLAGS) -MD -o $@ $(C_INCLUDES) -c $<
+libk.a: $(LIBC_OBJ)
+	$(CROSS_COMPILER_LOC)$(TARGET)-ar rcs $@ $^
+	@echo done building libk
+	# rm $(LIBC_OBJ)
+libc.a: $(LIBC_OBJ)
+	@echo libc is not ready for building, yet
 
 stage1.bin: boot/stage1.asm
 	$(ASM) -f bin -o $@ -I./boot/include $< $(DEFINES)
@@ -85,9 +91,9 @@ kernel_entry.o: kernel/src/kernel_entry.asm
 %.o: kernel/src/mem/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
-kernel.elf: kernel_entry.o $(OBJ) $(LIBC_OBJ)
+kernel.elf: kernel_entry.o $(OBJ) libk.a
 	# use GCC to link instead of LD because LD cannot find the libgcc
-	$(CC) $(LDFLAGS) -o $@ -Ttext $(KERNEL_ADDR) $^
+	$(CC) $(LDFLAGS) -o $@ -Ttext $(KERNEL_ADDR) $^ -L./ -lk
 kernel.bin: kernel.elf
 	$(CROSS_COMPILER_LOC)$(TARGET)-objcopy -O binary $< $@
 	dd if=/dev/zero of=$@ bs=512 count=0 seek=$(KERNEL_SECTOR_COUNT)
@@ -95,7 +101,10 @@ kernel.bin: kernel.elf
 disk.img: bootloader.bin kernel.bin
 	cat $^ > $@
 
-libc: $(LIBC_OBJ)
+libc:
+	@echo libc is not ready to build, yet
+
+libk: libk.a
 
 bootloader: bootloader.bin
 
@@ -114,4 +123,4 @@ debug: disk.img
 		-ex 'break main' \
 		-ex 'continue'
 clean:
-	rm *.bin *.o *.elf *.img
+	rm *.bin *.o *.d *.a *.elf *.img
