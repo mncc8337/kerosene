@@ -11,13 +11,12 @@ it's a working-in-progress project and should not be used as references for osde
 to compile and run the project you will need:
 - a [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a normal x86_64 elf GCC will compile it without any errors (by adding some flags, see the commented CFLAGS lines in Makefile), the osdev wiki said we should use a cross compiler to avoid any unexpected errors
 - nasm
+- grub (and xorriso to gen iso image)
 - qemu  
-  
-- to build run `make all`
-- to test run `make run`.  
+to build `./build.sh`. to run `./run.sh`. to add file to the disk image `./cpyfile.sh $filename ./mnt/path/to/dir`  
+these scripts will need sudo privilege to setup loopback device for the hard disk image.
 > [!WARNING]  
 > YOU SHOULD NOT RUN THE OS ON REAL HARDWARE.  
-> right now it's pretty safe to run the os on real hardware because it hasn't done anything like writting to hard drive, but by the time i implement the filesystem it should be dangerous to do so.
 > if you wish to do it any way, run `sudo dd if=disk.img of=/dev/sdX && sync` (MAKE SURE /dev/sdX IS AN USB DEVICE) or any program to burn the disk image into an usb device, restart the pc and choose the usb in the boot menu.
 ## progress
 - [x] boot to the kernel
@@ -40,10 +39,10 @@ to compile and run the project you will need:
     + [x] libc
     + [ ] split kernel_entry.asm
 - [ ] get current datetime
-- [ ] support multiboot
+- [x] support multiboot (i switched to GRUB so it should be lol)
 - [ ] filesystem (probaly FAT)
 - [ ] read disk
-- [ ] load kernel with ELF binary instead of flat binary
+- [x] load kernel with ELF binary instead of flat binary
 - [ ] multi-processing
 - [ ] userland
 - [ ] APCI
