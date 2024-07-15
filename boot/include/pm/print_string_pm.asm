@@ -1,8 +1,8 @@
 [bits 32]
 
 ; in
-;   esi, string to print
-;   ebx, offset
+;   esi = string to print
+;   ebx = offset
 print_string_pm:
     pusha
     mov edx, 0xb8000 ; Set edx to the start of vid mem.

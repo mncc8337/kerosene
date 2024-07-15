@@ -1,6 +1,9 @@
 # my cross compiler
 cross
 
+# dir use to put files onto image
+mnt
+
 # wip
 wip
 
@@ -11,3 +14,4 @@ wip
 *.elf
 *.bin
 *.img
+*.iso

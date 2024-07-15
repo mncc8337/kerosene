@@ -1,7 +1,7 @@
 ; in
-;   si: store address
+;   si = store address
 ; out
-;   cx: string length
+;   cx = string length
 get_line:
     mov cx, 0
 .get_char:

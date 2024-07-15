@@ -1,5 +1,5 @@
 ; in
-;   si, string to print
+;   si = string to print
 print_string:
     pusha
     mov ah, 0xe

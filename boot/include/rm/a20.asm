@@ -1,5 +1,5 @@
 ; out:
-;   ax - state (0 - disabled, 1 - enabled)
+;   ax = state (0 - disabled, 1 - enabled)
 get_a20_state:
     pushf
     push si
@@ -46,8 +46,8 @@ get_a20_state:
     .BufferOverMB  db 0
 
 ; out:
-;   ax - a20 support bits (bit #0 - supported on keyboard controller; bit #1 - supported with bit #1 of port 0x92)
-;   cf - set on error
+;   ax = a20 support bits (bit #0 - supported on keyboard controller; bit #1 - supported with bit #1 of port 0x92)
+;   cf = set on error
 query_a20_support:
     push bx
     clc
@@ -110,7 +110,7 @@ enable_a20_keyboard_controller:
     ret
 
 ; out:
-;   cf - set on error
+;   cf = set on error
 enable_a20:
     clc ; clear cf
     pusha

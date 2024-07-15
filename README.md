@@ -3,7 +3,7 @@ a x86 os written from scratch
 this is an attempt of me to learn about osdev  
 it's a working-in-progress project and should not be used as references for osdev (it's full of bad practices if you ask)  
 ## features
-- a (bad/suck/horrible) custom 2-stage bootloader
+- ~~~a (bad/suck/horrible) custom 2-stage bootloader~~~ i switched to GRUB
 - a proper keyboard driver (which lacks of LED indicating, shortcuts support lol)
 - it can print text! (with colors!)
 - yeah that's all

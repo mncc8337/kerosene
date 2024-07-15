@@ -12,27 +12,11 @@
 #define PAGE_GET_PHYSICAL_ADDRESS(x) (*(x) & ~0xfff)
 
 typedef struct {
-    uint32_t base_low;   uint32_t base_high;
-    uint32_t length_low; uint32_t length_high;
-    uint32_t type;
-    uint32_t acpi;
-} __attribute__((packed)) memmap_entry_t;
-
-typedef struct {
     uint32_t entry[1024] __attribute__((aligned(4096)));
 } __attribute__((packed)) ptable;
 typedef struct {
     uint32_t entry[1024] __attribute__((aligned(4096)));
 } __attribute__((packed)) pdir;
-
-enum MEMMAP_ENTRY_REGION_TYPE {
-    MMER_TYPE_UNKNOWN,
-    MMER_TYPE_USABLE,
-    MMER_TYPE_RESERVED,
-    MMER_TYPE_ACPI,
-    MMER_TYPE_ACPI_NVS,
-    MMER_TYPE_BADMEM,
-};
 
 enum PAGE_PTE_FLAGS {
     I86_PTE_PRESENT = 1,

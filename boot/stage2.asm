@@ -16,7 +16,6 @@ mmap_addr: dw 0
 
 %include "rm/print_string.asm"
 %include "rm/print_hex.asm"
-%include "rm/disk_load.asm"
 %include "rm/a20.asm"
 %include "rm/e820_memmap.asm"
 %include "switch_to_pm.asm"
@@ -25,6 +24,8 @@ mmap_addr: dw 0
 second_stage:
     mov si, boot_stage2_msg
     call print_string
+
+    jmp $
 
     ; enable A20 line
     call enable_a20

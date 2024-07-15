@@ -1,8 +1,8 @@
 [bits 32]
 
 ; in
-;   edx: hex to print
-;   ebx: offset
+;   edx = hex to print
+;   ebx = offset
 print_hex_pm:
     pusha
 

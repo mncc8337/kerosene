@@ -1,6 +1,6 @@
 ; in
-;   si, string to clear
-;   cx, number of bytes
+;   si = string to clear
+;   cx = number of bytes
 clear_string:
     cmp cx, 0x0
     je .end_clear_string
