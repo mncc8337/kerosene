@@ -3,6 +3,8 @@
 rm disk.img
 mkdir -p mnt
 
+set -e
+
 disksize_KiB=65536
 
 if [ -n "$1" ]; then

@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 if [ -z "$1" ]; then
     echo no arg, quitting

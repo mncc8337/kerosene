@@ -1,4 +1,5 @@
 #include "stdio.h"
+#include "stdlib.h"
 #include "limits.h"
 #include "stdbool.h"
 #include "stdarg.h"
@@ -10,6 +11,19 @@ static bool print(const char* data, size_t length) {
         if(putchar(bytes[i]) == EOF)
             return false;
     return true;
+}
+static size_t intlen(int num, int radix) {
+    if(num == 0) return 1;
+    size_t len = 0;
+    if(radix == 10 && num < 0) {
+        len++; // minus sign
+        num *= -1;
+    }
+    while(num > 0) {
+        num /= radix;
+        len++;
+    }
+    return len;
 }
 
 int printf(const char* restrict format, ...) {
@@ -28,7 +42,7 @@ int printf(const char* restrict format, ...) {
             while(format[amount] && format[amount] != '%')
                 amount++;
             if(maxrem < amount) {
-                // TODO: set errno to EOVERFLOW
+                // TODO: set errno to ERR_OVERFLOW
                 return -1;
             }
             if(!print(format, amount))
@@ -44,7 +58,7 @@ int printf(const char* restrict format, ...) {
             format++;
             char c = (char) va_arg(parameters, int /* char promotes to int */);
             if(!maxrem) {
-                // TODO: set errno to EOVERFLOW
+                // TODO: set errno to ERR_OVERFLOW
                 return -1;
             }
             if(!print(&c, sizeof(c)))
@@ -56,7 +70,46 @@ int printf(const char* restrict format, ...) {
             const char* str = va_arg(parameters, const char*);
             size_t len = strlen(str);
             if(maxrem < len) {
-                // TODO: set errno to EOVERFLOW
+                // TODO: set errno to ERR_OVERFLOW
+                return -1;
+            }
+            if(!print(str, len))
+                return -1;
+            written += len;
+        }
+        else if(*format == 'o') {
+            format++;
+            int integer = va_arg(parameters, int);
+            size_t len = intlen(integer, 8);
+            char str[len + 1]; itoa(integer, str, 8);
+            if(maxrem < len) {
+                // TODO: set errno to ERR_OVERFLOW
+                return -1;
+            }
+            if(!print(str, len))
+                return -1;
+            written += len;
+        }
+        else if(*format == 'd') {
+            format++;
+            int integer = va_arg(parameters, int);
+            size_t len = intlen(integer, 10);
+            char str[len + 1]; itoa(integer, str, 10);
+            if(maxrem < len) {
+                // TODO: set errno to ERR_OVERFLOW
+                return -1;
+            }
+            if(!print(str, len))
+                return -1;
+            written += len;
+        }
+        else if(*format == 'x') {
+            format++;
+            int integer = va_arg(parameters, int);
+            size_t len = intlen(integer, 16);
+            char str[len + 1]; itoa(integer, str, 16);
+            if(maxrem < len) {
+                // TODO: set errno to ERR_OVERFLOW
                 return -1;
             }
             if(!print(str, len))
@@ -67,7 +120,7 @@ int printf(const char* restrict format, ...) {
             format = format_begun_at;
             size_t len = strlen(format);
             if(maxrem < len) {
-                // TODO: set errno to EOVERFLO.
+                // TODO: set errno to ERR_OVERFLOW
                 return -1;
             }
             if(!print(format, len))

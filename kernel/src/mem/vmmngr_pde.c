@@ -24,5 +24,6 @@ bool pde_is_writable(uint32_t e) {
 uint32_t pde_pfn(uint32_t e) {
     return e & I86_PDE_FRAME;
 }
-void pde_enable_global(uint32_t e) {
-}
+// commented till i need it
+// void pde_enable_global(uint32_t e) {
+// }

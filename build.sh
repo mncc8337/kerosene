@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 make all
 if [ ! -f disk.img ]; then

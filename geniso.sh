@@ -1,4 +1,5 @@
 #!/bin/sh
+set -e
 
 sudo losetup /dev/loop0 disk.img -o 1048576 # 1024^2
 sudo mount /dev/loop0 ./mnt

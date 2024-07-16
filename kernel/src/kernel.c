@@ -33,9 +33,9 @@ void mem_init(multiboot_info_t* mbd) {
 
     // print mem info
     ///////////////////////////////////////////////////////////
-    printf("--[MEMORY]-+--------------------+-------------------\n");
-    printf("base addr  | length             | type\n");
-    printf("-----------+--------------------+-------------------\n");
+    puts("--[MEMORY]-+--------------------+-------------------");
+    puts("base addr  | length             | type");
+    puts("-----------+--------------------+-------------------");
 
     for(unsigned int i = 0; i < mbd->mmap_length; i += sizeof(multiboot_memory_map_t)) {
         multiboot_memory_map_t* mmmt = (multiboot_memory_map_t*)(mbd->mmap_addr + i);
@@ -68,7 +68,7 @@ void mem_init(multiboot_info_t* mbd) {
 
         putchar('\n');
     }
-    printf("-----------+--------------------+-------------------\n");
+    puts("-----------+--------------------+-------------------");
     ///////////////////////////////////////////////////////////
 
     // get memsize
@@ -114,31 +114,31 @@ void mem_init(multiboot_info_t* mbd) {
     pmmngr_update_usage();
     printf("initialized ");
     printf(itoa(pmmngr_get_free_size()/1024/1024, freebuff, 10));
-    printf(" MiB\n");
+    puts(" MiB");
 
     // vmmngr init
     ///////////////////////////////////////////////////////////
     if(vmmngr_init() == ERR_OUT_OF_MEM) {
-        printf("cannot enable paging because there is not enough memory, system halted\n");
+        puts("cannot enable paging because there is not enough memory, system halted");
         SYS_HALT();
     }
-    printf("paging enabled\n");
+    puts("paging enabled");
     ///////////////////////////////////////////////////////////
 }
 
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // greeting msg to let us know we are in the kernel
-    tty_set_attr(LIGHT_CYAN);  printf("hello\n");
+    tty_set_attr(LIGHT_CYAN);  puts("hello");
     tty_set_attr(LIGHT_GREEN); printf("this is ");
-    tty_set_attr(LIGHT_RED);   printf("the kernel\n");
+    tty_set_attr(LIGHT_RED);   puts("the kernel");
     tty_set_attr(LIGHT_GREY);
 
     if(magic != MULTIBOOT_BOOTLOADER_MAGIC) {
-        printf("invalid magic number. system halted");
+        puts("invalid magic number. system halted");
         SYS_HALT();
     }
     if(!(mbd->flags >> 6 & 0x1)) {
-        printf("invalid memory map given by GRUB");
+        puts("invalid memory map given by GRUB. system halted");
         SYS_HALT();
     }
     mem_init(mbd);
@@ -158,7 +158,14 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     set_key_listener(print_typed_char);
 
-    printf("done initializing\n");
+    puts("done initializing");
+
+    char printing_txt[] = "printing";
+    printf("im %s formated stri%c%c\n", printing_txt, 'n', 'g');
+    printf("this is some numbers: %d %d %d %d\n", 15, 0, 12, -8);
+    printf("%% symbol\n");
+    printf("some hex num: %x %x %x %x\n", 0x13, 0xbeef, 0xdead, 0xbee);
+    printf("some oct num: %o %o %o %o\n", 07, 0100, 014, 8);
 
     while(true);
 }
