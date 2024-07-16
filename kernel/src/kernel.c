@@ -111,10 +111,8 @@ void mem_init(multiboot_info_t* mbd) {
     pmmngr_deinit_region(endkernel, pmmngr_get_size()/MMNGR_BLOCK_SIZE);
     ///////////////////////////////////////////////////////////
 
-    pmmngr_update_usage();
-    printf("initialized ");
-    printf(itoa(pmmngr_get_free_size()/1024/1024, freebuff, 10));
-    puts(" MiB");
+    pmmngr_update_usage(); // always run this after init and deinit regions
+    printf("initialized %d MiB\n", pmmngr_get_free_size()/1024/1024);
 
     // vmmngr init
     ///////////////////////////////////////////////////////////

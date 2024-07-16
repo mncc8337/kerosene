@@ -1,34 +1,7 @@
 [bits 32]
 
-; TODO
-; split this into multiple files
+%define DATA_SEG 0x10
 
-CODE_SEG equ 0x08
-DATA_SEG equ 0x10
-
-; GDT
-global gdt_flush
-extern gdtr
-gdt_flush:
-    lgdt [gdtr]
-    jmp CODE_SEG:.flush ; far jump to flush all caches
-.flush:
-    mov ax, DATA_SEG
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov ss, ax
-    ret
-
-; IDT
-global load_idt
-extern idtr
-load_idt:
-    lidt [idtr]
-    ret
-
-; ISR
 %macro isr_err_stub 1
 isr_stub_%1:
     cli
@@ -109,69 +82,3 @@ isr_table:
     dd isr_stub_%+i
 %assign i i+1
 %endrep
-
-; IRQ
-%assign i 0 
-%rep 16
-irq_stub_%+i:
-    cli
-    push byte 0
-    push byte i+32
-    jmp irq_common_stub
-%assign i i+1 
-%endrep
-
-extern irq_handler
-irq_common_stub:
-    pusha
-    push ds
-    push es
-    push fs
-    push gs
-    mov ax, DATA_SEG
-    mov ds, ax
-    mov es, ax
-    mov fs, ax
-    mov gs, ax
-    mov eax, esp
-    push eax
-    mov eax, irq_handler
-    call eax
-    pop eax
-    pop gs
-    pop fs
-    pop es
-    pop ds
-    popa
-    add esp, 8
-    iret
-
-global irq_table
-irq_table:
-%assign i 0 
-%rep 16
-    dd irq_stub_%+i
-%assign i i+1 
-%endrep
-
-; paging
-global load_page_directory
-load_page_directory:
-    push ebp
-    mov ebp, esp
-    mov eax, [ebp + 8]
-    mov cr3, eax
-    mov esp, ebp
-    pop ebp
-    ret
-
-global enable_paging
-enable_paging:
-    push ebp
-    mov ebp, esp
-    mov eax, cr0
-    or eax, 0x80000000
-    mov cr0, eax
-    mov esp, ebp
-    pop ebp
-    ret

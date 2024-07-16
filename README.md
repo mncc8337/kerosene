@@ -35,9 +35,6 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
     + [x] physical memory manager
     + [x] virtual memory manager
     + [ ] the heap
-- [ ] better organizing
-    + [x] libc
-    + [ ] split kernel_entry.asm
 - [ ] get current datetime
 - [x] support multiboot (i switched to GRUB so it should be lol)
 - [ ] filesystem (probaly FAT)

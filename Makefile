@@ -15,8 +15,12 @@ C_SRC = kernel/src/*.c \
 		kernel/src/driver/*.c \
 		kernel/src/mem/*.c \
 
+ASM_SRC = kernel/src/system/*.asm \
+		  kernel/src/mem/*.asm \
+
 LIBC_OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
-OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(C_SRC)))))
+OBJ  = $(addsuffix .o, $(basename $(notdir $(wildcard $(C_SRC)))))
+OBJ += $(addsuffix .o, $(notdir $(wildcard $(ASM_SRC))))
 
 # memory address that the kernel will be loaded to
 KERNEL_ADDR = 0x1000
@@ -48,10 +52,7 @@ libk.a: $(LIBC_OBJ)
 libc.a: $(LIBC_OBJ)
 	@echo libc is not ready for building, yet
 
-boot.o: boot.asm
-	nasm $(NASMFLAGS) -o $@ $<
-
-kernel_entry.o: kernel/src/kernel_entry.asm
+multiboot-header.o: multiboot-header.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
 %.o: kernel/src/%.c
@@ -65,7 +66,12 @@ kernel_entry.o: kernel/src/kernel_entry.asm
 %.o: kernel/src/mem/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
-kernel.bin: boot.o kernel_entry.o $(OBJ) libk.a
+%.asm.o: kernel/src/system/%.asm
+	$(ASM) $(NASMFLAGS) -o $@ $<
+%.asm.o: kernel/src/mem/%.asm
+	$(ASM) $(NASMFLAGS) -o $@ $<
+
+kernel.bin: multiboot-header.o $(OBJ) libk.a
 	# use GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(LDFLAGS) -o $@ $^ -L./ -lk
 
