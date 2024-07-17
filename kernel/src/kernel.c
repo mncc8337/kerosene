@@ -124,6 +124,33 @@ void mem_init(multiboot_info_t* mbd) {
     puts("paging enabled");
     ///////////////////////////////////////////////////////////
 }
+void disk_init() {
+    uint16_t IDENTIFY_returned[256];
+    if(ata_pio_init(IDENTIFY_returned)) {
+        puts("ATA PIO initialized");
+
+        printf(
+            "    LBA48 mode: %s\n",
+            (IDENTIFY_returned[83] & 0x400) ? "yes" : "no"
+        );
+
+        if(IDENTIFY_returned[88]) {
+            uint8_t supported_UDMA = IDENTIFY_returned[88] & 0xff;
+            uint8_t active_UDMA = IDENTIFY_returned[88] >> 8;
+            printf("    supported UDMA mode:");
+            for(int i = 0; i < 8; i++)
+                if(supported_UDMA & (1 << i)) printf(" %d", i+1);
+            putchar('\n');
+            printf("    active UDMA mode:");
+            for(int i = 0; i < 8; i++)
+                if(active_UDMA & (1 << i)) printf(" %d", i+1);
+            putchar('\n');
+        }
+    }
+    else {
+        puts("failed to initialize ATA PIO");
+    }
+}
 
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // greeting msg to let us know we are in the kernel
@@ -150,31 +177,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // after initialize all interrupt handlers
     asm volatile("sti");
 
-    uint16_t IDENTIFY_returned[256];
-    if(ata_pio_init(IDENTIFY_returned)) {
-        puts("ATA PIO initialized");
-
-        printf(
-            "    LBA48 mode: %s\n",
-            (IDENTIFY_returned[83] & (1 << 10)) ? "yes" : "no"
-        );
-
-        if(IDENTIFY_returned[88]) {
-            uint8_t supported_UDMA = IDENTIFY_returned[88] & 0xff;
-            uint8_t active_UDMA = IDENTIFY_returned[88] >> 8;
-            printf("    supported UDMA mode:");
-            for(int i = 0; i < 8; i++)
-                if(supported_UDMA & (1 << i)) printf(" %d", i+1);
-            putchar('\n');
-            printf("    active UDMA mode:");
-            for(int i = 0; i < 8; i++)
-                if(active_UDMA & (1 << i)) printf(" %d", i+1);
-            putchar('\n');
-        }
-    }
-    else {
-        puts("failed to initialize ATA PIO");
-    }
+    disk_init();
 
     kbd_init();
 

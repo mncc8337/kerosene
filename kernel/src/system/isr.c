@@ -1,7 +1,7 @@
 #include "system.h"
 #include "tty.h"
 
-static char *exception_message[] = {
+static char* exception_message[] = {
     "Division Error",
     "Debug",
     "Non-maskable Interrupt",
