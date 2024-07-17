@@ -4,6 +4,13 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+typedef enum {
+    ERR_MEM_OUT_OF_MEM,
+    ERR_MEM_SUCCESS,
+    ERR_MEM_FAILED,
+    ERR_MEM_INVALID_DIR,
+} MEM_ERR;
+
 #define MMNGR_BLOCK_SIZE 4096
 #define MMNGR_PAGE_SIZE 4096
 
@@ -83,10 +90,10 @@ void load_page_directory(uint32_t* pd);
 void enable_paging();
 uint32_t* vmmngr_ptable_lookup_entry(ptable* p, uint32_t addr);
 uint32_t* vmmngr_pdirectory_lookup_entry(pdir* p, uint32_t addr);
-bool vmmngr_switch_pdirectory(pdir* dir);
+MEM_ERR vmmngr_switch_pdirectory(pdir* dir);
 pdir* vmmngr_get_directory();
 void vmmngr_flush_tlb_entry(uint32_t addr);
-bool vmmngr_alloc_page(uint32_t* e);
+MEM_ERR vmmngr_alloc_page(uint32_t* e);
 void vmmngr_free_page(uint32_t* e);
-void vmmngr_map_page(uint32_t phys, uint32_t virt);
-int vmmngr_init();
+MEM_ERR vmmngr_map_page(uint32_t phys, uint32_t virt);
+MEM_ERR vmmngr_init();

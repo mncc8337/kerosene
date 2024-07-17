@@ -1,6 +1,5 @@
 #include "mem.h"
 #include "string.h"
-#include "errorcode.h"
 
 extern void load_page_directory(uint32_t*);
 extern void enable_paging();
@@ -10,20 +9,20 @@ static uint32_t current_pdbr = 0;
 
 uint32_t* vmmngr_ptable_lookup_entry(ptable* p, uint32_t addr) {
     if(p) return &p->entry[PAGE_TABLE_INDEX(addr)];
-    return 0;
+    return (uint32_t*)ERR_MEM_FAILED;
 }
 
 uint32_t* vmmngr_pdirectory_lookup_entry(pdir* p, uint32_t addr) {
     if(p) return &p->entry[PAGE_TABLE_INDEX(addr)];
-    return 0;
+    return (uint32_t*)ERR_MEM_FAILED;
 }
 
-bool vmmngr_switch_pdirectory(pdir* dir) {
-    if(!dir) return false;
+MEM_ERR vmmngr_switch_pdirectory(pdir* dir) {
+    if(!dir) return ERR_MEM_INVALID_DIR;
 
     current_directory = dir;
     load_page_directory((uint32_t*)current_pdbr);
-    return true;
+    return ERR_MEM_SUCCESS;
 }
 
 pdir* vmmngr_get_directory() {
@@ -34,14 +33,14 @@ void vmmngr_flush_tlb_entry(uint32_t addr) {
 	asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
 }
 
-bool vmmngr_alloc_page(uint32_t* e) {
+MEM_ERR vmmngr_alloc_page(uint32_t* e) {
     void* p = pmmngr_alloc_block();
-    if(!p) return false;
+    if(!p) return ERR_MEM_OUT_OF_MEM;
 
     pte_set_frame(e, (uint32_t)p);
     pte_add_attrib(e, I86_PTE_PRESENT);
 
-    return true;
+    return ERR_MEM_SUCCESS;
 }
 
 void vmmngr_free_page(uint32_t* e) {
@@ -51,7 +50,7 @@ void vmmngr_free_page(uint32_t* e) {
     pte_del_attrib(e, I86_PTE_PRESENT);
 }
 
-void vmmngr_map_page(uint32_t phys, uint32_t virt) {
+MEM_ERR vmmngr_map_page(uint32_t phys, uint32_t virt) {
     // get page directory
     pdir* pageDirectory = vmmngr_get_directory();
 
@@ -60,7 +59,7 @@ void vmmngr_map_page(uint32_t phys, uint32_t virt) {
     if((*e & I86_PTE_PRESENT) != I86_PTE_PRESENT) {
         // if page table not present then allocate it
         ptable* table = (ptable*)pmmngr_alloc_block();
-        if(!table) return;
+        if(!table) return ERR_MEM_OUT_OF_MEM;
 
         // clear page table
         memset(table, 0, sizeof(ptable));
@@ -79,14 +78,16 @@ void vmmngr_map_page(uint32_t phys, uint32_t virt) {
     uint32_t* page = &table->entry[PAGE_TABLE_INDEX(virt)];
     pte_set_frame(page, phys);
     pte_add_attrib(page, I86_PTE_PRESENT);
+
+    return ERR_MEM_SUCCESS;
 }
 
-int vmmngr_init() {
+MEM_ERR vmmngr_init() {
     ptable* ptable1 = (ptable*)pmmngr_alloc_block();
-    if(!ptable1) return ERR_OUT_OF_MEM;
+    if(!ptable1) return ERR_MEM_OUT_OF_MEM;
 
     ptable* ptable2 = (ptable*)pmmngr_alloc_block();
-    if(!ptable2) return ERR_OUT_OF_MEM;
+    if(!ptable2) return ERR_MEM_OUT_OF_MEM;
 
     int frame = 0;
     int virt = 0;
@@ -111,7 +112,7 @@ int vmmngr_init() {
     }
 
     pdir* page_directory = (pdir*)pmmngr_alloc_multi_block(3);
-    if(!page_directory) return ERR_OUT_OF_MEM;
+    if(!page_directory) return ERR_MEM_OUT_OF_MEM;
 
     for(int i = 0; i < 1024; i++)
         page_directory->entry[i] = 0x00000002;
@@ -123,5 +124,5 @@ int vmmngr_init() {
     vmmngr_switch_pdirectory(page_directory);
     enable_paging();
 
-    return ERR_SUCCESS;
+    return ERR_MEM_SUCCESS;
 }

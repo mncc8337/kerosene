@@ -37,16 +37,16 @@ static bool ata_pio_identify() {
     for(int i = 1; i <= 14; i++) port_inb(PORT_ATA_PIO_STAT);
     uint8_t stat = port_inb(PORT_ATA_PIO_STAT);
     if(stat == 0) // drive does not exists
-        return false;
+        return ERR_ATA_PIO_NO_DEV;
 
     // poll until bit 7 (BSY) is clear
     while(stat & 0x80) stat = port_inb(PORT_ATA_PIO_STAT);
     // check if LBA low and LBA high are non-zero
     // if so they are not ATA device
     if(port_inb(PORT_ATA_PIO_LBA_LO) && port_inb(PORT_ATA_PIO_LBA_HI))
-        return false;
+        return ERR_ATA_PIO_NO_DEV;
 
-    return true;
+    return ERR_ATA_PIO_SUCCESS;
 }
 
 static void software_reset() {
@@ -54,16 +54,18 @@ static void software_reset() {
     port_outb(PORT_ATA_PIO_DEV_CTRL, 0);
 }
 
-// buffer len must be larger or equal to 31
-char* ata_pio_get_last_error() {
+char* ata_pio_get_error() {
     uint8_t err = port_inb(PORT_ATA_PIO_ERROR);
-    for(int i = 0; i < 8; i++)
-        if(err & (1 << i)) return error_msg[i];
-    return "it's never reach here";
+    int i;
+    for(i = 0; i < 8; i++)
+        if(err & (1 << i)) break;
+    software_reset();
+    return error_msg[i];
 }
 
-bool ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector_cnt, uint8_t* buff) {
-    if(!LBA28_mode) return false;
+ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector_cnt, uint8_t* buff) {
+    if(!LBA28_mode) return ERR_ATA_PIO_METHOD_NOT_AVAILABLE;
+    if(sector_cnt == 0) return ERR_ATA_PIO_INVALID_PARAMS;
     const int slavebit = 0; // idk what is this
 
     // 0xe0 for master, 0xf0 for slave
@@ -88,10 +90,7 @@ bool ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector_cnt, u
     for(unsigned int j = 0; j < sector_cnt; j++) {
         stat = 0;
         while(stat & 0x8 || stat & 0x1) stat = port_inb(PORT_ATA_PIO_STAT);
-        if(stat & 0x1) { // error bit set
-            software_reset(); // to clear error bit
-            return false;
-        }
+        if(stat & 0x1) return ERR_ATA_PIO_ERR_BIT_SET;
 
         uint16_t dat;
         for(int i = 0; i < 256; i++) {
@@ -110,32 +109,27 @@ bool ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector_cnt, u
     if(!read_op) port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_CACHE_FLUSH);
     io_wait();
 
-    return true;
+    return ERR_ATA_PIO_SUCCESS;
 }
 
-bool ata_pio_init(uint16_t* buff) {
+ATA_PIO_ERR ata_pio_init(uint16_t* buff) {
     uint8_t stat = port_inb(PORT_ATA_PIO_STAT);
     // 0xff is a illegal status return
     // if it is ever returned that means there is no drive
-    if(stat == 0xff) return false;
+    if(stat == 0xff) return ERR_ATA_PIO_NO_DEV;
 
     software_reset();
 
     bool dev_available = ata_pio_identify();
-    if(!dev_available) return false;
+    if(!dev_available) return ERR_ATA_PIO_NO_DEV;
 
     // continue polling until bit 3 (DRQ) or bit 0 (ERR) is set
     stat = 0;
     while(stat & 0x8 || stat & 0x1) stat = port_inb(PORT_ATA_PIO_STAT);
-    // if bit 0 (ERR) is set then data is not ready
-    if(stat & 0x1) {
-        software_reset(); // to clear error bit
-        return false;
-    }
+    if(stat & 0x1) return ERR_ATA_PIO_ERR_BIT_SET;
 
     for(int i = 0; i < 256; i++) buff[i] = port_inw(PORT_ATA_PIO_DATA);
 
-    // see https://wiki.osdev.org/ATA_PIO_Mode#Interesting_information_returned_by_IDENTIFY
     LBA48_mode = buff[83] & 0x400;
     supported_UDMA = buff[88] & 0xff;
     active_UDMA = buff[88] >> 8;
@@ -147,5 +141,5 @@ bool ata_pio_init(uint16_t* buff) {
                                  ((uint64_t)buff[103] << 48);
     LBA28_mode = (total_addressable_sec_LBA28 != 0);
 
-    return true;
+    return ERR_ATA_PIO_SUCCESS;
 }
