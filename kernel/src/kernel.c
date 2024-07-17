@@ -189,5 +189,24 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     puts("done initializing");
 
+    // try read the first 2 sectors
+    // which contain the boot sector with
+    // the boot signature 0xaa55
+    uint8_t sect[1024];
+    ata_pio_LBA28_access(true, 0, 2, sect);
+
+    bool boot_signature_found = false;
+    int bytenum;
+    for(int i = 1; i < 1024; i += 2) {
+        if(sect[i] == 0xaa && sect[i-1] == 0x55) {
+            tty_set_attr(LIGHT_RED);
+            boot_signature_found = true;
+            bytenum = i;
+        }
+        printf("%x%x ", sect[i], sect[i-1]);
+        tty_set_attr(LIGHT_GREY);
+    }
+    if(boot_signature_found) printf("\nboot signature found at byte no %d\n", bytenum);
+
     while(true);
 }
