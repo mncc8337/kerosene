@@ -8,29 +8,29 @@ void tty_set_attr(unsigned char attr) {
     current_attr = attr;
 }
 void tty_enable_cursor(unsigned char cursor_scanline_start, unsigned char cursor_scanline_end) {
-	port_outb(PORT_SCREEN_CTR, 0x0a);
-	port_outb(PORT_SCREEN_DAT, (port_inb(PORT_SCREEN_DAT) & 0xc0) | cursor_scanline_start);
+	port_outb(PORT_SCREEN_CTRL, 0x0a);
+	port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xc0) | cursor_scanline_start);
 
-	port_outb(PORT_SCREEN_CTR, 0x0b);
-	port_outb(PORT_SCREEN_DAT, (port_inb(PORT_SCREEN_DAT) & 0xe0) | cursor_scanline_end);
+	port_outb(PORT_SCREEN_CTRL, 0x0b);
+	port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xe0) | cursor_scanline_end);
 }
 void tty_disable_cursor() {
-	port_outb(PORT_SCREEN_CTR, 0x0a);
-	port_outb(PORT_SCREEN_DAT, 0x20);
+	port_outb(PORT_SCREEN_CTRL, 0x0a);
+	port_outb(PORT_SCREEN_DATA, 0x20);
 }
 int tty_get_cursor() {
     int offset = 0;
-    port_outb(PORT_SCREEN_CTR, 0x0f);
-    offset |= port_inb(PORT_SCREEN_DAT);
-    port_outb(PORT_SCREEN_CTR, 0x0e);
-    offset |= port_inb(PORT_SCREEN_DAT) << 8;
+    port_outb(PORT_SCREEN_CTRL, 0x0f);
+    offset |= port_inb(PORT_SCREEN_DATA);
+    port_outb(PORT_SCREEN_CTRL, 0x0e);
+    offset |= port_inb(PORT_SCREEN_DATA) << 8;
     return offset;
 }
 void tty_set_cursor(int offset){
-    port_outb(PORT_SCREEN_CTR, 14);
-    port_outb(PORT_SCREEN_DAT, (unsigned char)(offset >> 8));
-    port_outb(PORT_SCREEN_CTR, 15);
-    port_outb(PORT_SCREEN_DAT, (unsigned char)(offset));
+    port_outb(PORT_SCREEN_CTRL, 14);
+    port_outb(PORT_SCREEN_DATA, (unsigned char)(offset >> 8));
+    port_outb(PORT_SCREEN_CTRL, 15);
+    port_outb(PORT_SCREEN_DATA, (unsigned char)(offset));
 }
 void tty_cls(char attr) {
     for(int i = 0; i < 80 * 25; i++) {

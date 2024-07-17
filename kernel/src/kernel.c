@@ -2,6 +2,7 @@
 #include "mem.h"
 #include "tty.h"
 #include "kbd.h"
+#include "ata.h"
 
 #include "multiboot.h"
 #include "errorcode.h"
@@ -149,7 +150,34 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // after initialize all interrupt handlers
     asm volatile("sti");
 
+    uint16_t IDENTIFY_returned[256];
+    if(ata_pio_init(IDENTIFY_returned)) {
+        puts("ATA PIO initialized");
+
+        printf(
+            "    LBA48 mode: %s\n",
+            (IDENTIFY_returned[83] & (1 << 10)) ? "yes" : "no"
+        );
+
+        if(IDENTIFY_returned[88]) {
+            uint8_t supported_UDMA = IDENTIFY_returned[88] & 0xff;
+            uint8_t active_UDMA = IDENTIFY_returned[88] >> 8;
+            printf("    supported UDMA mode:");
+            for(int i = 0; i < 8; i++)
+                if(supported_UDMA & (1 << i)) printf(" %d", i+1);
+            putchar('\n');
+            printf("    active UDMA mode:");
+            for(int i = 0; i < 8; i++)
+                if(active_UDMA & (1 << i)) printf(" %d", i+1);
+            putchar('\n');
+        }
+    }
+    else {
+        puts("failed to initialize ATA PIO");
+    }
+
     kbd_init();
+
 
     // make cursor slimmer
     tty_enable_cursor(13, 14);
@@ -157,13 +185,6 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     set_key_listener(print_typed_char);
 
     puts("done initializing");
-
-    char printing_txt[] = "printing";
-    printf("im %s formated stri%c%c\n", printing_txt, 'n', 'g');
-    printf("this is some numbers: %d %d %d %d\n", 15, 0, 12, -8);
-    printf("%% symbol\n");
-    printf("some hex num: %x %x %x %x\n", 0x13, 0xbeef, 0xdead, 0xbee);
-    printf("some oct num: %o %o %o %o\n", 07, 0100, 014, 8);
 
     while(true);
 }

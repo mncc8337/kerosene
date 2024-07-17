@@ -2,8 +2,8 @@
 
 #include "system.h"
 
-#define PORT_SCREEN_CTR 0x3d4
-#define PORT_SCREEN_DAT 0x3d5
+#define PORT_SCREEN_CTRL 0x3d4
+#define PORT_SCREEN_DATA 0x3d5
 
 #define MAX_ROWS 25
 #define MAX_COLS 80

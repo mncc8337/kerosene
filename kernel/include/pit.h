@@ -2,9 +2,9 @@
 
 #include "system.h"
 
-#define PORT_PIT0_DAT 0x40
-#define PORT_PIT2_DAT 0x41
-#define PORT_PIT3_DAT 0x42
+#define PORT_PIT0_DATA 0x40
+#define PORT_PIT2_DATA 0x41
+#define PORT_PIT3_DATA 0x42
 #define PORT_PIT_COMM 0x43
 
 #define PIT_MODE_INT_ON_TERM_CNT          0

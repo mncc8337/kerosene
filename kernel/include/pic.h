@@ -2,10 +2,10 @@
 
 #include "system.h"
 
-#define PORT_PIC1_COM  0x20
-#define PORT_PIC1_DAT  0x21
-#define PORT_PIC2_COM  0xa0
-#define PORT_PIC2_DAT  0xa1
+#define PORT_PIC1_COMM  0x20
+#define PORT_PIC1_DATA  0x21
+#define PORT_PIC2_COMM  0xa0
+#define PORT_PIC2_DATA  0xa1
 
 #define PIC_EOI 0x20
 

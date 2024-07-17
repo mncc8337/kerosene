@@ -13,6 +13,7 @@ C_SRC = kernel/src/*.c \
 		kernel/src/utils/*.c \
 		kernel/src/system/*.c \
 		kernel/src/driver/*.c \
+		kernel/src/driver/ata/*.c \
 		kernel/src/mem/*.c \
 
 ASM_SRC = kernel/src/system/*.asm \
@@ -57,11 +58,13 @@ multiboot-header.o: multiboot-header.asm
 
 %.o: kernel/src/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/src/driver/%.c
+%.o: kernel/src/utils/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 %.o: kernel/src/system/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/src/utils/%.c
+%.o: kernel/src/driver/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+%.o: kernel/src/driver/ata/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 %.o: kernel/src/mem/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
