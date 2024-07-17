@@ -36,5 +36,5 @@
 
 // ata_pio.c
 char* ata_pio_get_last_error();
-bool LBA28_access(bool read_op, uint32_t lba, unsigned int sector_cnt, uint8_t* buff);
+bool ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector_cnt, uint8_t* buff);
 bool ata_pio_init(uint16_t* buff);

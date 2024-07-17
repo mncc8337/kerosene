@@ -62,7 +62,7 @@ char* ata_pio_get_last_error() {
     return "it's never reach here";
 }
 
-bool LBA28_access(bool read_op, uint32_t lba, unsigned int sector_cnt, uint8_t* buff) {
+bool ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector_cnt, uint8_t* buff) {
     if(!LBA28_mode) return false;
     const int slavebit = 0; // idk what is this
 
