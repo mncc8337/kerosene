@@ -40,7 +40,7 @@ static bool ata_pio_identify() {
         return ERR_ATA_PIO_NO_DEV;
 
     // poll until bit 7 (BSY) is clear
-    while(stat & 0x80) stat = port_inb(PORT_ATA_PIO_STAT);
+    while(stat & ATA_PIO_STAT_BSY) stat = port_inb(PORT_ATA_PIO_STAT);
     // check if LBA low and LBA high are non-zero
     // if so they are not ATA device
     if(port_inb(PORT_ATA_PIO_LBA_LO) && port_inb(PORT_ATA_PIO_LBA_HI))
@@ -52,6 +52,17 @@ static bool ata_pio_identify() {
 static void software_reset() {
     port_outb(PORT_ATA_PIO_DEV_CTRL, 4);
     port_outb(PORT_ATA_PIO_DEV_CTRL, 0);
+}
+
+// wait untill error or data is ready
+static ATA_PIO_ERR wait_data() {
+    uint8_t stat = 0;
+    while(stat & ATA_PIO_STAT_DRQ || stat & ATA_PIO_STAT_ERR || stat & ATA_PIO_STAT_DF)
+        stat = port_inb(PORT_ATA_PIO_STAT);
+
+    if(stat & ATA_PIO_STAT_ERR) return ERR_ATA_PIO_ERR_BIT_SET;
+    if(stat & ATA_PIO_STAT_DF) return ERR_ATA_PIO_DRIVE_FAULT;
+    return ERR_ATA_PIO_SUCCESS;
 }
 
 char* ata_pio_get_error() {
@@ -71,8 +82,8 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
     // 0xe0 for master, 0xf0 for slave
     port_outb(PORT_ATA_PIO_DRIVE, 0xe0 | (slavebit << 4) | ((lba >> 24) & 0xf));
     io_wait();
-    // send NULL
-    port_outb(PORT_ATA_PIO_FEATURE, 0x0);
+    // // send NULL
+    // port_outb(PORT_ATA_PIO_FEATURE, 0x0);
     // send sector count
     port_outb(PORT_ATA_PIO_SECTOR_COUNT, sector_cnt);
     // send LBA
@@ -85,14 +96,14 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
     else
         port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_WRITE_SECTORS);
 
-    // poll
-    uint8_t stat;
+    uint16_t dat;
     for(unsigned int j = 0; j < sector_cnt; j++) {
-        stat = 0;
-        while(stat & 0x8 || stat & 0x1) stat = port_inb(PORT_ATA_PIO_STAT);
-        if(stat & 0x1) return ERR_ATA_PIO_ERR_BIT_SET;
+        io_wait();
+        // ignore first 4 polls
+        for(int i = 0; i < 4; i++) port_inb(PORT_ATA_PIO_STAT);
+        ATA_PIO_ERR err = wait_data();
+        if(err != ERR_ATA_PIO_SUCCESS) return err;
 
-        uint16_t dat;
         for(int i = 0; i < 256; i++) {
             if(read_op) {
                 dat = port_inw(PORT_ATA_PIO_DATA);
@@ -104,10 +115,10 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
                 port_outw(PORT_ATA_PIO_DATA, dat);
             }
         }
+        io_wait();
     }
     // cache flush after writing
     if(!read_op) port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_CACHE_FLUSH);
-    io_wait();
 
     return ERR_ATA_PIO_SUCCESS;
 }
@@ -123,10 +134,8 @@ ATA_PIO_ERR ata_pio_init(uint16_t* buff) {
     bool dev_available = ata_pio_identify();
     if(!dev_available) return ERR_ATA_PIO_NO_DEV;
 
-    // continue polling until bit 3 (DRQ) or bit 0 (ERR) is set
-    stat = 0;
-    while(stat & 0x8 || stat & 0x1) stat = port_inb(PORT_ATA_PIO_STAT);
-    if(stat & 0x1) return ERR_ATA_PIO_ERR_BIT_SET;
+    ATA_PIO_ERR err = wait_data();
+    if(err != ERR_ATA_PIO_SUCCESS) return err;
 
     for(int i = 0; i < 256; i++) buff[i] = port_inw(PORT_ATA_PIO_DATA);
 

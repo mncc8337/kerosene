@@ -10,8 +10,6 @@
 #include "stdlib.h"
 #include "string.h"
 
-#define STRINGIFY(err) #err
-
 const unsigned int TIMER_PHASE = 100;
 
 char freebuff[512];
@@ -150,7 +148,7 @@ void mem_init(multiboot_info_t* mbd) {
     ///////////////////////////////////////////////////////////
     MEM_ERR merr = vmmngr_init();
     if(merr != ERR_MEM_SUCCESS) {
-        print_log_tag(LT_ERROR); printf("error while enabling paging: %s", STRINGIFY(merr));
+        print_log_tag(LT_ERROR); printf("error while enabling paging. error code %x", merr);
         SYS_HALT();
     }
     print_log_tag(LT_SUCCESS); puts("paging enabled");
@@ -224,27 +222,17 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // try read the first 2 sectors
     // which contain the boot sector with
     // the boot signature 0xaa55
-    uint8_t sect[1024];
-    ATA_PIO_ERR err = ata_pio_LBA28_access(true, 0, 2, sect);
+    uint8_t sect[512];
+    ATA_PIO_ERR err = ata_pio_LBA28_access(true, 0, 1, sect);
     if(err != ERR_ATA_PIO_SUCCESS) {
-        printf("err: %s\n", STRINGIFY(err));
+        printf("failed to read disk. error code %x\n", err);
         if(err == ERR_ATA_PIO_ERR_BIT_SET)
             puts(ata_pio_get_error());
     }
-    else {
-        // bool boot_signature_found = false;
-        // int bytenum;
-        // for(int i = 1; i < 1024; i += 2) {
-        //     if(sect[i] == 0xaa && sect[i-1] == 0x55) {
-        //         tty_set_attr(LIGHT_RED);
-        //         boot_signature_found = true;
-        //         bytenum = i;
-        //     }
-        //     printf("%x%x ", sect[i], sect[i-1]);
-        //     tty_set_attr(LIGHT_GREY);
-        // }
-        // if(boot_signature_found) printf("\nboot signature found at byte no %d\n", bytenum);
-    }
+    // you should see it printed 55aa
+    else printf("sector 0 byte 510 511: %x%x\n", sect[510], sect[511]);
 
-    while(true);
+    while(true) {
+        SYS_SLEEP();
+    }
 }

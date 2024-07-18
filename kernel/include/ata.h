@@ -9,6 +9,7 @@ typedef enum {
     ERR_ATA_PIO_UNKNOWN,
     ERR_ATA_PIO_SUCCESS,
     ERR_ATA_PIO_NO_DEV,
+    ERR_ATA_PIO_DRIVE_FAULT,
     ERR_ATA_PIO_ERR_BIT_SET,
     ERR_ATA_PIO_METHOD_NOT_AVAILABLE,
     ERR_ATA_PIO_INVALID_PARAMS
@@ -42,6 +43,15 @@ typedef enum {
 #define ATA_PIO_CMD_WRITE_SECTORS_EXT 0x34
 #define ATA_PIO_CMD_CACHE_FLUSH       0xe7
 #define ATA_PIO_CMD_IDENTIFY          0xec
+
+#define ATA_PIO_STAT_ERR  0x1
+#define ATA_PIO_STAT_IDX  0x2
+#define ATA_PIO_STAT_CORR 0x4
+#define ATA_PIO_STAT_DRQ  0x8
+#define ATA_PIO_STAT_SRV  0x10
+#define ATA_PIO_STAT_DF   0x20
+#define ATA_PIO_STAT_RDY  0x40
+#define ATA_PIO_STAT_BSY  0x80
 
 // ata_pio.c
 char* ata_pio_get_error();
