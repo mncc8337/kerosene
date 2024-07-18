@@ -19,6 +19,13 @@ static char* error_msg[] = {
     "BBK - Bad Block detected"
 };
 
+static void wait_400ns() {
+    port_inb(PORT_ATA_PIO_ALT_STAT);
+    port_inb(PORT_ATA_PIO_ALT_STAT);
+    port_inb(PORT_ATA_PIO_ALT_STAT);
+    port_inb(PORT_ATA_PIO_ALT_STAT);
+}
+
 static bool ata_pio_identify() {
     // select target device
     // 0xa0 for master, 0xb0 for slave
@@ -32,9 +39,7 @@ static bool ata_pio_identify() {
     port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_IDENTIFY);
 
     // read status port
-    // the osdev wiki said you should read it 15 times
-    // and only pay attention to the value returned by the last one
-    for(int i = 1; i <= 14; i++) port_inb(PORT_ATA_PIO_STAT);
+    wait_400ns();
     uint8_t stat = port_inb(PORT_ATA_PIO_STAT);
     if(stat == 0) // drive does not exists
         return ERR_ATA_PIO_NO_DEV;
@@ -51,10 +56,11 @@ static bool ata_pio_identify() {
 
 static void software_reset() {
     port_outb(PORT_ATA_PIO_DEV_CTRL, 4);
+    wait_400ns();
     port_outb(PORT_ATA_PIO_DEV_CTRL, 0);
 }
 
-// wait untill error or data is ready
+// wait until error or data is ready
 static ATA_PIO_ERR wait_data() {
     uint8_t stat = 0;
     while(stat & ATA_PIO_STAT_DRQ || stat & ATA_PIO_STAT_ERR || stat & ATA_PIO_STAT_DF)
@@ -81,7 +87,7 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
 
     // 0xe0 for master, 0xf0 for slave
     port_outb(PORT_ATA_PIO_DRIVE, 0xe0 | (slavebit << 4) | ((lba >> 24) & 0xf));
-    io_wait();
+    wait_400ns();
     // // send NULL
     // port_outb(PORT_ATA_PIO_FEATURE, 0x0);
     // send sector count
@@ -96,11 +102,10 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
     else
         port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_WRITE_SECTORS);
 
+    wait_400ns();
+
     uint16_t dat;
     for(unsigned int j = 0; j < sector_cnt; j++) {
-        io_wait();
-        // ignore first 4 polls
-        for(int i = 0; i < 4; i++) port_inb(PORT_ATA_PIO_STAT);
         ATA_PIO_ERR err = wait_data();
         if(err != ERR_ATA_PIO_SUCCESS) return err;
 
@@ -115,7 +120,7 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
                 port_outw(PORT_ATA_PIO_DATA, dat);
             }
         }
-        io_wait();
+        wait_400ns();
     }
     // cache flush after writing
     if(!read_op) port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_CACHE_FLUSH);

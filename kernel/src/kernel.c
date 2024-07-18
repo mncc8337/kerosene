@@ -3,6 +3,7 @@
 #include "tty.h"
 #include "kbd.h"
 #include "ata.h"
+#include "filesystem.h"
 
 #include "multiboot.h"
 
@@ -10,39 +11,11 @@
 #include "stdlib.h"
 #include "string.h"
 
+#include "debug.h"
+
 const unsigned int TIMER_PHASE = 100;
 
 char freebuff[512];
-
-enum LOG_TAG{
-    LT_INFO,
-    LT_SUCCESS,
-    LT_ERROR,
-    LT_WARNING
-};
-void print_log_tag(int lt) {
-    putchar('[');
-    switch(lt) {
-        case LT_INFO:
-            tty_set_attr(WHITE);
-            printf("IF");
-            break;
-        case LT_SUCCESS:
-            tty_set_attr(LIGHT_GREEN);
-            printf("OK");
-            break;
-        case LT_ERROR:
-            tty_set_attr(LIGHT_RED);
-            printf("ER");
-            break;
-        case LT_WARNING:
-            tty_set_attr(LIGHT_BROWN);
-            printf("WN");
-            break;
-    }
-    tty_set_attr(LIGHT_GREY);
-    printf("] ");
-}
 
 void print_typed_char(key_t k) {
     if(k.released) return;
@@ -62,7 +35,6 @@ void mem_init(multiboot_info_t* mbd) {
     // TODO: sort the mmmt
 
     // print mem info
-    ///////////////////////////////////////////////////////////
     puts("--[MEMORY]-+--------------------+-------------------");
     puts("base addr  | length             | type");
     puts("-----------+--------------------+-------------------");
@@ -99,10 +71,8 @@ void mem_init(multiboot_info_t* mbd) {
         putchar('\n');
     }
     puts("-----------+--------------------+-------------------");
-    ///////////////////////////////////////////////////////////
 
     // get memsize
-    ///////////////////////////////////////////////////////////
     size_t memsize = 0;
     for(unsigned int i = 0; i < mbd->mmap_length; i += sizeof(multiboot_memory_map_t)) {
         multiboot_memory_map_t* mmmt = (multiboot_memory_map_t*)(mbd->mmap_addr + i);
@@ -115,10 +85,8 @@ void mem_init(multiboot_info_t* mbd) {
         memsize += mmmt->len;
     }
     pmmngr_init(endkernel + 1, memsize);
-    ///////////////////////////////////////////////////////////
 
     // init regions
-    ///////////////////////////////////////////////////////////
     for(unsigned int i = 0; i < mbd->mmap_length; i += sizeof(multiboot_memory_map_t)) {
         multiboot_memory_map_t* mmmt = (multiboot_memory_map_t*)(mbd->mmap_addr + i);
 
@@ -131,55 +99,62 @@ void mem_init(multiboot_info_t* mbd) {
 
         pmmngr_init_region(mmmt->addr, mmmt->len);
     }
-    ///////////////////////////////////////////////////////////
 
     // deinit regions
-    ///////////////////////////////////////////////////////////
-    // kernel
-    pmmngr_deinit_region(startkernel, endkernel - startkernel + 1);
-    // physical mem manager
-    pmmngr_deinit_region(endkernel, pmmngr_get_size()/MMNGR_BLOCK_SIZE);
-    ///////////////////////////////////////////////////////////
+    pmmngr_deinit_region(startkernel, endkernel - startkernel + 1); // kernel
+    pmmngr_deinit_region(endkernel, pmmngr_get_size()/MMNGR_BLOCK_SIZE); // pmmngr
 
     pmmngr_update_usage(); // always run this after init and deinit regions
     print_log_tag(LT_SUCCESS); printf("initialized pmmngr with %d MiB\n", pmmngr_get_free_size()/1024/1024);
 
     // vmmngr init
-    ///////////////////////////////////////////////////////////
     MEM_ERR merr = vmmngr_init();
     if(merr != ERR_MEM_SUCCESS) {
         print_log_tag(LT_ERROR); printf("error while enabling paging. error code %x", merr);
         SYS_HALT();
     }
     print_log_tag(LT_SUCCESS); puts("paging enabled");
-    ///////////////////////////////////////////////////////////
 }
 void disk_init() {
     uint16_t IDENTIFY_returned[256];
-    if(ata_pio_init(IDENTIFY_returned)) {
-        print_log_tag(LT_SUCCESS); puts("ATA PIO initialized");
-
-        print_log_tag(LT_INFO); printf(
-            "    LBA48 mode: %s\n",
-            (IDENTIFY_returned[83] & 0x400) ? "yes" : "no"
-        );
-
-        if(IDENTIFY_returned[88]) {
-            uint8_t supported_UDMA = IDENTIFY_returned[88] & 0xff;
-            uint8_t active_UDMA = IDENTIFY_returned[88] >> 8;
-            print_log_tag(LT_INFO); printf("    supported UDMA mode:");
-            for(int i = 0; i < 8; i++)
-                if(supported_UDMA & (1 << i)) printf(" %d", i+1);
-            putchar('\n');
-            print_log_tag(LT_INFO); printf("    active UDMA mode:");
-            for(int i = 0; i < 8; i++)
-                if(active_UDMA & (1 << i)) printf(" %d", i+1);
-            putchar('\n');
-        }
-    }
-    else {
+    if(!ata_pio_init(IDENTIFY_returned)) {
         print_log_tag(LT_WARNING); puts("failed to initialize ATA PIO");
+        return;
     }
+
+    print_log_tag(LT_SUCCESS); puts("ATA PIO initialized");
+
+    print_log_tag(LT_INFO); printf(
+        "    LBA48 mode: %s\n",
+        (IDENTIFY_returned[83] & 0x400) ? "yes" : "no"
+    );
+
+    if(IDENTIFY_returned[88]) {
+        uint8_t supported_UDMA = IDENTIFY_returned[88] & 0xff;
+        uint8_t active_UDMA = IDENTIFY_returned[88] >> 8;
+        print_log_tag(LT_INFO); printf("    supported UDMA mode:");
+        for(int i = 0; i < 8; i++)
+            if(supported_UDMA & (1 << i)) printf(" %d", i+1);
+        putchar('\n');
+        print_log_tag(LT_INFO); printf("    active UDMA mode:");
+        for(int i = 0; i < 8; i++)
+            if(active_UDMA & (1 << i)) printf(" %d", i+1);
+        putchar('\n');
+    }
+
+    bool mbr_ok = mbr_load();
+    if(!mbr_ok) {
+        print_log_tag(LT_ERROR); puts("cannot load MBR");
+        return;
+    }
+    print_log_tag(LT_SUCCESS); puts("MBR loaded");
+
+    partition_entry_t pe = mbr_get_partition_entry(0);
+    print_log_tag(LT_INFO); puts("partition table 1 info:");
+    print_log_tag(LT_INFO); printf("    partition type: 0x%x\n", pe.partition_type);
+    print_log_tag(LT_INFO); printf("    drive attribute: 0b%b\n", pe.drive_attribute);
+    print_log_tag(LT_INFO); printf("    LBA start: 0x%x\n", pe.LBA_start);
+    print_log_tag(LT_INFO); printf("    sector count: %d\n", pe.sector_count);
 }
 
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
@@ -211,26 +186,12 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     kbd_init();
 
-
     // make cursor slimmer
     tty_enable_cursor(13, 14);
 
     set_key_listener(print_typed_char);
 
     print_log_tag(LT_INFO); puts("done initializing");
-
-    // try read the first 2 sectors
-    // which contain the boot sector with
-    // the boot signature 0xaa55
-    uint8_t sect[512];
-    ATA_PIO_ERR err = ata_pio_LBA28_access(true, 0, 1, sect);
-    if(err != ERR_ATA_PIO_SUCCESS) {
-        printf("failed to read disk. error code %x\n", err);
-        if(err == ERR_ATA_PIO_ERR_BIT_SET)
-            puts(ata_pio_get_error());
-    }
-    // you should see it printed 55aa
-    else printf("sector 0 byte 510 511: %x%x\n", sect[510], sect[511]);
 
     while(true) {
         SYS_SLEEP();

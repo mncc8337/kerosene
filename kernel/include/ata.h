@@ -17,6 +17,7 @@ typedef enum {
 
 // idk the difference between primary bus and secondary bus
 // so i only use the primary bus here
+// TODO: add support for secondary bus
 
 #define PORT_ATA_PIO_DATA          0x1f0
 #define PORT_ATA_PIO_ERROR         0x1f1

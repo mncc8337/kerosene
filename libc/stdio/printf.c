@@ -77,6 +77,19 @@ int printf(const char* restrict format, ...) {
                 return -1;
             written += len;
         }
+        else if(*format == 'b') {
+            format++;
+            int integer = va_arg(parameters, int);
+            size_t len = intlen(integer, 2);
+            char str[len + 1]; itoa(integer, str, 2);
+            if(maxrem < len) {
+                // TODO: set errno to ERR_OVERFLOW
+                return -1;
+            }
+            if(!print(str, len))
+                return -1;
+            written += len;
+        }
         else if(*format == 'o') {
             format++;
             int integer = va_arg(parameters, int);

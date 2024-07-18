@@ -35,25 +35,38 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
     + [x] physical memory manager
     + [x] virtual memory manager
     + [ ] the heap
-- [ ] get current datetime
+- [ ] get current datetime (RTC, CMOS)
 - [x] support multiboot (i switched to GRUB so it should be lol)
-- [ ] filesystem (probaly FAT)
-- [ ] read disk
+- [x] read disk
+- [ ] filesystem
+    - [ ] FAT32
+        - [ ] list
+        - [ ] make dir
+        - [ ] read
+        - [ ] write
+    - [ ] ext2
+        - [ ] list
+        - [ ] make dir
+        - [ ] read
+        - [ ] write
+- [ ] load and run ELF file
 - [x] load kernel with ELF binary instead of flat binary
 - [ ] multi-processing
 - [ ] userland
 - [ ] APCI
 - [ ] mouse driver
 - [ ] GUI
-    + [ ] render rectangle
-    + [ ] render mouse
-    + [ ] render image
-    + [ ] render fonts
+    - [ ] render rectangle
+    - [ ] render mouse
+    - [ ] render image
+    - [ ] render fonts
 - [ ] sound
 - [ ] video
 - [ ] im not gonna touch networking
 - [ ] port some program
     + [ ] GNU GCC
+## known bugs
+- ATA PIO mode initialization some time failed (very rare)
 ## learning resources
 - https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
 - http://www.osdever.net/bkerndev/Docs/gettingstarted.htm
