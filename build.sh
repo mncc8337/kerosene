@@ -7,5 +7,6 @@ if [ ! -f disk.img ]; then
 fi
 ./cpyfile.sh grub.cfg ./mnt/boot/grub/ # update grub config
 ./cpyfile.sh kernel.bin ./mnt/boot/ # update kernel
-# files in fsfiles/
-./cpyfile.sh fsfiles/* ./mnt/
+for file in fsfiles/*; do
+    ./cpyfile.sh $file ./mnt/
+done

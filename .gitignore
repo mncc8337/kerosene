@@ -4,9 +4,6 @@ cross
 # dir use to put files onto the image
 mnt
 
-# dir contains files to load into the image
-fsfiles
-
 # wip
 wip
 

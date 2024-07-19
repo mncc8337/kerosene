@@ -55,6 +55,7 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
         - [ ] write
 - [ ] load and run ELF file
 - [x] load kernel with ELF binary instead of flat binary
+- [ ] higher half kernel
 - [ ] multi-processing
 - [ ] userland
 - [ ] APCI

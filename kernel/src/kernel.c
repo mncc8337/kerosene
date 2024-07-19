@@ -17,6 +17,9 @@ const unsigned int TIMER_PHASE = 100;
 
 char freebuff[512];
 
+FAT32_BOOT_RECORD_t bootrec;
+FILESYSTEM fs;
+
 void print_typed_char(key_t k) {
     if(k.released) return;
 
@@ -110,11 +113,12 @@ void mem_init(multiboot_info_t* mbd) {
     // vmmngr init
     MEM_ERR merr = vmmngr_init();
     if(merr != ERR_MEM_SUCCESS) {
-        print_log_tag(LT_ERROR); printf("error while enabling paging. error code %x", merr);
+        print_log_tag(LT_CRITICAL); printf("error while enabling paging. system halted. error code %x", merr);
         SYS_HALT();
     }
     print_log_tag(LT_SUCCESS); puts("paging enabled");
 }
+
 void disk_init() {
     uint16_t IDENTIFY_returned[256];
     if(!ata_pio_init(IDENTIFY_returned)) {
@@ -149,34 +153,50 @@ void disk_init() {
     }
     print_log_tag(LT_SUCCESS); puts("MBR loaded");
 
-    partition_entry_t pe = mbr_get_partition_entry(0);
-    print_log_tag(LT_INFO); puts("partition table 1 info:");
-    print_log_tag(LT_INFO); printf("    partition type: 0x%x\n", pe.partition_type);
-    print_log_tag(LT_INFO); printf("    drive attribute: 0b%b\n", pe.drive_attribute);
-    print_log_tag(LT_INFO); printf("    LBA start: 0x%x\n", pe.LBA_start);
-    print_log_tag(LT_INFO); printf("    sector count: %d\n", pe.sector_count);
+    for(int i = 0; i < 4; i++) {
+        partition_entry_t part = mbr_get_partition_entry(i);
+        if(part.sector_count == 0) continue;
 
-    print_log_tag(LT_INFO); printf("    fs type: ");
-    FS_TYPE fs = detect_fs(pe);
-    switch(fs) {
-        case FS_EMPTY:
-            puts("unknown");
-            break;
-        case FS_FAT_12_16:
-            puts("FAT 12/16");
-            break;
-        case FS_FAT32:
-            puts("FAT 32");
-            break;
-        case FS_EXT2:
-            puts("ext2");
-            break;
-        case FS_EXT3:
-            puts("ext3");
-            break;
-        case FS_EXT4:
-            puts("ext4");
-            break;
+        print_log_tag(LT_INFO); printf("partition table %d info:\n", i+1);
+        print_log_tag(LT_INFO); printf("    partition type: 0x%x\n", part.partition_type);
+        print_log_tag(LT_INFO); printf("    drive attribute: %s\n",
+                        part.drive_attribute == 0x80 ? "active/bootable" :
+                        part.drive_attribute == 0x00 ? "inactive" : "invalid");
+        print_log_tag(LT_INFO); printf("    LBA start: 0x%x\n", part.LBA_start);
+        print_log_tag(LT_INFO); printf("    sector count: %d\n", part.sector_count);
+
+        print_log_tag(LT_INFO); printf("    fs type: ");
+        switch(fs_detect(part)) {
+            case FS_EMPTY:
+                puts("unknown");
+                break;
+            case FS_FAT_12_16:
+                puts("FAT 12/16");
+                print_log_tag(LT_WARNING);
+                printf("FAT 12/16 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
+                break;
+            case FS_FAT32:
+                puts("FAT 32");
+                fs = fat32_init(part);
+                print_log_tag(LT_SUCCESS); printf("initialized FAT 32 filesystem in partition %d\n", i+1);
+                bootrec = fat32_get_bootrec(part);
+                break;
+            case FS_EXT2:
+                puts("ext2");
+                print_log_tag(LT_WARNING);
+                printf("EXT2 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
+                break;
+            case FS_EXT3:
+                puts("ext3");
+                print_log_tag(LT_WARNING);
+                printf("EXT3 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
+                break;
+            case FS_EXT4:
+                puts("ext4");
+                print_log_tag(LT_WARNING);
+                printf("EXT4 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
+                break;
+        }
     }
 }
 
@@ -188,11 +208,11 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     tty_set_attr(LIGHT_GREY);
 
     if(magic != MULTIBOOT_BOOTLOADER_MAGIC) {
-        print_log_tag(LT_ERROR); puts("invalid magic number. system halted");
+        print_log_tag(LT_CRITICAL); puts("invalid magic number. system halted");
         SYS_HALT();
     }
     if(!(mbd->flags >> 6 & 0x1)) {
-        print_log_tag(LT_ERROR); puts("invalid memory map given by GRUB. system halted");
+        print_log_tag(LT_CRITICAL); puts("invalid memory map given by GRUB. system halted");
         SYS_HALT();
     }
     mem_init(mbd);
@@ -215,6 +235,10 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     set_key_listener(print_typed_char);
 
     print_log_tag(LT_INFO); puts("done initializing");
+
+    // read the rootdir
+    uint32_t rootdir_cluster = bootrec.ebpb.rootdir_cluster;
+    fat32_read_dir(&bootrec, rootdir_cluster, fs.part.LBA_start);
 
     while(true) {
         SYS_SLEEP();

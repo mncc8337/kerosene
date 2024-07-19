@@ -2,10 +2,7 @@
 
 #include "stdint.h"
 #include "stdbool.h"
-
-#define FS_FILE      0
-#define FS_DIRECTORY 1
-#define FS_INVALID   2
+#include "stddef.h"
 
 // there are some extra fs that might not be implemented
 // i added them for completeness
@@ -18,7 +15,7 @@ typedef enum {
     FS_EXT4
 } FS_TYPE;
 
-// structure that are parsed using memcpy need packed attribute
+// structure that are parsed using memcpy need attribute packed
 
 typedef struct {
     uint8_t drive_attribute;
@@ -33,7 +30,12 @@ typedef struct {
     uint32_t sector_count;
 } __attribute__((packed)) partition_entry_t; // 16 bytes
 
-// structure of a mordern standard MBR
+typedef struct {
+    uint8_t bootstrap[446];
+    partition_entry_t partition_entry[4];
+    uint16_t boot_signature; // should be 0xaa55
+} __attribute__((packed)) MBR_t; // 512 bytes
+
 // https://en.wikipedia.org/wiki/Master_boot_record
 typedef struct {
     uint8_t bootstrap_part1[218];
@@ -47,7 +49,7 @@ typedef struct {
     uint16_t null2; // 0x0000, 0x5a5a if copy-protected
     partition_entry_t partition_entry[4];
     uint16_t boot_signature; // should be 0xaa55
-} __attribute__((packed)) MBR_t; // 512 bytes
+} __attribute__((packed)) modern_MBR_t; // 512 bytes
 
 // https://wiki.osdev.org/FAT
 
@@ -83,9 +85,9 @@ typedef struct {
     uint32_t sectors_per_FAT;
     uint16_t flags;
     uint16_t FAT_version;
-    uint32_t rootdir_clusters;
-    uint16_t fsinfo_sectors;
-    uint16_t backup_bootsector_sectors;
+    uint32_t rootdir_cluster;
+    uint16_t fsinfo_sector;
+    uint16_t backup_bootsector_sector;
     uint8_t reserved[12];
     uint8_t drive_number;
     uint8_t windows_flags;
@@ -118,30 +120,71 @@ typedef struct {
 } __attribute__((packed)) FAT32_BOOT_RECORD_t; // 512 bytes
 
 typedef struct {
-    char name[32];
-    uint32_t flags;
-    uint32_t fileLength;
-    uint32_t id;
-    uint32_t eof;
-    uint32_t position;
-    uint32_t current_cluster;
-    uint32_t device;
-} FILE;
+    uint8_t filename[11];
+    uint8_t attr;
+    uint8_t reserved;
+    uint8_t centisecond;
+    uint16_t creation_time;
+    uint16_t creation_date;
+    uint16_t last_access_date;
+    uint16_t first_cluster_number_high;
+    uint16_t last_mod_time;
+    uint16_t last_mod_date;
+    uint16_t first_cluster_number_low;
+    uint32_t size;
+} __attribute__((packed)) FAT_DIRECTORY;
+
+typedef struct {
+    uint8_t order;
+    uint16_t chars_1[5];
+    uint8_t attr; // should be 0x0f
+    uint8_t long_entry_type;
+    uint8_t checksum;
+    uint16_t chars_2[6];
+    uint16_t zero;
+    uint16_t chars_3[2];
+} __attribute__((packed)) FAT_LFN;
 
 // typedef struct {
-//     char name[8];
-//     FILE (*directory)(const char* dirname);
-//     void (*mount)();
-//     void (*read)(FILE* file, unsigned char* buffer, unsigned int length);
-//     void (*close)(FILE*);
-//     FILE (*open)(const char* fname);
-// } FILESYSTEM;
+//     char name[32];
+//     uint32_t flags;
+//     uint32_t fileLength;
+//     uint32_t id;
+//     uint32_t eof;
+//     uint32_t position;
+//     uint32_t current_cluster;
+//     uint32_t device;
+// } FILE;
+
+typedef struct {
+    partition_entry_t part;
+    FS_TYPE fs_type;
+    // char name[8];
+    // FILE (*directory)(const char* dirname);
+    // void (*mount)();
+    // void (*read)(FILE* file, unsigned char* buffer, unsigned int length);
+    // void (*close)(FILE* file);
+    // FILE (*open)(const char* fname);
+} FILESYSTEM;
 
 // mbr.c
 bool mbr_load();
 partition_entry_t mbr_get_partition_entry(unsigned int id);
 
-// detect_fs.c
-FS_TYPE detect_fs(partition_entry_t part);
+// fsmngr.c
+FS_TYPE fs_detect(partition_entry_t part);
+void fs_add(FILESYSTEM fs);
 
-// file_op.c
+// fat32.c
+
+FAT32_BOOT_RECORD_t fat32_get_bootrec(partition_entry_t part);
+uint32_t fat32_total_sectors(FAT32_BOOT_RECORD_t* bootrec);
+uint32_t fat32_FAT_size(FAT32_BOOT_RECORD_t* bootrec);
+uint32_t fat32_first_data_sector(FAT32_BOOT_RECORD_t* bootrec);
+uint32_t fat32_first_FAT_sector(FAT32_BOOT_RECORD_t* bootrec);
+uint32_t fat32_total_data_sectors(FAT32_BOOT_RECORD_t* bootrec);
+uint32_t fat32_total_clusters(FAT32_BOOT_RECORD_t* bootrec);
+void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
+void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
+void fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset);
+FILESYSTEM fat32_init(partition_entry_t part);

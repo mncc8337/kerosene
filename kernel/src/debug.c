@@ -11,13 +11,17 @@ void print_log_tag(int lt) {
             tty_set_attr(LIGHT_GREEN);
             printf("OK");
             break;
+        case LT_WARNING:
+            tty_set_attr(LIGHT_BROWN);
+            printf("WN");
+            break;
         case LT_ERROR:
             tty_set_attr(LIGHT_RED);
             printf("ER");
             break;
-        case LT_WARNING:
-            tty_set_attr(LIGHT_BROWN);
-            printf("WN");
+        case LT_CRITICAL:
+            tty_set_attr(RED);
+            printf("CR");
             break;
     }
     tty_set_attr(LIGHT_GREY);
