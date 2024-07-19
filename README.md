@@ -38,13 +38,17 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
 - [ ] get current datetime (RTC, CMOS)
 - [x] support multiboot (i switched to GRUB so it should be lol)
 - [x] read disk
+- [x] MBR support
+- [ ] GPT support
 - [ ] filesystem
     - [ ] FAT32
+        - [ ] detect
         - [ ] list
         - [ ] make dir
         - [ ] read
         - [ ] write
     - [ ] ext2
+        - [ ] detect
         - [ ] list
         - [ ] make dir
         - [ ] read

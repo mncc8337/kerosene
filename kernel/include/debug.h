@@ -1,5 +1,8 @@
 #pragma once
 
+#include "tty.h"
+#include "stdio.h"
+
 enum LOG_TAG{
     LT_INFO,
     LT_SUCCESS,

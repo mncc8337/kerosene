@@ -26,31 +26,30 @@ static void wait_400ns() {
     port_inb(PORT_ATA_PIO_ALT_STAT);
 }
 
-static bool ata_pio_identify() {
-    // select target device
-    // 0xa0 for master, 0xb0 for slave
-    port_outb(PORT_ATA_PIO_DRIVE, 0xa0);
-    // set some stuffs
-    port_outb(PORT_ATA_PIO_SECTOR_COUNT, 0);
-    port_outb(PORT_ATA_PIO_LBA_LO, 0);
-    port_outb(PORT_ATA_PIO_LBA_MI, 0);
-    port_outb(PORT_ATA_PIO_LBA_HI, 0);
-    // send IDENTIFY command
-    port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_IDENTIFY);
+static uint8_t wait_until_not_busy() {
+    uint8_t stat;
+    while((stat = port_inb(PORT_ATA_PIO_STAT)) & ATA_PIO_STAT_BSY);
+    return stat;
+}
 
-    // read status port
+static ATA_PIO_ERR wait_until_data_ready() {
+    uint8_t stat;
+    while((stat = port_inb(PORT_ATA_PIO_STAT)) & (ATA_PIO_STAT_BSY | ATA_PIO_STAT_DRQ));
+    if(stat & ATA_PIO_STAT_ERR) return ERR_ATA_PIO_ERR_BIT_SET;
+    if(stat & ATA_PIO_STAT_DF) return ERR_ATA_PIO_DRIVE_FAULT;
+    return ERR_ATA_PIO_SUCCESS;
+}
+
+static ATA_PIO_ERR wait_ata(bool return_error) {
     wait_400ns();
-    uint8_t stat = port_inb(PORT_ATA_PIO_STAT);
-    if(stat == 0) // drive does not exists
-        return ERR_ATA_PIO_NO_DEV;
 
-    // poll until bit 7 (BSY) is clear
-    while(stat & ATA_PIO_STAT_BSY) stat = port_inb(PORT_ATA_PIO_STAT);
-    // check if LBA low and LBA high are non-zero
-    // if so they are not ATA device
-    if(port_inb(PORT_ATA_PIO_LBA_LO) && port_inb(PORT_ATA_PIO_LBA_HI))
-        return ERR_ATA_PIO_NO_DEV;
+    uint8_t stat = wait_until_not_busy();
 
+    if(return_error) {
+        stat = port_inb(PORT_ATA_PIO_STAT);
+        if(stat & ATA_PIO_STAT_ERR) return ERR_ATA_PIO_ERR_BIT_SET;
+        if(stat & ATA_PIO_STAT_DF) return ERR_ATA_PIO_DRIVE_FAULT;
+    }
     return ERR_ATA_PIO_SUCCESS;
 }
 
@@ -60,14 +59,34 @@ static void software_reset() {
     port_outb(PORT_ATA_PIO_DEV_CTRL, 0);
 }
 
-// wait until error or data is ready
-static ATA_PIO_ERR wait_data() {
-    uint8_t stat = 0;
-    while(stat & ATA_PIO_STAT_DRQ || stat & ATA_PIO_STAT_ERR || stat & ATA_PIO_STAT_DF)
-        stat = port_inb(PORT_ATA_PIO_STAT);
+static bool ata_pio_identify() {
+    // select target device
+    // 0xa0 for master, 0xb0 for slave
+    port_outb(PORT_ATA_PIO_DRIVE, 0xa0);
+    wait_400ns();
+    // set some stuffs
+    port_outb(PORT_ATA_PIO_SECTOR_COUNT, 0);
+    port_outb(PORT_ATA_PIO_LBA_LO, 0);
+    port_outb(PORT_ATA_PIO_LBA_MI, 0);
+    port_outb(PORT_ATA_PIO_LBA_HI, 0);
+    // send IDENTIFY command
+    port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_IDENTIFY);
+    wait_400ns();
 
-    if(stat & ATA_PIO_STAT_ERR) return ERR_ATA_PIO_ERR_BIT_SET;
-    if(stat & ATA_PIO_STAT_DF) return ERR_ATA_PIO_DRIVE_FAULT;
+    // read status port
+    uint8_t stat = port_inb(PORT_ATA_PIO_STAT);
+    if(stat == 0) // drive does not exists
+        return ERR_ATA_PIO_NO_DEV;
+
+    wait_until_not_busy();
+
+    // check if LBA low and LBA high are non-zero
+    // if so they are not ATA device
+    if(port_inb(PORT_ATA_PIO_LBA_LO) && port_inb(PORT_ATA_PIO_LBA_HI))
+        return ERR_ATA_PIO_NO_DEV;
+
+    port_outb(PORT_ATA_PIO_DEV_CTRL, 0x2);
+
     return ERR_ATA_PIO_SUCCESS;
 }
 
@@ -85,30 +104,30 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
     if(sector_cnt == 0) return ERR_ATA_PIO_INVALID_PARAMS;
     const int slavebit = 0; // idk what is this
 
+    port_outb(PORT_ATA_PIO_DEV_CTRL, 0x2);
+    wait_until_not_busy();
+
     // 0xe0 for master, 0xf0 for slave
     port_outb(PORT_ATA_PIO_DRIVE, 0xe0 | (slavebit << 4) | ((lba >> 24) & 0xf));
-    wait_400ns();
-    // // send NULL
-    // port_outb(PORT_ATA_PIO_FEATURE, 0x0);
+    // send NULL
+    port_outb(PORT_ATA_PIO_FEATURE, 0x0);
     // send sector count
     port_outb(PORT_ATA_PIO_SECTOR_COUNT, sector_cnt);
     // send LBA
-    port_outb(PORT_ATA_PIO_LBA_LO, (uint8_t)lba);
-    port_outb(PORT_ATA_PIO_LBA_MI, (uint8_t)(lba >> 8));
-    port_outb(PORT_ATA_PIO_LBA_HI, (uint8_t)(lba >> 16));
+    port_outb(PORT_ATA_PIO_LBA_LO, lba & 0xff);
+    port_outb(PORT_ATA_PIO_LBA_MI, (lba >> 8) & 0xff);
+    port_outb(PORT_ATA_PIO_LBA_HI, (lba >> 16) & 0xff);
     // send command
     if(read_op)
         port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_READ_SECTORS);
     else
         port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_WRITE_SECTORS);
 
-    wait_400ns();
+    ATA_PIO_ERR err = wait_ata(1);
+    if(err != ERR_ATA_PIO_SUCCESS) return err;
 
     uint16_t dat;
     for(unsigned int j = 0; j < sector_cnt; j++) {
-        ATA_PIO_ERR err = wait_data();
-        if(err != ERR_ATA_PIO_SUCCESS) return err;
-
         for(int i = 0; i < 256; i++) {
             if(read_op) {
                 dat = port_inw(PORT_ATA_PIO_DATA);
@@ -120,13 +139,16 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
                 port_outw(PORT_ATA_PIO_DATA, dat);
             }
         }
-        wait_400ns();
+        err = wait_until_data_ready();
+        if(err != ERR_ATA_PIO_SUCCESS) return err;
     }
-    // cache flush after writing
     if(!read_op) port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_CACHE_FLUSH);
 
+    wait_ata(0);
     return ERR_ATA_PIO_SUCCESS;
 }
+
+// TODO: implement LBA48 access (do i even need it lol)
 
 ATA_PIO_ERR ata_pio_init(uint16_t* buff) {
     uint8_t stat = port_inb(PORT_ATA_PIO_STAT);
@@ -139,7 +161,7 @@ ATA_PIO_ERR ata_pio_init(uint16_t* buff) {
     bool dev_available = ata_pio_identify();
     if(!dev_available) return ERR_ATA_PIO_NO_DEV;
 
-    ATA_PIO_ERR err = wait_data();
+    ATA_PIO_ERR err = wait_ata(1);
     if(err != ERR_ATA_PIO_SUCCESS) return err;
 
     for(int i = 0; i < 256; i++) buff[i] = port_inw(PORT_ATA_PIO_DATA);

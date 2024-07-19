@@ -1,8 +1,5 @@
 #include "debug.h"
 
-#include "tty.h"
-#include "stdio.h"
-
 void print_log_tag(int lt) {
     putchar('[');
     switch(lt) {

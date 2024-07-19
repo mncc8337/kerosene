@@ -118,11 +118,11 @@ void mem_init(multiboot_info_t* mbd) {
 void disk_init() {
     uint16_t IDENTIFY_returned[256];
     if(!ata_pio_init(IDENTIFY_returned)) {
-        print_log_tag(LT_WARNING); puts("failed to initialize ATA PIO");
+        print_log_tag(LT_WARNING); puts("failed to initialize ATA PIO mode");
         return;
     }
 
-    print_log_tag(LT_SUCCESS); puts("ATA PIO initialized");
+    print_log_tag(LT_SUCCESS); puts("ATA PIO mode initialized");
 
     print_log_tag(LT_INFO); printf(
         "    LBA48 mode: %s\n",
@@ -155,6 +155,9 @@ void disk_init() {
     print_log_tag(LT_INFO); printf("    drive attribute: 0b%b\n", pe.drive_attribute);
     print_log_tag(LT_INFO); printf("    LBA start: 0x%x\n", pe.LBA_start);
     print_log_tag(LT_INFO); printf("    sector count: %d\n", pe.sector_count);
+
+    // FS_TYPE fs = detect_fs(pe);
+    // print_log_tag(LT_INFO); printf("    fs type: %d\n", fs);
 }
 
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
@@ -192,6 +195,17 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     set_key_listener(print_typed_char);
 
     print_log_tag(LT_INFO); puts("done initializing");
+
+    uint8_t bootsect[512];
+    MBR_t mbr;
+
+    // read 15 times to confirm that it is not giving junk bytes
+    for(int i = 0; i < 15; i++) {
+        ata_pio_LBA28_access(true, 0, 1, bootsect);
+        memcpy(&mbr, bootsect, 512);
+
+        printf("%x ", mbr.boot_signature);
+    }
 
     while(true) {
         SYS_SLEEP();

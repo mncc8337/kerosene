@@ -7,7 +7,18 @@
 #define FS_DIRECTORY 1
 #define FS_INVALID   2
 
-#define FS_MAXDEV 26
+// there are some extra fs that might not be implemented
+// i added them for completeness
+typedef enum {
+    FS_EMPTY,
+    FS_FAT_12_16,
+    FS_FAT32,
+    FS_EXT2,
+    FS_EXT3,
+    FS_EXT4
+} FS_TYPE;
+
+// structure that are parsed using memcpy need packed attribute
 
 typedef struct {
     uint8_t drive_attribute;
@@ -20,7 +31,7 @@ typedef struct {
     uint8_t CHS_end_high;
     uint32_t LBA_start;
     uint32_t sector_count;
-} __attribute__((packed)) partition_entry_t;
+} __attribute__((packed)) partition_entry_t; // 16 bytes
 
 // structure of a mordern standard MBR
 // https://en.wikipedia.org/wiki/Master_boot_record
@@ -35,8 +46,76 @@ typedef struct {
     uint32_t disk_32bit_signature;
     uint16_t null2; // 0x0000, 0x5a5a if copy-protected
     partition_entry_t partition_entry[4];
-    uint16_t boot_signature;
-} __attribute__((packed)) MBR_t;
+    uint16_t boot_signature; // should be 0xaa55
+} __attribute__((packed)) MBR_t; // 512 bytes
+
+// https://wiki.osdev.org/FAT
+
+typedef struct {
+    uint8_t null[3];
+    uint8_t OEM_identifier[8];
+    uint16_t bytes_per_sector;
+    uint8_t sectors_per_cluster;
+    uint16_t reserved_sectors;
+    uint8_t FATs;
+    uint16_t rootdir_entries;
+    uint16_t total_sectors; // if it is 0 then check large_sector_count
+    uint8_t media_type;
+    uint16_t sectors_per_FAT;
+    uint16_t sectors_per_track;
+    uint16_t heads;
+    uint32_t hidden_sectors;
+    uint32_t large_sector_count;
+} __attribute__((packed)) BPB_t; // 36 bytes
+
+typedef struct {
+    uint8_t driver_number;
+    uint8_t windows_flags;
+    uint8_t signature; // should be 0x28 or 0x29
+    uint32_t volume_id_serial;
+    uint8_t label[11];
+    uint8_t system_identifier[8];
+    uint8_t bootcode[448];
+    uint16_t boot_signature; // should be 0xaa55
+} __attribute__((packed)) EBPB_t; // 476 bytes
+
+typedef struct {
+    uint32_t sectors_per_FAT;
+    uint16_t flags;
+    uint16_t FAT_version;
+    uint32_t rootdir_clusters;
+    uint16_t fsinfo_sectors;
+    uint16_t backup_bootsector_sectors;
+    uint8_t reserved[12];
+    uint8_t drive_number;
+    uint8_t windows_flags;
+    uint8_t signature; // should be 0x28 or 0x29
+    uint32_t volume_id_serial;
+    uint8_t label[11];
+    uint8_t system_identifier[8]; // should be "FAT32   "
+    uint8_t bootcode[420];
+    uint16_t boot_signature; // should be 0xaa55
+} __attribute__((packed)) FAT32_EBPB_t; // 476 bytes
+
+typedef struct {
+    uint32_t lead_signature; // should be 0x41615252
+    uint8_t reserved1[480];
+    uint32_t mid_signature; // should be 0x61417272
+    uint32_t last_known_free_cluster; // should be range check, if 0xffffffff then compute
+    uint32_t available_clusters_start; // should be range check, if 0xffffffff then start at 2
+    uint8_t reserved2[12];
+    uint32_t trail_signature; // should be 0xaa550000
+} __attribute__((packed)) FAT32_FSINFO_t; // 4096 bytes
+
+typedef struct {
+    BPB_t bpb;
+    EBPB_t ebpb;
+} __attribute__((packed)) FAT_BOOT_RECORD_t; // 512 bytes
+
+typedef struct {
+    BPB_t bpb;
+    FAT32_EBPB_t ebpb;
+} __attribute__((packed)) FAT32_BOOT_RECORD_t; // 512 bytes
 
 typedef struct {
     char name[32];
@@ -61,5 +140,8 @@ typedef struct {
 // mbr.c
 bool mbr_load();
 partition_entry_t mbr_get_partition_entry(unsigned int id);
+
+// detect_fs.c
+FS_TYPE detect_fs(partition_entry_t part);
 
 // file_op.c
