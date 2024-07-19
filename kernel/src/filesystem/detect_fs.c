@@ -4,10 +4,14 @@
 #include "string.h"
 #include "debug.h"
 
-static bool is_field_fs_type(uint8_t* buff, int from, int to) {
-    for(int i = from; i <= to; i++)
-        if(buff[i] != 0x20 && (buff[i] < 0x41 || buff[i] > 0x5a) && (buff[i] < 0x61 || buff[i] > 0x7a))
+static bool is_field_fs_type(uint8_t* buff, int cnt) {
+    for(int i = 0; i < cnt; i++) {
+        if(buff[i] != 0x20 // space
+                && (buff[i] < 0x41 || buff[i] > 0x5a) // uppercase
+                && (buff[i] < 0x61 || buff[i] > 0x7a) // lowercase
+                && (buff[i] < 0x30 || buff[i] > 0x39)) // number
             return false;
+    }
 
     return true;
 }
@@ -21,10 +25,12 @@ FS_TYPE detect_fs(partition_entry_t part) {
     // i think using goto label is much cleaner than pure if else
 
 // FAT32:
+    FAT32_BOOT_RECORD_t* fat32_bootrec = (FAT32_BOOT_RECORD_t*)sect;
+
     // check BPB 7.0 signature
-    if(sect[0x42] == 0x28 || sect[0x42] == 0x29) {
+    if(fat32_bootrec->ebpb.signature == 0x28 || fat32_bootrec->ebpb.signature == 0x29) {
         // check the filesystem type field
-        if(!is_field_fs_type(sect, 0x52, 0x69))
+        if(!is_field_fs_type(fat32_bootrec->ebpb.system_identifier, 8))
             goto FAT_12_16;
     }
     else goto FAT_12_16;
@@ -32,10 +38,11 @@ FS_TYPE detect_fs(partition_entry_t part) {
     return FS_FAT32;
 
 FAT_12_16:
+    FAT_BOOT_RECORD_t* fat_bootrec = (FAT_BOOT_RECORD_t*)sect;
     // check BPB 4.0 signature
-    if(sect[0x26] == 0x28 || sect[0x26] == 0x29) {
-        // check fs type field
-        if(!is_field_fs_type(sect, 0x36, 0x3d))
+    if(fat_bootrec->ebpb.signature == 0x28 || fat_bootrec->ebpb.signature == 0x29) {
+        // check the filesystem type field
+        if(!is_field_fs_type(fat_bootrec->ebpb.system_identifier, 8))
             goto EXT_234;
     }
     else goto EXT_234;

@@ -156,8 +156,28 @@ void disk_init() {
     print_log_tag(LT_INFO); printf("    LBA start: 0x%x\n", pe.LBA_start);
     print_log_tag(LT_INFO); printf("    sector count: %d\n", pe.sector_count);
 
-    // FS_TYPE fs = detect_fs(pe);
-    // print_log_tag(LT_INFO); printf("    fs type: %d\n", fs);
+    print_log_tag(LT_INFO); printf("    fs type: ");
+    FS_TYPE fs = detect_fs(pe);
+    switch(fs) {
+        case FS_EMPTY:
+            puts("unknown");
+            break;
+        case FS_FAT_12_16:
+            puts("FAT 12/16");
+            break;
+        case FS_FAT32:
+            puts("FAT 32");
+            break;
+        case FS_EXT2:
+            puts("ext2");
+            break;
+        case FS_EXT3:
+            puts("ext3");
+            break;
+        case FS_EXT4:
+            puts("ext4");
+            break;
+    }
 }
 
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
@@ -195,17 +215,6 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     set_key_listener(print_typed_char);
 
     print_log_tag(LT_INFO); puts("done initializing");
-
-    uint8_t bootsect[512];
-    MBR_t mbr;
-
-    // read 15 times to confirm that it is not giving junk bytes
-    for(int i = 0; i < 15; i++) {
-        ata_pio_LBA28_access(true, 0, 1, bootsect);
-        memcpy(&mbr, bootsect, 512);
-
-        printf("%x ", mbr.boot_signature);
-    }
 
     while(true) {
         SYS_SLEEP();
