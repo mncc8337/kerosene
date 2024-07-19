@@ -42,10 +42,7 @@ void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour) {
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year) {
     *day = date & 0b11111;
     *month = (date >> 5) & 0b1111;
-    // NOTE: wrong year: 24 yields 44, 12 yeilds 32, 95 yields 15
-    // seem like we just need to subtract 20
-    // added 100 to prevent it from being negative
-    *year = ((date >> 9) - 20 + 100) % 100;
+    *year = (date >> 9) + 1980; // i read the docs lol
 }
 
 void fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset) {
@@ -68,11 +65,11 @@ void fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
         FAT_LFN temp_lfn;
         FAT_DIRECTORY temp_dir;
         for(unsigned int i = 0; i < cluster_size; i += 32) {
-            if(directory[i] == 0x00) { // no more file/directory in this dir
+            if(directory[i] == 0x00) { // no more file/directory in this dir, free entry
                 finish = true;
                 break;
             }
-            if(directory[i] == 0xe5) continue; // unused entry
+            if(directory[i] == 0xe5) continue; // free entry
             // check if it is long file name entry
             if(directory[i+11] == 0x0f) {
                 memcpy(&temp_lfn, directory + i, 32);
