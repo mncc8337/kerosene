@@ -36,20 +36,20 @@ typedef struct {
     uint16_t boot_signature; // should be 0xaa55
 } __attribute__((packed)) MBR_t; // 512 bytes
 
-// https://en.wikipedia.org/wiki/Master_boot_record
-typedef struct {
-    uint8_t bootstrap_part1[218];
-    uint16_t null1; // 0x0000
-    uint8_t original_physical_drive;
-    uint8_t seconds;
-    uint8_t minutes;
-    uint8_t hours;
-    uint8_t bootstrap_part2[216];
-    uint32_t disk_32bit_signature;
-    uint16_t null2; // 0x0000, 0x5a5a if copy-protected
-    partition_entry_t partition_entry[4];
-    uint16_t boot_signature; // should be 0xaa55
-} __attribute__((packed)) modern_MBR_t; // 512 bytes
+// // https://en.wikipedia.org/wiki/Master_boot_record
+// typedef struct {
+//     uint8_t bootstrap_part1[218];
+//     uint16_t null1; // 0x0000
+//     uint8_t original_physical_drive;
+//     uint8_t seconds;
+//     uint8_t minutes;
+//     uint8_t hours;
+//     uint8_t bootstrap_part2[216];
+//     uint32_t disk_32bit_signature;
+//     uint16_t null2; // 0x0000, 0x5a5a if copy-protected
+//     partition_entry_t partition_entry[4];
+//     uint16_t boot_signature; // should be 0xaa55
+// } __attribute__((packed)) modern_MBR_t; // 512 bytes
 
 // https://wiki.osdev.org/FAT
 
@@ -68,7 +68,7 @@ typedef struct {
     uint16_t heads;
     uint32_t hidden_sectors;
     uint32_t large_sector_count;
-} __attribute__((packed)) BPB_t; // 36 bytes
+} __attribute__((packed)) FAT_BPB_t; // 36 bytes
 
 typedef struct {
     uint8_t driver_number;
@@ -79,7 +79,7 @@ typedef struct {
     uint8_t system_identifier[8];
     uint8_t bootcode[448];
     uint16_t boot_signature; // should be 0xaa55
-} __attribute__((packed)) EBPB_t; // 476 bytes
+} __attribute__((packed)) FAT_EBPB_t; // 476 bytes
 
 typedef struct {
     uint32_t sectors_per_FAT;
@@ -99,23 +99,23 @@ typedef struct {
     uint16_t boot_signature; // should be 0xaa55
 } __attribute__((packed)) FAT32_EBPB_t; // 476 bytes
 
-typedef struct {
-    uint32_t lead_signature; // should be 0x41615252
-    uint8_t reserved1[480];
-    uint32_t mid_signature; // should be 0x61417272
-    uint32_t last_known_free_cluster; // should be range check, if 0xffffffff then compute
-    uint32_t available_clusters_start; // should be range check, if 0xffffffff then start at 2
-    uint8_t reserved2[12];
-    uint32_t trail_signature; // should be 0xaa550000
-} __attribute__((packed)) FAT32_FSINFO_t; // 4096 bytes
+// typedef struct {
+//     uint32_t lead_signature; // should be 0x41615252
+//     uint8_t reserved1[480];
+//     uint32_t mid_signature; // should be 0x61417272
+//     uint32_t last_known_free_cluster; // should be range check, if 0xffffffff then compute
+//     uint32_t available_clusters_start; // should be range check, if 0xffffffff then start at 2
+//     uint8_t reserved2[12];
+//     uint32_t trail_signature; // should be 0xaa550000
+// } __attribute__((packed)) FAT32_FSINFO_t; // 4096 bytes
 
 typedef struct {
-    BPB_t bpb;
-    EBPB_t ebpb;
+    FAT_BPB_t bpb;
+    FAT_EBPB_t ebpb;
 } __attribute__((packed)) FAT_BOOT_RECORD_t; // 512 bytes
 
 typedef struct {
-    BPB_t bpb;
+    FAT_BPB_t bpb;
     FAT32_EBPB_t ebpb;
 } __attribute__((packed)) FAT32_BOOT_RECORD_t; // 512 bytes
 
@@ -146,7 +146,12 @@ typedef struct {
 } __attribute__((packed)) FAT_LFN; // 32 bytes
 
 typedef struct {
+    FAT32_BOOT_RECORD_t bootrec;
+} __attribute__((packed)) FAT32_INFO_TABLE;
+
+typedef struct {
     char name[32];
+    bool valid;
     uint32_t start_cluster;
     uint32_t parent_cluster;
     uint8_t attr;
@@ -160,14 +165,9 @@ typedef struct {
 } FS_NODE;
 
 typedef struct {
-    partition_entry_t part;
-    FS_TYPE fs_type;
-    // char name[8];
-    // FILE (*directory)(const char* dirname);
-    // void (*mount)();
-    // void (*read)(FILE* file, unsigned char* buffer, unsigned int length);
-    // void (*close)(FILE* file);
-    // FILE (*open)(const char* fname);
+    FS_TYPE type;
+    partition_entry_t partition;
+    uint8_t info_table[512];
 } FILESYSTEM;
 
 // mbr.c
@@ -176,10 +176,17 @@ partition_entry_t mbr_get_partition_entry(unsigned int id);
 
 // fsmngr.c
 FS_TYPE fs_detect(partition_entry_t part);
-void fs_add(FILESYSTEM fs);
+void fs_add(FILESYSTEM fs, int id);
+FILESYSTEM* fs_get(int id);
+
+// file_op.c
+bool file_set_current_dir(FS_NODE node);
+void file_set_current_cluster(uint32_t cluster);
+bool file_list_dir(FILESYSTEM* fs, bool (*callback)(FS_NODE));
+FS_NODE file_open(FILESYSTEM* fs, const char* filename);
+bool file_read(FILESYSTEM* fs, FS_NODE node, uint8_t* buff);
 
 // fat32.c
-
 FAT32_BOOT_RECORD_t fat32_get_bootrec(partition_entry_t part);
 uint32_t fat32_total_sectors(FAT32_BOOT_RECORD_t* bootrec);
 uint32_t fat32_FAT_size(FAT32_BOOT_RECORD_t* bootrec);
@@ -189,6 +196,6 @@ uint32_t fat32_total_data_sectors(FAT32_BOOT_RECORD_t* bootrec);
 uint32_t fat32_total_clusters(FAT32_BOOT_RECORD_t* bootrec);
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
-bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, bool (*process_node)(FS_NODE));
+bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, bool (*callback)(FS_NODE));
 void fat32_read_file(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, uint8_t* buffer);
-FILESYSTEM fat32_init(partition_entry_t part);
+void fat32_init(partition_entry_t part, int id);

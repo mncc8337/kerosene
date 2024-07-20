@@ -42,10 +42,10 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
 - [ ] GPT support
 - [ ] filesystem
     - [ ] FAT32
-        - [ ] detect
-        - [ ] list
+        - [x] detect
+        - [x] list
         - [ ] make dir
-        - [ ] read
+        - [x] read
         - [ ] write
     - [ ] ext2
         - [ ] detect

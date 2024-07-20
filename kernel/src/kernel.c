@@ -15,10 +15,10 @@
 
 const unsigned int TIMER_PHASE = 100;
 
-char freebuff[512 * 6];
+char freebuff[512 * 2];
 
-FAT32_BOOT_RECORD_t bootrec;
-FILESYSTEM fs;
+FILESYSTEM* fs;
+int FS_ID = 0;
 
 void print_typed_char(key_t k) {
     if(k.released) return;
@@ -118,7 +118,6 @@ void mem_init(multiboot_info_t* mbd) {
     }
     print_log_tag(LT_SUCCESS); puts("paging enabled");
 }
-
 void disk_init() {
     uint16_t IDENTIFY_returned[256];
     if(!ata_pio_init(IDENTIFY_returned)) {
@@ -177,9 +176,8 @@ void disk_init() {
                 break;
             case FS_FAT32:
                 puts("FAT 32");
-                fs = fat32_init(part);
+                fat32_init(part, FS_ID); fs = fs_get(FS_ID);
                 print_log_tag(LT_SUCCESS); printf("initialized FAT 32 filesystem in partition %d\n", i+1);
-                bootrec = fat32_get_bootrec(part);
                 break;
             case FS_EXT2:
                 puts("ext2");
@@ -200,9 +198,6 @@ void disk_init() {
     }
 }
 
-char* filename;
-FS_NODE ret_node;
-
 int indent_level = 0;
 int max_level = 3;
 bool list_dir(FS_NODE node) {
@@ -216,19 +211,10 @@ bool list_dir(FS_NODE node) {
     printf("|---");
     printf("%s (%s)\n", node.name, is_dir ? "directory" : "file");
 
-    if(is_dir) fat32_read_dir(&bootrec, node.start_cluster, fs.part.LBA_start, list_dir);
+    if(is_dir) fat32_read_dir((FAT32_BOOT_RECORD_t*)(fs->info_table), node.start_cluster, fs->partition.LBA_start, list_dir);
 
     indent_level--;
 
-    return true;
-}
-
-bool find_file(FS_NODE node) {
-    if(node.attr == 0x10) return true; // not file
-    if(strcmp(node.name, filename)) {
-        ret_node = node;
-        return false;
-    }
     return true;
 }
 
@@ -268,22 +254,22 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     print_log_tag(LT_INFO); puts("done initializing");
 
-    // read the rootdir
-    uint32_t rootdir_cluster = bootrec.ebpb.rootdir_cluster;
-    puts("root directory");
-    fat32_read_dir(&bootrec, rootdir_cluster, fs.part.LBA_start, list_dir);
+    // assume that the filesystem is FAT 32
+    FAT32_BOOT_RECORD_t* bootrec = (FAT32_BOOT_RECORD_t*)(fs->info_table);
+    uint32_t rootdir_cluster = bootrec->ebpb.rootdir_cluster;
+    file_set_current_cluster(rootdir_cluster);
 
-    char find[] = "test.txt";
-    memcpy(filename, find, strlen(find)+1);
-    bool found_file = !fat32_read_dir(&bootrec, rootdir_cluster, fs.part.LBA_start, find_file);
-    if(found_file) {
-        printf("---[%s]", filename);
-        for(unsigned int i = 0; i < 30 - (strlen(filename) + 6); i++) putchar('-');
-        putchar('\n');
-        fat32_read_file(&bootrec, ret_node.start_cluster, fs.part.LBA_start, (uint8_t*)freebuff);
-        for(unsigned int i = 0; i < ret_node.size; i++) putchar(freebuff[i]);
-        for(int i = 0; i < 30; i++) putchar('-');
-        putchar('\n');
+    puts("root directory");
+    file_list_dir(fs, list_dir);
+
+
+    FS_NODE file = file_open(fs, "test.txt");
+    if(!file.valid) puts("file not found");
+    else {
+        puts("---------------------------");
+        file_read(fs, file, freebuff);
+        printf(freebuff);
+        puts("\n---------------------------");
     }
 
     while(true) {

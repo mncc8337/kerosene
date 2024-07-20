@@ -2,7 +2,6 @@
 #include "ata.h"
 
 #include "string.h"
-#include "debug.h"
 
 FAT32_BOOT_RECORD_t fat32_get_bootrec(partition_entry_t part) {
     FAT32_BOOT_RECORD_t bootrec;
@@ -45,13 +44,7 @@ void fat32_parse_date(uint16_t date, int* day, int* month, int* year) {
     *year = (date >> 9) + 1980; // i read the docs lol
 }
 
-// find all files and directories in a directory
-// for each file/directory run a callback
-// if callback return true then continue
-// else return
-// the function return true when no more files or directories are found
-// return false when the callback stop it
-bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, bool (*process_node)(FS_NODE)) {
+bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, bool (*callback)(FS_NODE)) {
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
@@ -113,7 +106,7 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
             node.size = temp_dir.size;
 
             // run callback
-            if(!process_node(node)) return false;
+            if(!callback(node)) return false;
         }
 
         // get next cluster
@@ -122,8 +115,7 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
         ata_pio_LBA28_access(true, sector_offset + FAT_sector, 1, FAT);
         int entry_offset = FAT_offset % bootrec->bpb.bytes_per_sector;
 
-        uint32_t FAT_val;
-        memcpy(&FAT_val, FAT + entry_offset, 32);
+        uint32_t FAT_val = *((uint32_t*)&(FAT[entry_offset]));
         FAT_val &= 0x0fffffff;
 
         if(FAT_val >= 0x0ffffff8)
@@ -161,8 +153,7 @@ void fat32_read_file(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint3
         ata_pio_LBA28_access(true, sector_offset + FAT_sector, 1, FAT);
         int entry_offset = FAT_offset % bootrec->bpb.bytes_per_sector;
 
-        uint32_t FAT_val;
-        memcpy(&FAT_val, FAT + entry_offset, 32);
+        uint32_t FAT_val = *((uint32_t*)&(FAT[entry_offset]));
         FAT_val &= 0x0fffffff;
 
         if(FAT_val >= 0x0ffffff8)
@@ -175,11 +166,12 @@ void fat32_read_file(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint3
     }
 }
 
-FILESYSTEM fat32_init(partition_entry_t part) {
-    FILESYSTEM fat32;
-    fat32.part = part;
-    fat32.fs_type = FS_FAT32;
+void fat32_init(partition_entry_t part, int id) {
+    FILESYSTEM fs;
+    fs.partition = part;
+    fs.type = FS_FAT32;
+    FAT32_BOOT_RECORD_t bootrec = fat32_get_bootrec(part);
+    memcpy(fs.info_table, &bootrec, 512);
 
-    fs_add(fat32);
-    return fat32;
+    fs_add(fs, id);
 }

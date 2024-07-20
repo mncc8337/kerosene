@@ -5,7 +5,6 @@
 #include "debug.h"
 
 static FILESYSTEM FS[26];
-static size_t fs_count = 0;
 
 static bool is_field_fs_type(uint8_t* buff, int cnt) {
     for(int i = 0; i < cnt; i++) {
@@ -71,7 +70,10 @@ FS_TYPE fs_detect(partition_entry_t part) {
     return FS_EMPTY;
 }
 
-void fs_add(FILESYSTEM fs) {
-    FS[fs_count] = fs;
-    fs_count++;
+void fs_add(FILESYSTEM fs, int id) {
+    FS[id] = fs;
+}
+
+FILESYSTEM* fs_get(int id) {
+    return &(FS[id]);
 }
