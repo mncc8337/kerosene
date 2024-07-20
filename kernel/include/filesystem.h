@@ -132,7 +132,7 @@ typedef struct {
     uint16_t last_mod_date;
     uint16_t first_cluster_number_low;
     uint32_t size;
-} __attribute__((packed)) FAT_DIRECTORY;
+} __attribute__((packed)) FAT_DIRECTORY_ENTRY; // 32 bytes
 
 typedef struct {
     uint8_t order;
@@ -143,18 +143,21 @@ typedef struct {
     uint16_t chars_2[6];
     uint16_t zero;
     uint16_t chars_3[2];
-} __attribute__((packed)) FAT_LFN;
+} __attribute__((packed)) FAT_LFN; // 32 bytes
 
-// typedef struct {
-//     char name[32];
-//     uint32_t flags;
-//     uint32_t fileLength;
-//     uint32_t id;
-//     uint32_t eof;
-//     uint32_t position;
-//     uint32_t current_cluster;
-//     uint32_t device;
-// } FILE;
+typedef struct {
+    char name[32];
+    uint32_t start_cluster;
+    uint32_t parent_cluster;
+    uint8_t attr;
+    uint32_t size;
+    uint8_t centisecond;
+    uint16_t creation_time;
+    uint16_t creation_date;
+    uint16_t last_access_date;
+    uint16_t last_mod_time;
+    uint16_t last_mod_date;
+} FS_NODE;
 
 typedef struct {
     partition_entry_t part;
@@ -186,5 +189,6 @@ uint32_t fat32_total_data_sectors(FAT32_BOOT_RECORD_t* bootrec);
 uint32_t fat32_total_clusters(FAT32_BOOT_RECORD_t* bootrec);
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
-void fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset);
+bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, bool (*process_node)(FS_NODE));
+void fat32_read_file(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, uint8_t* buffer);
 FILESYSTEM fat32_init(partition_entry_t part);

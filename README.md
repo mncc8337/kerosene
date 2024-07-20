@@ -78,3 +78,4 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
 - http://wiki.osdev.org/Expanded_Main_Page
 - http://www.brokenthorn.com/Resources/OSDevIndex.html
 - https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
+- https://download.microsoft.com/download/1/6/1/161ba512-40e2-4cc9-843a-923143f3456c/fatgen103.doc

@@ -15,7 +15,7 @@
 
 const unsigned int TIMER_PHASE = 100;
 
-char freebuff[512];
+char freebuff[512 * 6];
 
 FAT32_BOOT_RECORD_t bootrec;
 FILESYSTEM fs;
@@ -200,6 +200,38 @@ void disk_init() {
     }
 }
 
+char* filename;
+FS_NODE ret_node;
+
+int indent_level = 0;
+int max_level = 3;
+bool list_dir(FS_NODE node) {
+    if(indent_level >= max_level) return true;
+    indent_level++;
+
+    bool is_dir = node.attr == 0x10;
+
+    for(int i = 0; i < indent_level-1; i++)
+        printf("|   ");
+    printf("|---");
+    printf("%s (%s)\n", node.name, is_dir ? "directory" : "file");
+
+    if(is_dir) fat32_read_dir(&bootrec, node.start_cluster, fs.part.LBA_start, list_dir);
+
+    indent_level--;
+
+    return true;
+}
+
+bool find_file(FS_NODE node) {
+    if(node.attr == 0x10) return true; // not file
+    if(strcmp(node.name, filename)) {
+        ret_node = node;
+        return false;
+    }
+    return true;
+}
+
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // greeting msg to let us know we are in the kernel
     tty_set_attr(LIGHT_CYAN);  puts("hello");
@@ -238,7 +270,21 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     // read the rootdir
     uint32_t rootdir_cluster = bootrec.ebpb.rootdir_cluster;
-    fat32_read_dir(&bootrec, rootdir_cluster, fs.part.LBA_start);
+    puts("root directory");
+    fat32_read_dir(&bootrec, rootdir_cluster, fs.part.LBA_start, list_dir);
+
+    char find[] = "test.txt";
+    memcpy(filename, find, strlen(find)+1);
+    bool found_file = !fat32_read_dir(&bootrec, rootdir_cluster, fs.part.LBA_start, find_file);
+    if(found_file) {
+        printf("---[%s]", filename);
+        for(unsigned int i = 0; i < 30 - (strlen(filename) + 6); i++) putchar('-');
+        putchar('\n');
+        fat32_read_file(&bootrec, ret_node.start_cluster, fs.part.LBA_start, (uint8_t*)freebuff);
+        for(unsigned int i = 0; i < ret_node.size; i++) putchar(freebuff[i]);
+        for(int i = 0; i < 30; i++) putchar('-');
+        putchar('\n');
+    }
 
     while(true) {
         SYS_SLEEP();
