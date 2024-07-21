@@ -14,3 +14,4 @@ void* memcpy(void* restrict dstptr, const void* restrict srcptr, size_t size);
 size_t strlen(const char* str);
 char* strrev(char* str);
 bool strcmp(char* str1, char* str2);
+char* strtok(char* str, const char* delimiters);

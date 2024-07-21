@@ -17,7 +17,7 @@ const unsigned int TIMER_PHASE = 100;
 
 char freebuff[512 * 2];
 
-FILESYSTEM* fs;
+FILESYSTEM* fs = 0;
 int FS_ID = 0;
 
 void print_typed_char(key_t k) {
@@ -199,9 +199,9 @@ void disk_init() {
 }
 
 int indent_level = 0;
-int max_level = 3;
+int max_depth = 2;
 bool list_dir(FS_NODE node) {
-    if(indent_level >= max_level) return true;
+    if(indent_level >= max_depth) return true;
     indent_level++;
 
     bool is_dir = node.attr == 0x10;
@@ -211,11 +211,30 @@ bool list_dir(FS_NODE node) {
     printf("|---");
     printf("%s (%s)\n", node.name, is_dir ? "directory" : "file");
 
-    if(is_dir) fat32_read_dir((FAT32_BOOT_RECORD_t*)(fs->info_table), node.start_cluster, fs->partition.LBA_start, list_dir);
+    if(is_dir) {
+        FS_NODE curr = fs_get_current_node();
+        fs_set_current_node(node);
+        fs_list_dir(fs, list_dir);
+        fs_set_current_node(curr);
+    }
 
     indent_level--;
 
     return true;
+}
+
+void read_file(const char* path) {
+    FS_NODE node = fs_find_node(fs, path);
+    if(!node.valid) {
+        printf("file %s not found\n", path);
+        return;
+    }
+
+    printf("reading %s\n", path);
+    puts("---------------------------");
+    fs_read_node(fs, node, (uint8_t*)freebuff);
+    printf(freebuff);
+    puts("\n---------------------------");
 }
 
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
@@ -254,22 +273,14 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     print_log_tag(LT_INFO); puts("done initializing");
 
-    // assume that the filesystem is FAT 32
-    FAT32_BOOT_RECORD_t* bootrec = (FAT32_BOOT_RECORD_t*)(fs->info_table);
-    uint32_t rootdir_cluster = bootrec->ebpb.rootdir_cluster;
-    file_set_current_cluster(rootdir_cluster);
+    // we have a filesystem initialized
+    if(fs != 0) {
+        // list files and directories
+        puts("root directory");
+        fs_list_dir(fs, list_dir);
 
-    puts("root directory");
-    file_list_dir(fs, list_dir);
-
-
-    FS_NODE file = file_open(fs, "test.txt");
-    if(!file.valid) puts("file not found");
-    else {
-        puts("---------------------------");
-        file_read(fs, file, freebuff);
-        printf(freebuff);
-        puts("\n---------------------------");
+        read_file("testdir/test.txt");
+        read_file("a/very/deep/dir/we-found-it.txt");
     }
 
     while(true) {

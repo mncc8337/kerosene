@@ -2,6 +2,25 @@
 #include "ata.h"
 
 #include "string.h"
+#include "debug.h"
+
+static void parse_lfn(FAT_LFN* lfn, char* buff, int* cnt) {
+    for(int i = 0; i < 5 && *cnt < 32; i++) {
+        if(lfn->chars_1[i] == 0)
+            return;
+        buff[(*cnt)++] = (char)lfn->chars_1[i];
+    }
+    for(int i = 0; i < 6 && *cnt < 32; i++) {
+        if(lfn->chars_2[i] == 0)
+            return;
+        buff[(*cnt)++] = (char)lfn->chars_2[i];
+    }
+    for(int i = 0; i < 2 && *cnt < 32; i++) {
+        if(lfn->chars_3[i] == 0)
+            return;
+        buff[(*cnt)++] = (char)lfn->chars_3[i];
+    }
+}
 
 FAT32_BOOT_RECORD_t fat32_get_bootrec(partition_entry_t part) {
     FAT32_BOOT_RECORD_t bootrec;
@@ -63,7 +82,10 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
 
         bool lfn_ready = false;
         FAT_LFN temp_lfn;
+        char lfn_name[32];
+        int namelen = 0;
         FAT_DIRECTORY_ENTRY temp_dir;
+
         for(unsigned int i = 0; i < cluster_size; i += 32) {
             if(directory[i] == 0x00) { // no more file/directory in this dir, free entry
                 finish = true;
@@ -72,8 +94,17 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
             if(directory[i] == 0xe5) continue; // free entry
             // check if it is long file name entry
             if(directory[i+11] == 0x0f) {
-                memcpy(&temp_lfn, directory + i, 32);
                 lfn_ready = true;
+
+                if(namelen < 32) {
+                    memcpy(&temp_lfn, directory + i, 32);
+                    int startlen = namelen; // store for later use
+                    parse_lfn(&temp_lfn, lfn_name, &namelen);
+                    // reverse the parsed string
+                    // set end point for strrev. note that it will be replaced in the next iteration
+                    lfn_name[namelen] = '\0';
+                    strrev(lfn_name + startlen);
+                }
                 // skip to the next entry
                 continue;
             }
@@ -81,17 +112,14 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
             if(!lfn_ready) continue;
 
             // long file name is ready
-            lfn_ready = false;
-
             FS_NODE node;
-            // parse long file name
-            for(int i = 0; i < 5; i++)
-                node.name[i] = (char)temp_lfn.chars_1[i];
-            for(int i = 0; i < 6; i++)
-                node.name[5+i] = (char)temp_lfn.chars_2[i];
-            for(int i = 0; i < 2; i++)
-                node.name[11+i] = (char)temp_lfn.chars_3[i];
-            node.name[14] = 0; // null-terminating
+
+            // the parser did not add the null character automatically
+            // so we need to manually do it
+            lfn_name[namelen++] = '\0';
+            strrev(lfn_name);
+            // copy all the thing, including the null character added earlier
+            memcpy(node.name, lfn_name, namelen);
 
             node.start_cluster = (uint32_t)temp_dir.first_cluster_number_high << 16 | temp_dir.first_cluster_number_low;
             node.centisecond = temp_dir.centisecond;
@@ -107,6 +135,11 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
 
             // run callback
             if(!callback(node)) return false;
+
+            // reset control var
+            lfn_ready = false;
+            namelen = 0;
+
         }
 
         // get next cluster
@@ -174,4 +207,11 @@ void fat32_init(partition_entry_t part, int id) {
     memcpy(fs.info_table, &bootrec, 512);
 
     fs_add(fs, id);
+
+    // set default dir
+    FS_NODE rootnode;
+    rootnode.start_cluster = bootrec.ebpb.rootdir_cluster;
+    rootnode.parent_cluster = 0; // no parent
+    rootnode.attr = 0x10; // is a dir
+    fs_set_current_node(rootnode);
 }

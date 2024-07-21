@@ -10,7 +10,6 @@ LIBC_SRC = libc/stdio/*.c \
 		   libc/string/*.c \
 
 C_SRC = kernel/src/*.c \
-		kernel/src/utils/*.c \
 		kernel/src/system/*.c \
 		kernel/src/driver/*.c \
 		kernel/src/driver/ata/*.c \
@@ -58,8 +57,6 @@ multiboot-header.o: multiboot-header.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
 %.o: kernel/src/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/src/utils/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 %.o: kernel/src/system/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<

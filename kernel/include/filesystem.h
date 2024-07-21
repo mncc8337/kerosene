@@ -145,9 +145,13 @@ typedef struct {
     uint16_t chars_3[2];
 } __attribute__((packed)) FAT_LFN; // 32 bytes
 
-typedef struct {
-    FAT32_BOOT_RECORD_t bootrec;
-} __attribute__((packed)) FAT32_INFO_TABLE;
+// READ_ONLY=0x01
+// HIDDEN=0x02
+// SYSTEM=0x04
+// VOLUME_ID=0x08
+// DIRECTORY=0x10
+// ARCHIVE=0x20
+// LFN=READ_ONLY|HIDDEN|SYSTEM|VOLUME_ID
 
 typedef struct {
     char name[32];
@@ -167,6 +171,8 @@ typedef struct {
 typedef struct {
     FS_TYPE type;
     partition_entry_t partition;
+    // the filesystem info table
+    // for FAT12/16/32 it is the boot record
     uint8_t info_table[512];
 } FILESYSTEM;
 
@@ -180,11 +186,11 @@ void fs_add(FILESYSTEM fs, int id);
 FILESYSTEM* fs_get(int id);
 
 // file_op.c
-bool file_set_current_dir(FS_NODE node);
-void file_set_current_cluster(uint32_t cluster);
-bool file_list_dir(FILESYSTEM* fs, bool (*callback)(FS_NODE));
-FS_NODE file_open(FILESYSTEM* fs, const char* filename);
-bool file_read(FILESYSTEM* fs, FS_NODE node, uint8_t* buff);
+bool fs_set_current_node(FS_NODE node);
+FS_NODE fs_get_current_node();
+bool fs_list_dir(FILESYSTEM* fs, bool (*callback)(FS_NODE));
+FS_NODE fs_find_node(FILESYSTEM* fs, const char* path);
+bool fs_read_node(FILESYSTEM* fs, FS_NODE node, uint8_t* buff);
 
 // fat32.c
 FAT32_BOOT_RECORD_t fat32_get_bootrec(partition_entry_t part);
