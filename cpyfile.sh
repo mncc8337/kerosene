@@ -16,14 +16,16 @@ if [ ! -d "$dest" ]; then
     mkdir -p $dest
 fi
 
-sudo losetup /dev/loop0 disk.img -o 1048576 # 1024^2
-sudo mount /dev/loop0 ./mnt
+if [ -z "$(losetup -a | grep "/dev/loop1")" ]; then
+    sudo losetup /dev/loop1 disk.img -o 1048576 # 1024^2
+fi
+sudo mount --onlyonce /dev/loop1 ./mnt
 
 if sudo cp -r --preserve=timestamps $1 $dest; then
     echo copied $1 to $dest
 fi
 
 sudo umount ./mnt
-sudo losetup -d /dev/loop0
+sudo losetup -d /dev/loop1
 
 sync

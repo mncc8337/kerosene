@@ -8,11 +8,11 @@ QEMUFLAGS="-m 128M \
 
 if [ "$1" == "debug" ]; then
     qemu-system-i386 -hda disk.img $QEMUFLAGS -s -S &
-    gdb kernel.elf \
+    gdb kernel.bin \
         -ex 'target remote localhost:1234' \
         -ex 'layout src' \
         -ex 'layout reg' \
-        -ex 'break main' \
+        -ex 'break kmain' \
         -ex 'continue'
 else
     qemu-system-i386 -hda disk.img $QEMUFLAGS

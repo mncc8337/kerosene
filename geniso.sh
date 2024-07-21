@@ -1,12 +1,14 @@
 #!/bin/sh
 set -e
 
-sudo losetup /dev/loop0 disk.img -o 1048576 # 1024^2
-sudo mount /dev/loop0 ./mnt
+if [ -z "$(losetup -a | grep "/dev/loop1")" ]; then
+    sudo losetup /dev/loop1 disk.img -o 1048576 # 1024^2
+fi
+sudo mount --onlyonce /dev/loop1 ./mnt
 
 grub-mkrescue -o sos.iso --modules="normal part_msdos fat multiboot" ./mnt
 
 sudo umount ./mnt
-sudo losetup -d /dev/loop0
+sudo losetup -d /dev/loop1
 
 echo "iso generated"
