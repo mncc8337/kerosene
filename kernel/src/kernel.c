@@ -108,38 +108,35 @@ void mem_init(multiboot_info_t* mbd) {
     pmmngr_deinit_region(endkernel, pmmngr_get_size()/MMNGR_BLOCK_SIZE); // pmmngr
 
     pmmngr_update_usage(); // always run this after init and deinit regions
-    print_log_tag(LT_SUCCESS); printf("initialized pmmngr with %d MiB\n", pmmngr_get_free_size()/1024/1024);
+    print_debug(LT_OK, "initialized pmmngr with %d MiB\n", pmmngr_get_free_size()/1024/1024);
 
     // vmmngr init
     MEM_ERR merr = vmmngr_init();
     if(merr != ERR_MEM_SUCCESS) {
-        print_log_tag(LT_CRITICAL); printf("error while enabling paging. system halted. error code %x", merr);
+        print_debug(LT_CR, "error while enabling paging. system halted. error code %x", merr);
         SYS_HALT();
     }
-    print_log_tag(LT_SUCCESS); puts("paging enabled");
+    print_debug(LT_OK, "paging enabled\n");
 }
 void disk_init() {
     uint16_t IDENTIFY_returned[256];
     if(!ata_pio_init(IDENTIFY_returned)) {
-        print_log_tag(LT_WARNING); puts("failed to initialize ATA PIO mode");
+        print_debug(LT_WN, "failed to initialize ATA PIO mode\n");
         return;
     }
 
-    print_log_tag(LT_SUCCESS); puts("ATA PIO mode initialized");
+    print_debug(LT_OK, "ATA PIO mode initialized\n");
 
-    print_log_tag(LT_INFO); printf(
-        "    LBA48 mode: %s\n",
-        (IDENTIFY_returned[83] & 0x400) ? "yes" : "no"
-    );
+    print_debug(LT_IF, "    LBA48 mode: %s\n", (IDENTIFY_returned[83] & 0x400) ? "yes" : "no");
 
     if(IDENTIFY_returned[88]) {
         uint8_t supported_UDMA = IDENTIFY_returned[88] & 0xff;
         uint8_t active_UDMA = IDENTIFY_returned[88] >> 8;
-        print_log_tag(LT_INFO); printf("    supported UDMA mode:");
+        print_debug(LT_IF, "    supported UDMA mode:");
         for(int i = 0; i < 8; i++)
             if(supported_UDMA & (1 << i)) printf(" %d", i+1);
         putchar('\n');
-        print_log_tag(LT_INFO); printf("    active UDMA mode:");
+        print_debug(LT_IF, "    active UDMA mode:");
         for(int i = 0; i < 8; i++)
             if(active_UDMA & (1 << i)) printf(" %d", i+1);
         putchar('\n');
@@ -147,52 +144,48 @@ void disk_init() {
 
     bool mbr_ok = mbr_load();
     if(!mbr_ok) {
-        print_log_tag(LT_ERROR); puts("cannot load MBR");
+        print_debug(LT_ER, "cannot load MBR\n");
         return;
     }
-    print_log_tag(LT_SUCCESS); puts("MBR loaded");
+    print_debug(LT_OK, "MBR loaded\n");
 
     for(int i = 0; i < 4; i++) {
         partition_entry_t part = mbr_get_partition_entry(i);
         if(part.sector_count == 0) continue;
 
-        print_log_tag(LT_INFO); printf("partition table %d info:\n", i+1);
-        print_log_tag(LT_INFO); printf("    partition type: 0x%x\n", part.partition_type);
-        print_log_tag(LT_INFO); printf("    drive attribute: %s\n",
+        print_debug(LT_IF, "partition table %d info:\n", i+1);
+        print_debug(LT_IF, "    partition type: 0x%x\n", part.partition_type);
+        print_debug(LT_IF, "    drive attribute: %s\n",
                         part.drive_attribute == 0x80 ? "active/bootable" :
                         part.drive_attribute == 0x00 ? "inactive" : "invalid");
-        print_log_tag(LT_INFO); printf("    LBA start: 0x%x\n", part.LBA_start);
-        print_log_tag(LT_INFO); printf("    sector count: %d\n", part.sector_count);
+        print_debug(LT_IF, "    LBA start: 0x%x\n", part.LBA_start);
+        print_debug(LT_IF, "    sector count: %d\n", part.sector_count);
 
-        print_log_tag(LT_INFO); printf("    fs type: ");
+        print_debug(LT_IF, "    fs type: ");
         switch(fs_detect(part)) {
             case FS_EMPTY:
                 puts("unknown");
                 break;
             case FS_FAT_12_16:
                 puts("FAT 12/16");
-                print_log_tag(LT_WARNING);
-                printf("FAT 12/16 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
+                print_debug(LT_WN, "FAT 12/16 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
                 break;
             case FS_FAT32:
                 puts("FAT 32");
                 current_node = fat32_init(part, FS_ID);
-                print_log_tag(LT_SUCCESS); printf("initialized FAT 32 filesystem in partition %d\n", i+1);
+                print_debug(LT_OK, "initialized FAT 32 filesystem in partition %d\n", i+1);
                 break;
             case FS_EXT2:
                 puts("ext2");
-                print_log_tag(LT_WARNING);
-                printf("EXT2 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
+                print_debug(LT_WN, "EXT2 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
                 break;
             case FS_EXT3:
                 puts("ext3");
-                print_log_tag(LT_WARNING);
-                printf("EXT3 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
+                print_debug(LT_WN, "EXT3 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
                 break;
             case FS_EXT4:
                 puts("ext4");
-                print_log_tag(LT_WARNING);
-                printf("EXT4 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
+                print_debug(LT_WN, "EXT3 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
                 break;
         }
     }
@@ -241,11 +234,11 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     tty_set_attr(LIGHT_GREY);
 
     if(magic != MULTIBOOT_BOOTLOADER_MAGIC) {
-        print_log_tag(LT_CRITICAL); puts("invalid magic number. system halted");
+        print_debug(LT_CR, "invalid magic number. system halted\n");
         SYS_HALT();
     }
     if(!(mbd->flags >> 6 & 0x1)) {
-        print_log_tag(LT_CRITICAL); puts("invalid memory map given by GRUB. system halted");
+        print_debug(LT_CR, "invalid memory map given by GRUB. system halted\n");
         SYS_HALT();
     }
     mem_init(mbd);
@@ -267,7 +260,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     set_key_listener(print_typed_char);
 
-    print_log_tag(LT_INFO); puts("done initializing");
+    print_debug(LT_IF, "done initializing\n");
 
     if(current_node.valid) {
         // list files and directories

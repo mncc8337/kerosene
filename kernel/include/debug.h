@@ -1,14 +1,16 @@
 #pragma once
 
+#include "stdarg.h"
+
 #include "tty.h"
 #include "stdio.h"
 
 enum LOG_TAG{
-    LT_INFO,
-    LT_SUCCESS,
-    LT_WARNING,
-    LT_ERROR,
-    LT_CRITICAL
+    LT_IF,
+    LT_OK,
+    LT_WN,
+    LT_ER,
+    LT_CR
 };
 
-void print_log_tag(int lt);
+void print_debug(int log_tag, const char* restrict format, ...);
