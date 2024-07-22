@@ -28,10 +28,6 @@ _OBJ += $(addsuffix .o, $(notdir $(wildcard $(ASM_SRC))))
 LIBC_OBJ = $(addprefix $(BIN), $(_LIBC_OBJ))
 OBJ = $(addprefix $(BIN), $(_OBJ))
 
-DEPS  = $(patsubst %.o,%.d,$(OBJ))
-DEPS += $(patsubst %.o,%.d,$(LIBC_OBJ))
--include $(DEPS)
-
 DEFINES = -D__is_libk
 
 C_INCLUDES = -I./kernel/include -I./libc/include
@@ -43,7 +39,6 @@ LDFLAGS = -T linker.ld -nostdlib -lgcc
 NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
 
 .PHONY: all libc libk kernel disk clean
-.DEFAULT_GOAL: all
 
 all: $(BIN) $(BIN)kernel.bin
 
@@ -59,9 +54,8 @@ $(BIN)%.o: libc/string/%.c
 $(BIN)libk.a: $(LIBC_OBJ)
 	$(CROSS_COMPILER_LOC)$(TARGET)-ar rcs $@ $^
 	@echo done building libk
-	# rm $(LIBC_OBJ)
 $(BIN)libc.a: $(LIBC_OBJ)
-	@echo libc is not ready for building, yet
+	@echo libc is not ready for build, yet
 
 $(BIN)multiboot-header.o: multiboot-header.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
@@ -89,12 +83,15 @@ $(BIN)kernel.bin: $(BIN)multiboot-header.o $(OBJ) $(BIN)libk.a
 	# use GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lk
 
-libc:
-	@echo libc is not ready to build, yet
+libc: $(BIN)libc.a
 
-libk: libk.a
+libk: $(BIN)libk.a
 
 kernel: $(BIN)kernel.bin
 
 clean:
 	rm -r $(BIN)
+
+DEPS  = $(patsubst %.o,%.d,$(OBJ))
+DEPS += $(patsubst %.o,%.d,$(LIBC_OBJ))
+-include $(DEPS)

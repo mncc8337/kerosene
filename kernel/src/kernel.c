@@ -212,11 +212,11 @@ bool list_dir(fs_node_t node) {
     return true;
 }
 
-void read_file(const char* path) {
+fs_node_t read_file(const char* path) {
     fs_node_t node = fs_find_node(&current_node, path);
     if(!node.valid) {
         printf("file %s not found\n", path);
-        return;
+        return node;
     }
 
     printf("reading %s\n", path);
@@ -224,6 +224,8 @@ void read_file(const char* path) {
     fs_read_node(&node, (uint8_t*)freebuff);
     printf(freebuff);
     puts("\n---------------------------");
+
+    return node;
 }
 
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
@@ -268,8 +270,15 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         fs_list_dir(&current_node, list_dir);
 
         read_file("testdir/test.txt");
-        read_file("a/very/deep/dir/we-found-it.txt");
+
+        for(int i = 1; i < 5; i++) {
+            uint32_t freecluster = fat32_find_free_clusters(current_node.fs, i);
+            printf("created %d clusters, starting at 0x%x\n", i, freecluster);
+            fat32_free_clusters_chain(current_node.fs, freecluster);
+            puts("freed");
+        }
     }
+
 
     while(true) {
         SYS_SLEEP();

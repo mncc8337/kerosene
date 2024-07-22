@@ -52,11 +52,11 @@ typedef struct {
     uint32_t lead_signature; // should be 0x41615252
     uint8_t reserved1[480];
     uint32_t mid_signature; // should be 0x61417272
-    uint32_t last_known_free_cluster; // should be range check, if 0xffffffff then compute
+    uint32_t free_cluster_count; // should be range check, if 0xffffffff then compute
     uint32_t available_clusters_start; // should be range check, if 0xffffffff then start at 2
     uint8_t reserved2[12];
     uint32_t trail_signature; // should be 0xaa550000
-} __attribute__((packed)) FAT32_FSINFO_t; // 4096 bytes
+} __attribute__((packed)) FAT32_FSINFO_t; // 512 bytes
 
 typedef struct {
     FAT_BPB_t bpb;

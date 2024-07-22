@@ -2,6 +2,7 @@
 
 #include "stdint.h"
 #include "stdbool.h"
+#include "stddef.h"
 
 #include "fat_type.h"
 
@@ -111,4 +112,6 @@ void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
 bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 void fat32_read_file(fs_node_t* node, uint8_t* buffer);
+uint32_t fat32_find_free_clusters(fs_t* fs, size_t cluster_count);
+void fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
 fs_node_t fat32_init(partition_entry_t part, int id);
