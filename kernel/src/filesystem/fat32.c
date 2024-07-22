@@ -63,22 +63,22 @@ void fat32_parse_date(uint16_t date, int* day, int* month, int* year) {
     *year = (date >> 9) + 1980; // i read the docs lol
 }
 
-bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, bool (*callback)(FS_NODE)) {
+bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
+    FAT32_BOOT_RECORD_t* bootrec = (FAT32_BOOT_RECORD_t*)parent->fs->info_table;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
 
-    uint32_t current_cluster = start_cluster;
-
+    uint32_t current_cluster = parent->start_cluster;
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t directory[cluster_size];
 
     uint8_t FAT[bootrec->bpb.bytes_per_sector];
 
-    bool finish = false;
-    while(!finish) {
+    while(true) {
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
-        ata_pio_LBA28_access(true, sector_offset + first_sector, sectors_per_cluster, directory);
+        ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector,
+                sectors_per_cluster, directory);
 
         bool lfn_ready = false;
         FAT_LFN temp_lfn;
@@ -87,10 +87,8 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
         FAT_DIRECTORY_ENTRY temp_dir;
 
         for(unsigned int i = 0; i < cluster_size; i += 32) {
-            if(directory[i] == 0x00) { // no more file/directory in this dir, free entry
-                finish = true;
+            if(directory[i] == 0x00) // no more file/directory in this dir, free entry
                 break;
-            }
             if(directory[i] == 0xe5) continue; // free entry
             // check if it is long file name entry
             if(directory[i+11] == 0x0f) {
@@ -100,7 +98,7 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
                     memcpy(&temp_lfn, directory + i, 32);
                     int startlen = namelen; // store for later use
                     parse_lfn(&temp_lfn, lfn_name, &namelen);
-                    // reverse the parsed string
+                    // reverse the parsed string because LFN entries are in reverse order
                     // set end point for strrev. note that it will be replaced in the next iteration
                     lfn_name[namelen] = '\0';
                     strrev(lfn_name + startlen);
@@ -112,11 +110,14 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
             if(!lfn_ready) continue;
 
             // long file name is ready
-            FS_NODE node;
+            fs_node_t node;
+            node.fs = parent->fs;
+            node.parent_node = parent;
 
             // the parser did not add the null character automatically
             // so we need to manually do it
             lfn_name[namelen++] = '\0';
+            // reverse again to get the correct string
             strrev(lfn_name);
             // copy all the thing, including the null character added earlier
             memcpy(node.name, lfn_name, namelen);
@@ -130,7 +131,6 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
             node.last_mod_date = temp_dir.last_mod_date;
             node.attr = temp_dir.attr;
 
-            node.parent_cluster = start_cluster;
             node.size = temp_dir.size;
 
             // run callback
@@ -139,13 +139,12 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
             // reset control var
             lfn_ready = false;
             namelen = 0;
-
         }
 
         // get next cluster
         int FAT_offset = current_cluster * 4;
         int FAT_sector = first_FAT_sector + FAT_offset / bootrec->bpb.bytes_per_sector;
-        ata_pio_LBA28_access(true, sector_offset + FAT_sector, 1, FAT);
+        ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + FAT_sector, 1, FAT);
         int entry_offset = FAT_offset % bootrec->bpb.bytes_per_sector;
 
         uint32_t FAT_val = *((uint32_t*)&(FAT[entry_offset]));
@@ -162,28 +161,29 @@ bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32
     return true;
 }
 
-void fat32_read_file(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, uint8_t* buffer) {
+void fat32_read_file(fs_node_t* node, uint8_t* buffer) {
+    FAT32_BOOT_RECORD_t* bootrec = (FAT32_BOOT_RECORD_t*)node->fs->info_table;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
 
+    uint32_t current_cluster = node->start_cluster;
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
 
     uint8_t FAT[bootrec->bpb.bytes_per_sector];
 
     unsigned int cluster_count = 0;
-    bool finish = false;
-    while(!finish) {
-        uint32_t first_sector = ((start_cluster - 2) * sectors_per_cluster) + first_data_sector;
+    while(true) {
+        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
         // read into buffer
         ata_pio_LBA28_access(true,
-                sector_offset + first_sector,
+                node->fs->partition.LBA_start + first_sector,
                 sectors_per_cluster, buffer + cluster_size * cluster_count);
 
         // get next cluster
-        int FAT_offset = start_cluster * 4;
+        int FAT_offset = current_cluster * 4;
         int FAT_sector = first_FAT_sector + FAT_offset / bootrec->bpb.bytes_per_sector;
-        ata_pio_LBA28_access(true, sector_offset + FAT_sector, 1, FAT);
+        ata_pio_LBA28_access(true, node->fs->partition.LBA_start + FAT_sector, 1, FAT);
         int entry_offset = FAT_offset % bootrec->bpb.bytes_per_sector;
 
         uint32_t FAT_val = *((uint32_t*)&(FAT[entry_offset]));
@@ -194,13 +194,15 @@ void fat32_read_file(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint3
         if(FAT_val == 0x0ffffff7)
             break; // bad cluster
 
-        start_cluster = FAT_val;
+        current_cluster = FAT_val;
         cluster_count++;
     }
 }
 
-void fat32_init(partition_entry_t part, int id) {
-    FILESYSTEM fs;
+// initialize FAT 32
+// return the root node
+fs_node_t fat32_init(partition_entry_t part, int id) {
+    fs_t fs;
     fs.partition = part;
     fs.type = FS_FAT32;
     FAT32_BOOT_RECORD_t bootrec = fat32_get_bootrec(part);
@@ -208,10 +210,13 @@ void fat32_init(partition_entry_t part, int id) {
 
     fs_add(fs, id);
 
-    // set default dir
-    FS_NODE rootnode;
+    fs_node_t rootnode;
+    rootnode.fs = fs_get(id);
     rootnode.start_cluster = bootrec.ebpb.rootdir_cluster;
-    rootnode.parent_cluster = 0; // no parent
-    rootnode.attr = 0x10; // is a dir
-    fs_set_current_node(rootnode);
+    rootnode.parent_node = 0; // no parent
+    rootnode.attr = NODE_DIRECTORY;
+    rootnode.valid = true;
+    
+    fs.root_node = rootnode;
+    return rootnode;
 }

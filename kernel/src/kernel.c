@@ -17,8 +17,8 @@ const unsigned int TIMER_PHASE = 100;
 
 char freebuff[512 * 2];
 
-FILESYSTEM* fs = 0;
 int FS_ID = 0;
+fs_node_t current_node;
 
 void print_typed_char(key_t k) {
     if(k.released) return;
@@ -176,7 +176,7 @@ void disk_init() {
                 break;
             case FS_FAT32:
                 puts("FAT 32");
-                fat32_init(part, FS_ID); fs = fs_get(FS_ID);
+                current_node = fat32_init(part, FS_ID);
                 print_log_tag(LT_SUCCESS); printf("initialized FAT 32 filesystem in partition %d\n", i+1);
                 break;
             case FS_EXT2:
@@ -200,7 +200,7 @@ void disk_init() {
 
 int indent_level = 0;
 int max_depth = 2;
-bool list_dir(FS_NODE node) {
+bool list_dir(fs_node_t node) {
     if(indent_level >= max_depth) return true;
     indent_level++;
 
@@ -211,12 +211,8 @@ bool list_dir(FS_NODE node) {
     printf("|---");
     printf("%s (%s)\n", node.name, is_dir ? "directory" : "file");
 
-    if(is_dir) {
-        FS_NODE curr = fs_get_current_node();
-        fs_set_current_node(node);
-        fs_list_dir(fs, list_dir);
-        fs_set_current_node(curr);
-    }
+    if(is_dir)
+        fs_list_dir(&node, list_dir);
 
     indent_level--;
 
@@ -224,7 +220,7 @@ bool list_dir(FS_NODE node) {
 }
 
 void read_file(const char* path) {
-    FS_NODE node = fs_find_node(fs, path);
+    fs_node_t node = fs_find_node(&current_node, path);
     if(!node.valid) {
         printf("file %s not found\n", path);
         return;
@@ -232,7 +228,7 @@ void read_file(const char* path) {
 
     printf("reading %s\n", path);
     puts("---------------------------");
-    fs_read_node(fs, node, (uint8_t*)freebuff);
+    fs_read_node(&node, (uint8_t*)freebuff);
     printf(freebuff);
     puts("\n---------------------------");
 }
@@ -273,11 +269,10 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     print_log_tag(LT_INFO); puts("done initializing");
 
-    // we have a filesystem initialized
-    if(fs != 0) {
+    if(current_node.valid) {
         // list files and directories
         puts("root directory");
-        fs_list_dir(fs, list_dir);
+        fs_list_dir(&current_node, list_dir);
 
         read_file("testdir/test.txt");
         read_file("a/very/deep/dir/we-found-it.txt");

@@ -2,7 +2,8 @@
 
 #include "stdint.h"
 #include "stdbool.h"
-#include "stddef.h"
+
+#include "fat_type.h"
 
 // there are some extra fs that might not be implemented
 // i added them for completeness
@@ -14,8 +15,6 @@ typedef enum {
     FS_EXT3,
     FS_EXT4
 } FS_TYPE;
-
-// structure that are parsed using memcpy need attribute packed
 
 typedef struct {
     uint8_t drive_attribute;
@@ -51,113 +50,22 @@ typedef struct {
 //     uint16_t boot_signature; // should be 0xaa55
 // } __attribute__((packed)) modern_MBR_t; // 512 bytes
 
-// https://wiki.osdev.org/FAT
+typedef struct _fs_t fs_t;
+typedef struct _fs_node_t fs_node_t;
 
-typedef struct {
-    uint8_t null[3];
-    uint8_t OEM_identifier[8];
-    uint16_t bytes_per_sector;
-    uint8_t sectors_per_cluster;
-    uint16_t reserved_sectors;
-    uint8_t FATs;
-    uint16_t rootdir_entries;
-    uint16_t total_sectors; // if it is 0 then check large_sector_count
-    uint8_t media_type;
-    uint16_t sectors_per_FAT;
-    uint16_t sectors_per_track;
-    uint16_t heads;
-    uint32_t hidden_sectors;
-    uint32_t large_sector_count;
-} __attribute__((packed)) FAT_BPB_t; // 36 bytes
+#define NODE_READ_ONLY 0x01
+#define NODE_HIDDEN    0x02
+#define NODE_SYSTEM    0x04
+#define NODE_VOLUME_ID 0x08
+#define NODE_DIRECTORY 0x10
+#define NODE_ARCHIVE   0x20
 
-typedef struct {
-    uint8_t driver_number;
-    uint8_t windows_flags;
-    uint8_t signature; // should be 0x28 or 0x29
-    uint32_t volume_id_serial;
-    uint8_t label[11];
-    uint8_t system_identifier[8];
-    uint8_t bootcode[448];
-    uint16_t boot_signature; // should be 0xaa55
-} __attribute__((packed)) FAT_EBPB_t; // 476 bytes
-
-typedef struct {
-    uint32_t sectors_per_FAT;
-    uint16_t flags;
-    uint16_t FAT_version;
-    uint32_t rootdir_cluster;
-    uint16_t fsinfo_sector;
-    uint16_t backup_bootsector_sector;
-    uint8_t reserved[12];
-    uint8_t drive_number;
-    uint8_t windows_flags;
-    uint8_t signature; // should be 0x28 or 0x29
-    uint32_t volume_id_serial;
-    uint8_t label[11];
-    uint8_t system_identifier[8]; // should be "FAT32   "
-    uint8_t bootcode[420];
-    uint16_t boot_signature; // should be 0xaa55
-} __attribute__((packed)) FAT32_EBPB_t; // 476 bytes
-
-// typedef struct {
-//     uint32_t lead_signature; // should be 0x41615252
-//     uint8_t reserved1[480];
-//     uint32_t mid_signature; // should be 0x61417272
-//     uint32_t last_known_free_cluster; // should be range check, if 0xffffffff then compute
-//     uint32_t available_clusters_start; // should be range check, if 0xffffffff then start at 2
-//     uint8_t reserved2[12];
-//     uint32_t trail_signature; // should be 0xaa550000
-// } __attribute__((packed)) FAT32_FSINFO_t; // 4096 bytes
-
-typedef struct {
-    FAT_BPB_t bpb;
-    FAT_EBPB_t ebpb;
-} __attribute__((packed)) FAT_BOOT_RECORD_t; // 512 bytes
-
-typedef struct {
-    FAT_BPB_t bpb;
-    FAT32_EBPB_t ebpb;
-} __attribute__((packed)) FAT32_BOOT_RECORD_t; // 512 bytes
-
-typedef struct {
-    uint8_t filename[11];
-    uint8_t attr;
-    uint8_t reserved;
-    uint8_t centisecond;
-    uint16_t creation_time;
-    uint16_t creation_date;
-    uint16_t last_access_date;
-    uint16_t first_cluster_number_high;
-    uint16_t last_mod_time;
-    uint16_t last_mod_date;
-    uint16_t first_cluster_number_low;
-    uint32_t size;
-} __attribute__((packed)) FAT_DIRECTORY_ENTRY; // 32 bytes
-
-typedef struct {
-    uint8_t order;
-    uint16_t chars_1[5];
-    uint8_t attr; // should be 0x0f
-    uint8_t long_entry_type;
-    uint8_t checksum;
-    uint16_t chars_2[6];
-    uint16_t zero;
-    uint16_t chars_3[2];
-} __attribute__((packed)) FAT_LFN; // 32 bytes
-
-// READ_ONLY=0x01
-// HIDDEN=0x02
-// SYSTEM=0x04
-// VOLUME_ID=0x08
-// DIRECTORY=0x10
-// ARCHIVE=0x20
-// LFN=READ_ONLY|HIDDEN|SYSTEM|VOLUME_ID
-
-typedef struct {
+struct _fs_node_t {
     char name[32];
     bool valid;
+    struct _fs_t* fs;
+    struct _fs_node_t* parent_node;
     uint32_t start_cluster;
-    uint32_t parent_cluster;
     uint8_t attr;
     uint32_t size;
     uint8_t centisecond;
@@ -166,15 +74,16 @@ typedef struct {
     uint16_t last_access_date;
     uint16_t last_mod_time;
     uint16_t last_mod_date;
-} FS_NODE;
+};
 
-typedef struct {
+struct _fs_t {
     FS_TYPE type;
     partition_entry_t partition;
+    struct _fs_node_t root_node;
     // the filesystem info table
-    // for FAT12/16/32 it is the boot record
+    // FAT12/16/32: boot record
     uint8_t info_table[512];
-} FILESYSTEM;
+};
 
 // mbr.c
 bool mbr_load();
@@ -182,15 +91,13 @@ partition_entry_t mbr_get_partition_entry(unsigned int id);
 
 // fsmngr.c
 FS_TYPE fs_detect(partition_entry_t part);
-void fs_add(FILESYSTEM fs, int id);
-FILESYSTEM* fs_get(int id);
+void fs_add(fs_t fs, int id);
+fs_t* fs_get(int id);
 
 // file_op.c
-bool fs_set_current_node(FS_NODE node);
-FS_NODE fs_get_current_node();
-bool fs_list_dir(FILESYSTEM* fs, bool (*callback)(FS_NODE));
-FS_NODE fs_find_node(FILESYSTEM* fs, const char* path);
-bool fs_read_node(FILESYSTEM* fs, FS_NODE node, uint8_t* buff);
+bool fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
+fs_node_t fs_find_node(fs_node_t* parent, const char* path);
+bool fs_read_node(fs_node_t* node, uint8_t* buff);
 
 // fat32.c
 FAT32_BOOT_RECORD_t fat32_get_bootrec(partition_entry_t part);
@@ -202,6 +109,6 @@ uint32_t fat32_total_data_sectors(FAT32_BOOT_RECORD_t* bootrec);
 uint32_t fat32_total_clusters(FAT32_BOOT_RECORD_t* bootrec);
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
-bool fat32_read_dir(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, bool (*callback)(FS_NODE));
-void fat32_read_file(FAT32_BOOT_RECORD_t* bootrec, uint32_t start_cluster, uint32_t sector_offset, uint8_t* buffer);
-void fat32_init(partition_entry_t part, int id);
+bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
+void fat32_read_file(fs_node_t* node, uint8_t* buffer);
+fs_node_t fat32_init(partition_entry_t part, int id);

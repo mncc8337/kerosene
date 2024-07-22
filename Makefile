@@ -5,6 +5,8 @@ CC = $(CROSS_COMPILER_LOC)$(TARGET)-gcc
 # LD = $(CROSS_COMPILER_LOC)$(TARGET)-ld
 ASM = nasm
 
+BIN = bin/
+
 LIBC_SRC = libc/stdio/*.c \
 		   libc/stdlib/*.c \
 		   libc/string/*.c \
@@ -19,12 +21,16 @@ C_SRC = kernel/src/*.c \
 ASM_SRC = kernel/src/system/*.asm \
 		  kernel/src/mem/*.asm \
 
-LIBC_OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
-OBJ  = $(addsuffix .o, $(basename $(notdir $(wildcard $(C_SRC)))))
-OBJ += $(addsuffix .o, $(notdir $(wildcard $(ASM_SRC))))
+_LIBC_OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
+_OBJ  = $(addsuffix .o, $(basename $(notdir $(wildcard $(C_SRC)))))
+_OBJ += $(addsuffix .o, $(notdir $(wildcard $(ASM_SRC))))
 
-# memory address that the kernel will be loaded to
-KERNEL_ADDR = 0x1000
+LIBC_OBJ = $(addprefix $(BIN), $(_LIBC_OBJ))
+OBJ = $(addprefix $(BIN), $(_OBJ))
+
+DEPS  = $(patsubst %.o,%.d,$(OBJ))
+DEPS += $(patsubst %.o,%.d,$(LIBC_OBJ))
+-include $(DEPS)
 
 DEFINES = -D__is_libk
 
@@ -32,55 +38,63 @@ C_INCLUDES = -I./kernel/include -I./libc/include
 
 # CFLAGS = $(DEFINES) -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles
 # LDFLAGS = -T linker.ld -m elf_i386 -nostdlib --nmagic
-CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -std=gnu99 -g
+CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -std=gnu99 -g -MMD -MP
 LDFLAGS = -T linker.ld -nostdlib -lgcc
 NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
 
-.PHONY: all libc libk kernel disk
+.PHONY: all libc libk kernel disk clean
+.DEFAULT_GOAL: all
 
-all: kernel.bin
+all: $(BIN) $(BIN)kernel.bin
 
-%.o: libc/stdio/%.c
-	$(CC) $(CFLAGS) -MD -o $@ $(C_INCLUDES) -c $<
-%.o: libc/stdlib/%.c
-	$(CC) $(CFLAGS) -MD -o $@ $(C_INCLUDES) -c $<
-%.o: libc/string/%.c
-	$(CC) $(CFLAGS) -MD -o $@ $(C_INCLUDES) -c $<
-libk.a: $(LIBC_OBJ)
+$(BIN):
+	mkdir $(BIN)
+
+$(BIN)%.o: libc/stdio/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)%.o: libc/stdlib/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)%.o: libc/string/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)libk.a: $(LIBC_OBJ)
 	$(CROSS_COMPILER_LOC)$(TARGET)-ar rcs $@ $^
 	@echo done building libk
 	# rm $(LIBC_OBJ)
-libc.a: $(LIBC_OBJ)
+$(BIN)libc.a: $(LIBC_OBJ)
 	@echo libc is not ready for building, yet
 
-multiboot-header.o: multiboot-header.asm
+$(BIN)multiboot-header.o: multiboot-header.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
-%.o: kernel/src/%.c
+$(BIN)%.o: kernel/src/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/src/system/%.c
+$(BIN)%.o: kernel/src/system/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/src/driver/%.c
+$(BIN)%.o: kernel/src/driver/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/src/driver/ata/%.c
+$(BIN)%.o: kernel/src/driver/ata/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/src/filesystem/%.c
+$(BIN)%.o: kernel/src/filesystem/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-%.o: kernel/src/mem/%.c
+$(BIN)%.o: kernel/src/mem/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
-%.asm.o: kernel/src/system/%.asm
+$(BIN)%.asm.o: kernel/src/system/%.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
-%.asm.o: kernel/src/mem/%.asm
+$(BIN)%.asm.o: kernel/src/mem/%.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
-kernel.bin: multiboot-header.o $(OBJ) libk.a
+$(BIN)kernel.bin: $(BIN)multiboot-header.o $(OBJ) $(BIN)libk.a
+	@echo $(OBJ)
 	# use GCC to link instead of LD because LD cannot find the libgcc
-	$(CC) $(LDFLAGS) -o $@ $^ -L./ -lk
+	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lk
 
 libc:
 	@echo libc is not ready to build, yet
 
 libk: libk.a
 
-kernel: kernel.bin
+kernel: $(BIN)kernel.bin
+
+clean:
+	rm -r $(BIN)

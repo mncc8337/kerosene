@@ -4,8 +4,8 @@ cross
 # dir use to put files onto the image
 mnt
 
-# wip
-wip
+# bins
+bin
 
 # various bins
 *.o
