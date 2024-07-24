@@ -272,7 +272,6 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         // read_file("testdir/test.txt");
     }
 
-
     while(true) {
         SYS_SLEEP();
     }
