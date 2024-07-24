@@ -17,7 +17,7 @@ typedef struct {
     uint16_t heads;
     uint32_t hidden_sectors;
     uint32_t large_sector_count;
-} __attribute__((packed)) FAT_BPB_t; // 36 bytes
+} __attribute__((packed)) fat_bpb_t; // 36 bytes
 
 typedef struct {
     uint8_t driver_number;
@@ -28,7 +28,7 @@ typedef struct {
     uint8_t system_identifier[8];
     uint8_t bootcode[448];
     uint16_t boot_signature; // should be 0xaa55
-} __attribute__((packed)) FAT_EBPB_t; // 476 bytes
+} __attribute__((packed)) fat_ebpb_t; // 476 bytes
 
 typedef struct {
     uint32_t sectors_per_FAT;
@@ -46,7 +46,7 @@ typedef struct {
     uint8_t system_identifier[8]; // should be "FAT32   "
     uint8_t bootcode[420];
     uint16_t boot_signature; // should be 0xaa55
-} __attribute__((packed)) FAT32_EBPB_t; // 476 bytes
+} __attribute__((packed)) fat32_ebpb_t; // 476 bytes
 
 typedef struct {
     uint32_t lead_signature; // should be 0x41615252
@@ -56,17 +56,17 @@ typedef struct {
     uint32_t available_clusters_start; // should be range check, if 0xffffffff then start at 2
     uint8_t reserved2[12];
     uint32_t trail_signature; // should be 0xaa550000
-} __attribute__((packed)) FAT32_FSINFO_t; // 512 bytes
+} __attribute__((packed)) fat32_fsinfo_t; // 512 bytes
 
 typedef struct {
-    FAT_BPB_t bpb;
-    FAT_EBPB_t ebpb;
-} __attribute__((packed)) FAT_BOOT_RECORD_t; // 512 bytes
+    fat_bpb_t bpb;
+    fat_ebpb_t ebpb;
+} __attribute__((packed)) fat_bootrecord_t; // 512 bytes
 
 typedef struct {
-    FAT_BPB_t bpb;
-    FAT32_EBPB_t ebpb;
-} __attribute__((packed)) FAT32_BOOT_RECORD_t; // 512 bytes
+    fat_bpb_t bpb;
+    fat32_ebpb_t ebpb;
+} __attribute__((packed)) fat32_bootrecord_t; // 512 bytes
 
 typedef struct {
     uint8_t filename[11];
@@ -81,7 +81,7 @@ typedef struct {
     uint16_t last_mod_date;
     uint16_t first_cluster_number_low;
     uint32_t size;
-} __attribute__((packed)) FAT_DIRECTORY_ENTRY; // 32 bytes
+} __attribute__((packed)) fat_directory_entry_t; // 32 bytes
 
 typedef struct {
     uint8_t order;
@@ -92,5 +92,5 @@ typedef struct {
     uint16_t chars_2[6];
     uint16_t zero;
     uint16_t chars_3[2];
-} __attribute__((packed)) FAT_LFN; // 32 bytes
+} __attribute__((packed)) fat_lfn_t; // 32 bytes
 

@@ -19,7 +19,7 @@ static bool is_field_fs_type(uint8_t* buff, int cnt) {
 }
 
 static bool fat32_check(uint8_t* sect) {
-    FAT32_BOOT_RECORD_t* fat32_bootrec = (FAT32_BOOT_RECORD_t*)sect;
+    fat32_bootrecord_t* fat32_bootrec = (fat32_bootrecord_t*)sect;
 
     // check BPB 7.0 signature
     if(fat32_bootrec->ebpb.signature != 0x28 && fat32_bootrec->ebpb.signature != 0x29)
@@ -33,7 +33,7 @@ static bool fat32_check(uint8_t* sect) {
 }
 
 static bool fat_12_16_check(uint8_t* sect) {
-    FAT_BOOT_RECORD_t* fat_bootrec = (FAT_BOOT_RECORD_t*)sect;
+    fat_bootrecord_t* fat_bootrec = (fat_bootrecord_t*)sect;
 
     // check BPB 4.0 signature
     if(fat_bootrec->ebpb.signature != 0x28 && fat_bootrec->ebpb.signature != 0x29)
@@ -57,7 +57,7 @@ static bool fat_12_16_check(uint8_t* sect) {
 //     return false;
 // }
 
-FS_TYPE fs_detect(partition_entry_t part) {
+fs_type_t fs_detect(partition_entry_t part) {
     uint8_t sect[512];
     ata_pio_LBA28_access(true, part.LBA_start, 1, sect);
 

@@ -6,7 +6,7 @@
 
 #include "debug.h"
 
-static MBR_t MBR;
+static mbr_t MBR;
 
 bool mbr_load() {
     ATA_PIO_ERR err = ata_pio_LBA28_access(true, 0, 1, (uint8_t*)(&MBR));

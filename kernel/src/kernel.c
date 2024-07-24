@@ -269,14 +269,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         puts("root directory");
         fs_list_dir(&current_node, list_dir);
 
-        read_file("testdir/test.txt");
-
-        for(int i = 1; i < 5; i++) {
-            uint32_t freecluster = fat32_find_free_clusters(current_node.fs, i);
-            printf("created %d clusters, starting at 0x%x\n", i, freecluster);
-            fat32_free_clusters_chain(current_node.fs, freecluster);
-            puts("freed");
-        }
+        // read_file("testdir/test.txt");
     }
 
 

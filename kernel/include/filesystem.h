@@ -6,6 +6,16 @@
 
 #include "fat_type.h"
 
+// including the null char
+#define FILENAME_LIMIT 64
+
+#define NODE_READ_ONLY 0x01
+#define NODE_HIDDEN    0x02
+#define NODE_SYSTEM    0x04
+#define NODE_VOLUME_ID 0x08
+#define NODE_DIRECTORY 0x10
+#define NODE_ARCHIVE   0x20
+
 // there are some extra fs that might not be implemented
 // i added them for completeness
 typedef enum {
@@ -15,7 +25,7 @@ typedef enum {
     FS_EXT2,
     FS_EXT3,
     FS_EXT4
-} FS_TYPE;
+} fs_type_t;
 
 typedef struct {
     uint8_t drive_attribute;
@@ -34,7 +44,7 @@ typedef struct {
     uint8_t bootstrap[446];
     partition_entry_t partition_entry[4];
     uint16_t boot_signature; // should be 0xaa55
-} __attribute__((packed)) MBR_t; // 512 bytes
+} __attribute__((packed)) mbr_t; // 512 bytes
 
 // // https://en.wikipedia.org/wiki/Master_boot_record
 // typedef struct {
@@ -54,15 +64,8 @@ typedef struct {
 typedef struct _fs_t fs_t;
 typedef struct _fs_node_t fs_node_t;
 
-#define NODE_READ_ONLY 0x01
-#define NODE_HIDDEN    0x02
-#define NODE_SYSTEM    0x04
-#define NODE_VOLUME_ID 0x08
-#define NODE_DIRECTORY 0x10
-#define NODE_ARCHIVE   0x20
-
 struct _fs_node_t {
-    char name[32];
+    char name[FILENAME_LIMIT];
     bool valid;
     struct _fs_t* fs;
     struct _fs_node_t* parent_node;
@@ -78,7 +81,7 @@ struct _fs_node_t {
 };
 
 struct _fs_t {
-    FS_TYPE type;
+    fs_type_t type;
     partition_entry_t partition;
     struct _fs_node_t root_node;
     // the filesystem info table
@@ -91,7 +94,7 @@ bool mbr_load();
 partition_entry_t mbr_get_partition_entry(unsigned int id);
 
 // fsmngr.c
-FS_TYPE fs_detect(partition_entry_t part);
+fs_type_t fs_detect(partition_entry_t part);
 void fs_add(fs_t fs, int id);
 fs_t* fs_get(int id);
 
@@ -101,17 +104,21 @@ fs_node_t fs_find_node(fs_node_t* parent, const char* path);
 bool fs_read_node(fs_node_t* node, uint8_t* buff);
 
 // fat32.c
-FAT32_BOOT_RECORD_t fat32_get_bootrec(partition_entry_t part);
-uint32_t fat32_total_sectors(FAT32_BOOT_RECORD_t* bootrec);
-uint32_t fat32_FAT_size(FAT32_BOOT_RECORD_t* bootrec);
-uint32_t fat32_first_data_sector(FAT32_BOOT_RECORD_t* bootrec);
-uint32_t fat32_first_FAT_sector(FAT32_BOOT_RECORD_t* bootrec);
-uint32_t fat32_total_data_sectors(FAT32_BOOT_RECORD_t* bootrec);
-uint32_t fat32_total_clusters(FAT32_BOOT_RECORD_t* bootrec);
+fat32_bootrecord_t fat32_get_bootrec(partition_entry_t part);
+uint32_t fat32_total_sectors(fat32_bootrecord_t* bootrec);
+uint32_t fat32_FAT_size(fat32_bootrecord_t* bootrec);
+uint32_t fat32_first_data_sector(fat32_bootrecord_t* bootrec);
+uint32_t fat32_first_FAT_sector(fat32_bootrecord_t* bootrec);
+uint32_t fat32_total_data_sectors(fat32_bootrecord_t* bootrec);
+uint32_t fat32_total_clusters(fat32_bootrecord_t* bootrec);
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
+//
 bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 void fat32_read_file(fs_node_t* node, uint8_t* buffer);
+//
 uint32_t fat32_find_free_clusters(fs_t* fs, size_t cluster_count);
 void fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
+uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
+//
 fs_node_t fat32_init(partition_entry_t part, int id);
