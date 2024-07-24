@@ -10,9 +10,10 @@ static uint8_t FAT[512];
 // store the last sector that is read to FAT
 static int last_read_FAT_sector = -1;
 
-static void parse_lfn(fat_lfn_t* lfn, char* buff, int offset, int* cnt) {
+static void parse_lfn(fat_lfn_entry_t* lfn, char* buff, int offset, int* cnt) {
     *cnt = 0;
 
+    // TODO: unicode support
     for(int i = 0; i < 5 && offset < FILENAME_LIMIT; i++) {
         buff[offset++] = (char)lfn->chars_1[i];
         (*cnt)++;
@@ -54,6 +55,17 @@ static uint32_t get_FAT_entry(fat32_bootrecord_t* bootrec, fs_t* fs,
     }
 
     return *((uint32_t*)&(FAT[entry_offset])) & 0x0fffffff;
+}
+
+static uint8_t gen_checksum(char* shortname) {
+    // code taken from fatgen103.doc
+
+    uint8_t sum = 0;
+
+    for(int namelen = 11; namelen != 0; namelen--)
+        sum = ((sum & 1) ? 0x80 : 0) + (sum >> 1) + *shortname++;
+
+    return sum;
 }
 
 fat32_bootrecord_t fat32_get_bootrec(partition_entry_t part) {
@@ -107,35 +119,54 @@ bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t directory[cluster_size];
 
+    bool lfn_ready = false;
+    fat_lfn_entry_t temp_lfn;
+    char lfn_name[FILENAME_LIMIT];
+    int namelen = 0;
+    bool found_last_LFN_entry = false;
+    fat_directory_entry_t temp_dir;
+
     while(true) {
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector,
                 sectors_per_cluster, directory);
 
-        bool lfn_ready = false;
-        fat_lfn_t temp_lfn;
-        char lfn_name[FILENAME_LIMIT];
-        int namelen = 0;
-        fat_directory_entry_t temp_dir;
-
         for(unsigned int i = 0; i < cluster_size; i += 32) {
             if(directory[i] == 0x00) // no more file/directory in this dir, free entry
-                break;
+                return true;
             if(directory[i] == 0xe5) continue; // free entry
             // check if it is a long file name entry
             if(directory[i+11] == 0x0f) {
+                // TODO: check checksum (optional)
+                // to be sure that the long name and the short name matchs
+                // they will not match if the short entries are edited in
+                // a computer which does not support LFN
+                // which is very unlikely to occure
+
                 lfn_ready = true;
 
-                memcpy(&temp_lfn, directory + i, sizeof(fat_lfn_t));
+                memcpy(&temp_lfn, directory + i, sizeof(fat_lfn_entry_t));
+
+                int order = temp_lfn.order;
+                bool last_LFN_entry = false;
+                if(!found_last_LFN_entry) {
+                    found_last_LFN_entry = true;
+                    last_LFN_entry = true;
+                    // TODO: check if the 6th bit (0x40) is originally 0 or 1
+                    // can just check the next entry but it will be very complex
+                    // if the next entry is in another cluster
+                    // right now just assume that all entries order are less than 0x40
+                    order &= 0x3f;
+                }
 
                 int cnt;
-                int offset = ((temp_lfn.order & 0xf) - 1) * 13;
+                int offset = (order - 1) * 13;
                 parse_lfn(&temp_lfn, lfn_name, offset, &cnt);
-                if((temp_lfn.order >> 4) == 4) {
+                if(last_LFN_entry) {
                     namelen = offset + cnt;
-                    if(namelen > FILENAME_LIMIT) {
+                    if(namelen >= FILENAME_LIMIT) {
                         namelen = FILENAME_LIMIT;
-                        // the name is exceeding the limit
+                        // the name exceeded the limit
                         // so we need to set the null char manually
                         lfn_name[FILENAME_LIMIT-1] = '\0';
                     }
@@ -171,6 +202,7 @@ bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
 
             // reset control var
             lfn_ready = false;
+            found_last_LFN_entry = false;
         }
 
         uint32_t FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
@@ -216,7 +248,7 @@ void fat32_read_file(fs_node_t* node, uint8_t* buffer) {
     }
 }
 
-uint32_t fat32_find_free_clusters(fs_t* fs, size_t cluster_count) {
+uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count) {
     fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table;
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
 
@@ -255,6 +287,10 @@ uint32_t fat32_find_free_clusters(fs_t* fs, size_t cluster_count) {
         current_cluster++;
     }
     current_cluster--;
+
+    // no available cluster
+    if(start_cluster == 0) return 0;
+
     // set end-of-cluster
     set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, 0x0ffffff8);
 
@@ -303,15 +339,201 @@ uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t clus
     fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table;
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
     // create new chain
-    uint32_t new_chain = fat32_find_free_clusters(fs, cluster_count);
+    uint32_t new_chain = fat32_allocate_clusters(fs, cluster_count);
+    // no more free space
+    if(new_chain == 0) return 0;
     // link them
     set_FAT_entry(bootrec, fs, first_FAT_sector, end_cluster, new_chain);
     return new_chain;
 }
 
-// void fat32_add_file_to_dir(fs_t* fs, fs_node_t* parent, fs_node_t* file) {
-//     ;
-// }
+fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size) {
+    fs_node_t node;
+    node.valid = false;
+
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table;
+    uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
+    uint32_t first_data_sector = fat32_first_data_sector(bootrec);
+    uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
+
+    uint32_t current_cluster = parent->start_cluster;
+    uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
+    uint8_t directory[cluster_size];
+
+    unsigned int start_index;
+    bool new_cluster_created = false;
+    while(true) {
+        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        if(new_cluster_created) {
+            // clear the new cluster
+            // this will guarantee us to find a free entry
+            memset(directory, 0, cluster_size);
+            ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector,
+                    sectors_per_cluster, directory);
+        }
+        else
+            ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector,
+                    sectors_per_cluster, directory);
+
+        bool found = false;
+        for(start_index = 0; start_index < cluster_size; start_index += 32) {
+            // TODO: check if the `name` entry is already exists
+
+            if(directory[start_index] == 0x00) {
+                found = true;
+                break;
+            }
+        }
+        if(found) break;
+
+        uint32_t FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
+
+        if(FAT_val >= 0x0ffffff8) { // end of cluster
+            // add a new cluster
+            current_cluster = fat32_expand_clusters_chain(parent->fs, current_cluster, 1);
+            // nomore space
+            if(current_cluster == 0) return node;
+            new_cluster_created = true;
+            continue;
+        }
+
+        current_cluster = FAT_val;
+    }
+
+    // we found a start index in current cluster
+
+    // remove leading spaces, trailing spaces and trailing periods
+    while(name[0] == ' ') name++;
+    int namelen = strlen(name);
+    while(name[namelen-1] == ' ' || name[namelen-1] == '.') {
+        name[namelen-1] = '\0';
+        namelen--;
+    }
+
+    // calculate the number of LFN entries will be generated
+    int lfn_entry_count = (namelen + 13) / 13; // include null char
+    // calculate how many clusters are needed to create
+    int estimated_new_cluster_count = (lfn_entry_count - (cluster_size - start_index)/sizeof(fat_lfn_entry_t) + 17) /
+                                      (cluster_size / sizeof(fat_lfn_entry_t)); // ididthemath
+    if(estimated_new_cluster_count > 0) {
+        // try to expand
+        uint32_t valid = fat32_expand_clusters_chain(parent->fs, current_cluster, estimated_new_cluster_count);
+        if(!valid) return node;
+    }
+
+    memcpy(node.name, name, namelen+1);
+
+    char shortname[11];
+    // generate short name
+    // it's only needed to be different from the others short name entries
+    // so we can actually using a random number generator to do this
+    // TODO: generate properly
+    memcpy(shortname, name, 11);
+    uint8_t checksum = gen_checksum(shortname);
+
+    node.valid = true;
+    node.parent_node = parent;
+    node.fs = parent->fs;
+    node.parent_node = parent;
+    node.start_cluster = start_cluster;
+    node.attr = attr;
+    node.size = size;
+    // TODO: set correct time attr
+    // these are dummy value
+    node.centisecond = 102;
+    node.creation_time = 0b0010110011101111;
+    node.creation_date = 0b0101100110001101;
+    node.last_access_date = 0b0101100110001101;
+    node.last_mod_time = 0b0010110011101111;
+    node.last_mod_date = 0b0101100110001101;
+
+    // add FLN entries
+    fat_lfn_entry_t temp_lfn;
+    for(int i = lfn_entry_count; i >= 0; i--) {
+        if(i > 0) { // long file name entry
+            temp_lfn.order = i;
+            if(i == lfn_entry_count) // "first" LFN entry
+                temp_lfn.order |= 0x40;
+            temp_lfn.attr = 0x0f;
+            temp_lfn.checksum = checksum;
+
+            // TODO: unicode support
+            // not very likely to do it
+            // because who tf naming using emoji ???
+            for(int j = 0; j < 5; j++) {
+                temp_lfn.chars_1[j] = name[(i-1) * 13 + j];
+                if(temp_lfn.chars_1[j] == '\0') goto done_parsing_name;
+            }
+            for(int j = 0; j < 6; j++) {
+                temp_lfn.chars_2[j] = name[(i-1) * 13 + j + 5];
+                if(temp_lfn.chars_2[j] == '\0') goto done_parsing_name;
+            }
+            for(int j = 0; j < 2; j++) {
+                temp_lfn.chars_3[j] = name[(i-1) * 13 + j + 5 + 6];
+                if(temp_lfn.chars_3[j] == '\0') goto done_parsing_name;
+            }
+            // note that we have clear the temp_lfn with 0's
+            // so it is automatically null terminated
+        
+            done_parsing_name:
+            memcpy(directory + start_index, (uint8_t*)(&temp_lfn), sizeof(fat_lfn_entry_t));
+            // clear
+            memset((char*)(&temp_lfn), 0, sizeof(fat_lfn_entry_t));
+        }
+        else if(i == 0) { // directory entry
+            fat_directory_entry_t dir_entry;
+            memcpy(dir_entry.name, shortname, 11);
+            dir_entry.attr = attr;
+            dir_entry.centisecond = node.centisecond;
+            dir_entry.creation_time = node.creation_time;
+            dir_entry.creation_date = node.creation_date;
+            dir_entry.last_access_date = node.last_access_date;
+            dir_entry.first_cluster_number_high = start_cluster >> 16;
+            dir_entry.last_mod_time = node.last_mod_time;
+            dir_entry.last_mod_date = node.last_mod_date;
+            dir_entry.first_cluster_number_low = start_cluster & 0xffff;
+            dir_entry.size = size;
+
+            memcpy(directory + start_index, (uint8_t*)(&dir_entry), sizeof(fat_directory_entry_t));
+        }
+
+        // make changes
+        start_index += 32;
+        if(start_index >= cluster_size) { // current cluster is exceeded
+            uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+            // only write changes after filling a sector worth of byte
+            ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector,
+                    sectors_per_cluster, directory);
+            // get next cluster
+            // the next cluster is always valid because we have created it before
+            current_cluster = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
+            start_index = 0;
+        }
+    }
+
+    if(start_index != 0) {
+        // clear the remain bytes
+        memset(directory + start_index, 0, cluster_size - start_index);
+        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector,
+                sectors_per_cluster, directory);
+    }
+
+    return node;
+}
+
+fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr) {
+    fs_node_t created_dir = fat32_add_entry(parent, name, start_cluster, attr | NODE_DIRECTORY, 0);
+    if(!created_dir.valid) return created_dir;
+
+    // create the '..' and the '.' dir
+    fs_node_t dot_dir = fat32_add_entry(parent, ".", start_cluster, NODE_DIRECTORY, 0);
+    if(!dot_dir.valid) return dot_dir;
+    fs_node_t dotdot_dir = fat32_add_entry(parent, "..", parent->start_cluster, NODE_DIRECTORY, 0);
+    if(!dotdot_dir.valid) return dotdot_dir;
+
+    return created_dir;
+}
 
 // initialize FAT 32
 // return the root node

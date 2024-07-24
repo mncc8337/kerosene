@@ -2,8 +2,6 @@
 
 static char* old;
 
-#include "stdio.h"
-
 char* strtok(char* str, const char* delimiters) {
     if(str != NULL) old = str;
     else if(*old == '\0') return NULL;

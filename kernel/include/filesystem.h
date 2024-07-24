@@ -7,6 +7,7 @@
 #include "fat_type.h"
 
 // including the null char
+// the limit is 256
 #define FILENAME_LIMIT 64
 
 #define NODE_READ_ONLY 0x01
@@ -111,14 +112,18 @@ uint32_t fat32_first_data_sector(fat32_bootrecord_t* bootrec);
 uint32_t fat32_first_FAT_sector(fat32_bootrecord_t* bootrec);
 uint32_t fat32_total_data_sectors(fat32_bootrecord_t* bootrec);
 uint32_t fat32_total_clusters(fat32_bootrecord_t* bootrec);
+
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
-//
+
 bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 void fat32_read_file(fs_node_t* node, uint8_t* buffer);
-//
-uint32_t fat32_find_free_clusters(fs_t* fs, size_t cluster_count);
+
+uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count);
 void fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
-//
+
+fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size);
+fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr);
+
 fs_node_t fat32_init(partition_entry_t part, int id);

@@ -6,6 +6,7 @@ static char buffer[512];
 static fs_node_t ret_node;
 
 static bool find_node_callback(fs_node_t node) {
+    // TODO: perform insensitive-case comparison if fs is FAT
     if(strcmp(node.name, buffer)) {
         ret_node = node;
         return false;

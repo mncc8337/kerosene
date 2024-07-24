@@ -69,7 +69,7 @@ typedef struct {
 } __attribute__((packed)) fat32_bootrecord_t; // 512 bytes
 
 typedef struct {
-    uint8_t filename[11];
+    uint8_t name[11];
     uint8_t attr;
     uint8_t reserved;
     uint8_t centisecond;
@@ -92,5 +92,5 @@ typedef struct {
     uint16_t chars_2[6];
     uint16_t zero;
     uint16_t chars_3[2];
-} __attribute__((packed)) fat_lfn_t; // 32 bytes
+} __attribute__((packed)) fat_lfn_entry_t; // 32 bytes
 

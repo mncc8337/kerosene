@@ -71,7 +71,8 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
 - [ ] port some program
     + [ ] GNU GCC
 ## known bugs
-- ATA PIO mode initialization some time failed (very rare)
+- ATA PIO mode initialization some time failed (very rare): address mark not found
+- created file/dir not shown in linux (probaly wrong implementation)
 ## learning resources
 - https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
 - http://www.osdever.net/bkerndev/Docs/gettingstarted.htm

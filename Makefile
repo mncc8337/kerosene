@@ -38,7 +38,7 @@ CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -std=gnu99 -g -MMD -MP
 LDFLAGS = -T linker.ld -nostdlib -lgcc
 NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
 
-.PHONY: all libc libk kernel disk clean
+.PHONY: all libc libk kernel disk clean clean-all
 
 all: $(BIN) $(BIN)kernel.bin
 
@@ -91,6 +91,9 @@ kernel: $(BIN)kernel.bin
 
 clean:
 	rm -r $(BIN)
+
+clean-all:
+	rm -r $(BIN) disk.img disk.iso
 
 DEPS  = $(patsubst %.o,%.d,$(OBJ))
 DEPS += $(patsubst %.o,%.d,$(LIBC_OBJ))
