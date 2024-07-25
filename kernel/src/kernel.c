@@ -204,7 +204,7 @@ bool list_dir(fs_node_t node) {
     printf("|---");
     printf("%s (%s)\n", node.name, is_dir ? "directory" : "file");
 
-    if(is_dir)
+    if(is_dir && !strcmp(node.name, ".") && !strcmp(node.name, ".."))
         fs_list_dir(&node, list_dir);
 
     indent_level--;
@@ -273,7 +273,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         if(!kernel_dir.valid) {
             uint32_t dir_cluster = fat32_allocate_clusters(current_node.fs, 1);
             if(dir_cluster != 0) {
-                kernel_dir = fat32_add_entry(&current_node, "kernel-makes-this-dir", dir_cluster, NODE_DIRECTORY, 0);
+                kernel_dir = fat32_mkdir(&current_node, "kernel-makes-this-dir", dir_cluster, NODE_DIRECTORY);
                 puts("root directory");
                 fs_list_dir(&current_node, list_dir);
             }

@@ -44,9 +44,10 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
     - [ ] FAT32
         - [x] detect
         - [x] list
-        - [ ] make dir
+        - [x] make dir
+        - [x] touch files
         - [x] read
-        - [ ] write
+        - [ ] write file
     - [ ] ext2
         - [ ] detect
         - [ ] list
@@ -72,7 +73,6 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
     + [ ] GNU GCC
 ## known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
-- created file/dir not shown in linux (probaly wrong implementation)
 ## learning resources
 - https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
 - http://www.osdever.net/bkerndev/Docs/gettingstarted.htm

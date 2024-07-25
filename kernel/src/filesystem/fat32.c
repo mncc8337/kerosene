@@ -152,10 +152,6 @@ bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
                 if(!found_last_LFN_entry) {
                     found_last_LFN_entry = true;
                     last_LFN_entry = true;
-                    // TODO: check if the 6th bit (0x40) is originally 0 or 1
-                    // can just check the next entry but it will be very complex
-                    // if the next entry is in another cluster
-                    // right now just assume that all entries order are less than 0x40
                     order &= 0x3f;
                 }
 
@@ -402,13 +398,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
 
     // we found a start index in current cluster
 
-    // remove leading spaces, trailing spaces and trailing periods
-    while(name[0] == ' ') name++;
     int namelen = strlen(name);
-    while(name[namelen-1] == ' ' || name[namelen-1] == '.') {
-        name[namelen-1] = '\0';
-        namelen--;
-    }
 
     // calculate the number of LFN entries will be generated
     int lfn_entry_count = (namelen + 13) / 13; // include null char
@@ -423,12 +413,64 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
 
     memcpy(node.name, name, namelen+1);
 
-    char shortname[11];
-    // generate short name
-    // it's only needed to be different from the others short name entries
-    // so we can actually using a random number generator to do this
-    // TODO: generate properly
-    memcpy(shortname, name, 11);
+    char shortname[11]; memset(shortname, ' ', 11);
+
+    // generating short name
+    // '.' and '..' directory need to be handle differently
+    if(strcmp(name, ".") || strcmp(name, "..")) {
+        memcpy(shortname, name, namelen);
+    }
+    else {
+        // it's only needed to be different from the others short name entries
+        // so we can actually using a random number generator to do this
+        bool isdir = attr & NODE_DIRECTORY;
+        // find the last embedded period
+        int dot_pos;
+        for(dot_pos = namelen-1; dot_pos > 0; dot_pos--)
+            if(name[dot_pos] == '.') break;
+        // extension
+        if(dot_pos > 0 && !isdir) {
+            int name_pos = dot_pos+1; int filled_chars = 0;
+            while(name[name_pos] != '\0' && filled_chars < 3) {
+                if(name[name_pos] == ' '
+                        || name[name_pos] == '+'
+                        || name[name_pos] == ','
+                        || name[name_pos] == ';'
+                        || name[name_pos] == '='
+                        || name[name_pos] == '['
+                        || name[name_pos] == ']') name_pos++;
+                else shortname[8 + filled_chars++] = name[name_pos++];
+            }
+        }
+        // base name
+        int name_pos = 0; int filled_chars = 0;
+        while(name[name_pos] != '\0' && filled_chars < 8) {
+            if(name_pos == dot_pos && dot_pos > 0 && !isdir) break;
+            if(name[name_pos] == ' '
+                    || name[name_pos] == '.'
+                    || name[name_pos] == '+'
+                    || name[name_pos] == ','
+                    || name[name_pos] == ';'
+                    || name[name_pos] == '='
+                    || name[name_pos] == '['
+                    || name[name_pos] == ']') name_pos++;
+            else shortname[filled_chars++] = name[name_pos++];
+        }
+        // add numeric tail
+        if(dot_pos > 8 || (isdir && namelen > 8)) {
+            // TODO: generate some random chars here
+            // this implementation did not guarantee
+            // us to create a unique shortname
+            // that's why we need a random number generator
+            shortname[6] = '~';
+            shortname[7] = '1';
+        }
+        // convert to uppercase
+        for(int i = 0; i < 11; i++)
+            if(shortname[i] >= 0x61 && shortname[i] <= 0x7a) shortname[i] -= 0x20;
+    }
+
+    // generate checksum
     uint8_t checksum = gen_checksum(shortname);
 
     node.valid = true;
@@ -522,14 +564,24 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     return node;
 }
 
-fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr) {
+fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr) {    
+    // remove leading spaces, trailing spaces and trailing periods
+    while(name[0] == ' ') name++;
+    int namelen = strlen(name);
+    while(name[namelen-1] == ' ' || name[namelen-1] == '.') {
+        name[namelen-1] = '\0';
+        namelen--;
+    }
+
     fs_node_t created_dir = fat32_add_entry(parent, name, start_cluster, attr | NODE_DIRECTORY, 0);
     if(!created_dir.valid) return created_dir;
 
     // create the '..' and the '.' dir
-    fs_node_t dot_dir = fat32_add_entry(parent, ".", start_cluster, NODE_DIRECTORY, 0);
+    // in linux you need to create them
+    // so that `ls` will not show input/output error
+    fs_node_t dot_dir = fat32_add_entry(&created_dir, ".", start_cluster, NODE_DIRECTORY, 0);
     if(!dot_dir.valid) return dot_dir;
-    fs_node_t dotdot_dir = fat32_add_entry(parent, "..", parent->start_cluster, NODE_DIRECTORY, 0);
+    fs_node_t dotdot_dir = fat32_add_entry(&created_dir, "..", parent->start_cluster, NODE_DIRECTORY, 0);
     if(!dotdot_dir.valid) return dotdot_dir;
 
     return created_dir;
