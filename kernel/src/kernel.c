@@ -267,10 +267,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     if(current_node.valid) {
         fs_node_t kernel_dir = fs_find_node(&current_node, "kernel-makes-this-dir");
         if(!kernel_dir.valid) {
-            uint32_t dir_cluster = fat32_allocate_clusters(current_node.fs, 1);
-            if(dir_cluster != 0) {
-                kernel_dir = fat32_mkdir(&current_node, "kernel-makes-this-dir", dir_cluster, NODE_DIRECTORY);
-            }
+            kernel_dir = fs_mkdir(&current_node, "kernel-makes-this-dir");
         }
         else {
             // REMOVE !!!!!

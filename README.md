@@ -73,7 +73,6 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
     + [ ] GNU GCC
 ## known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
-- create an entry, remove it, then create it again will make that entry contain random files (is it overlap with other thing on the disk ??)
 ## learning resources
 - https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
 - http://www.osdever.net/bkerndev/Docs/gettingstarted.htm

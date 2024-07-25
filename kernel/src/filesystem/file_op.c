@@ -73,3 +73,19 @@ bool fs_read_node(fs_node_t* node, uint8_t* buffer) {
 
     return false;
 }
+
+// make a directory in parent node
+// return invalid node when failed to find free cluster / fs not defined / directory already exists
+fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
+    ret_node.valid = false;
+
+    if(parent->fs->type == FS_FAT32) {
+        uint32_t dir_cluster = fat32_allocate_clusters(parent->fs, 1);
+        if(dir_cluster == 0) return ret_node;
+
+        ret_node = fat32_mkdir(parent, name, dir_cluster, NODE_DIRECTORY);
+        return ret_node;
+    }
+
+    return ret_node;
+}

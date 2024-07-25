@@ -103,6 +103,7 @@ fs_t* fs_get(int id);
 bool fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 fs_node_t fs_find_node(fs_node_t* parent, const char* path);
 bool fs_read_node(fs_node_t* node, uint8_t* buff);
+fs_node_t fs_mkdir(fs_node_t* parent, char* name);
 
 // fat32.c
 fat32_bootrecord_t fat32_get_bootrec(partition_entry_t part);
@@ -120,7 +121,7 @@ bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 void fat32_read_file(fs_node_t* node, uint8_t* buffer);
 
 uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count);
-void fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
+bool fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
 
 fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size);
