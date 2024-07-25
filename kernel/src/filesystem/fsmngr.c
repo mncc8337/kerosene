@@ -46,7 +46,7 @@ static bool fat_12_16_check(uint8_t* sect) {
     return true;
 }
 
-// TODO: implement these
+// TODO: implement EXT* check
 // static bool ext2_check(uint8_t* sect) {
 //     return false;
 // }

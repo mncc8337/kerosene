@@ -6,10 +6,17 @@ static char buffer[512];
 static fs_node_t ret_node;
 
 static bool find_node_callback(fs_node_t node) {
-    // TODO: perform insensitive-case comparison if fs is FAT
-    if(strcmp(node.name, buffer)) {
-        ret_node = node;
-        return false;
+    if(node.fs->type == FS_FAT32 || node.fs->type == FS_FAT_12_16) {
+        if(strcmp_case_insensitive(node.name, buffer)) {
+            ret_node = node;
+            return false;
+        }
+    }
+    else if(node.fs->type == FS_EXT2 || node.fs->type == FS_EXT3 || node.fs->type == FS_EXT4) {
+        if(strcmp(node.name, buffer)) {
+            ret_node = node;
+            return false;
+        }
     }
     return true;
 }

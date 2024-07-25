@@ -265,36 +265,43 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     print_debug(LT_IF, "done initializing\n");
 
     if(current_node.valid) {
-        // list files and directories
-        puts("root directory");
-        fs_list_dir(&current_node, list_dir);
-
         fs_node_t kernel_dir = fs_find_node(&current_node, "kernel-makes-this-dir");
         if(!kernel_dir.valid) {
             uint32_t dir_cluster = fat32_allocate_clusters(current_node.fs, 1);
             if(dir_cluster != 0) {
                 kernel_dir = fat32_mkdir(&current_node, "kernel-makes-this-dir", dir_cluster, NODE_DIRECTORY);
-                puts("root directory");
-                fs_list_dir(&current_node, list_dir);
+            }
+        }
+        else {
+            // REMOVE !!!!!
+            bool removed = fat32_remove_entry(&current_node, "kernel-makes-this-dir");
+            if(removed) {
+                puts("kernel-makes-this-dir dir is removed");
+            }
+            else {
+                puts("cannot remove the dir for some reason");
             }
         }
 
-        if(kernel_dir.valid) {
-            puts("");
-            fs_node_t kernel_file = fs_find_node(&kernel_dir, "kernel-makes-this-file");
-            if(!kernel_file.valid) {
-                uint32_t file_cluster = fat32_allocate_clusters(current_node.fs, 1);
-                if(file_cluster != 0) {
-                    kernel_file = fat32_add_entry(&kernel_dir, "kernel-makes-this-file", file_cluster, 0, 0);
-                    puts("root directory");
-                    fs_list_dir(&current_node, list_dir);
-                }
-            }
+        puts("root directory");
+        fs_list_dir(&current_node, list_dir);
 
-            puts("");
-            puts("kernel-makes-this-dir");
-            fs_list_dir(&kernel_dir, list_dir);
-        }
+        // if(kernel_dir.valid) {
+        //     puts("");
+        //     fs_node_t kernel_file = fs_find_node(&kernel_dir, "kernel-makes-this-file");
+        //     if(!kernel_file.valid) {
+        //         uint32_t file_cluster = fat32_allocate_clusters(current_node.fs, 1);
+        //         if(file_cluster != 0) {
+        //             kernel_file = fat32_add_entry(&kernel_dir, "kernel-makes-this-file", file_cluster, 0, 0);
+        //             puts("root directory");
+        //             fs_list_dir(&current_node, list_dir);
+        //         }
+        //     }
+        //
+        //     puts("");
+        //     puts("kernel-makes-this-dir");
+        //     fs_list_dir(&kernel_dir, list_dir);
+        // }
     }
 
     while(true) {

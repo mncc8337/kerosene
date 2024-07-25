@@ -124,6 +124,7 @@ void fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
 
 fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size);
+bool fat32_remove_entry(fs_node_t* parent, char* name);
 fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr);
 
 fs_node_t fat32_init(partition_entry_t part, int id);

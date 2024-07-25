@@ -57,6 +57,17 @@ static uint32_t get_FAT_entry(fat32_bootrecord_t* bootrec, fs_t* fs,
     return *((uint32_t*)&(FAT[entry_offset])) & 0x0fffffff;
 }
 
+static size_t count_free_cluster(fat32_bootrecord_t* bootrec, fs_t* fs, uint32_t first_FAT_sector) {
+    size_t free_count = 0;
+
+    // it's gonna takes along time ...
+    for(size_t i = 2; i < fat32_total_clusters(bootrec) + 2; i++) {
+        if(get_FAT_entry(bootrec, fs, first_FAT_sector, i) == 0) free_count++;
+    }
+
+    return free_count;
+}
+
 static uint8_t gen_checksum(char* shortname) {
     // code taken from fatgen103.doc
 
@@ -109,6 +120,10 @@ void fat32_parse_date(uint16_t date, int* day, int* month, int* year) {
     *year = (date >> 9) + 1980;
 }
 
+// loop through all files/entries in a dir
+// call the callback when find one
+// return false if callback return false
+// return true if exit naturally
 bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
     fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
@@ -121,7 +136,7 @@ bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
 
     bool lfn_ready = false;
     fat_lfn_entry_t temp_lfn;
-    char lfn_name[FILENAME_LIMIT];
+    char entry_name[FILENAME_LIMIT];
     int namelen = 0;
     bool found_last_LFN_entry = false;
     fat_directory_entry_t temp_dir;
@@ -157,29 +172,44 @@ bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
 
                 int cnt;
                 int offset = (order - 1) * 13;
-                parse_lfn(&temp_lfn, lfn_name, offset, &cnt);
+                parse_lfn(&temp_lfn, entry_name, offset, &cnt);
                 if(last_LFN_entry) {
                     namelen = offset + cnt;
                     if(namelen >= FILENAME_LIMIT) {
                         namelen = FILENAME_LIMIT;
                         // the name exceeded the limit
                         // so we need to set the null char manually
-                        lfn_name[FILENAME_LIMIT-1] = '\0';
+                        entry_name[FILENAME_LIMIT-1] = '\0';
                     }
                 }
 
                 // skip to the next entry
                 continue;
             }
-            memcpy(&temp_dir, directory + i, sizeof(fat_directory_entry_t));
-            if(!lfn_ready) continue;
 
-            // long file name is ready
+            memcpy(&temp_dir, directory + i, sizeof(fat_directory_entry_t));
+
+            if(!lfn_ready) {
+                // this is a short entry without any LFN entries
+                int name_pos = 0;
+                while(temp_dir.name[name_pos] != ' ' && name_pos < 8) {
+                    entry_name[name_pos] = temp_dir.name[name_pos];
+                    name_pos++;
+                }
+                // add extension
+                if(temp_dir.name[8] != ' ' && temp_dir.name[9] != ' ' && temp_dir.name[10] != ' ') {
+                    entry_name[name_pos++] = '.';
+                    memcpy(entry_name + name_pos, temp_dir.name+8, 3);
+                    name_pos += 3;
+                }
+                entry_name[name_pos] = '\0';
+                namelen = name_pos+1;
+            }
+            // LFN name is already ready
             fs_node_t node;
             node.fs = parent->fs;
             node.parent_node = parent;
-
-            memcpy(node.name, lfn_name, namelen);
+            memcpy(node.name, entry_name, namelen);
 
             node.start_cluster = (uint32_t)temp_dir.first_cluster_number_high << 16
                                 | temp_dir.first_cluster_number_low;
@@ -258,11 +288,13 @@ uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count) {
             || fsinfo.trail_signature != 0xaa550000)
         return 0;
 
-    // note that available clusters start and free cluster count
-    // infomation are verified and fixed when initialize the fs
-
     uint32_t current_cluster = fsinfo.available_clusters_start;
+    if(current_cluster == 0xffffffff)
+        current_cluster = 2;
+
     size_t free_cluster_count = fsinfo.free_cluster_count;
+    if(free_cluster_count == 0xffffffff)
+        free_cluster_count = count_free_cluster(bootrec, fs, first_FAT_sector);
 
     uint32_t start_cluster = 0;
     uint32_t prev_cluster = 0;
@@ -313,7 +345,12 @@ void fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster) {
         return;
 
     size_t fsinfo_free_cluster_count = fsinfo.free_cluster_count;
+    if(fsinfo_free_cluster_count == 0xffffffff)
+        fsinfo_free_cluster_count = count_free_cluster(bootrec, fs, first_FAT_sector);
+
     uint32_t fsinfo_start_cluster = fsinfo.available_clusters_start;
+    if(fsinfo_start_cluster == 0xffffffff)
+        fsinfo_start_cluster = 2;
 
     uint32_t current_cluster = start_cluster;
     while(current_cluster != 0x0ffffff8) {
@@ -343,6 +380,13 @@ uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t clus
     return new_chain;
 }
 
+// WARNING
+// the functions below are really messy
+// they are clones of the read_dir function
+// so they span over hundreds line of code
+// also variable naming are very confusing
+// you have been warned!
+
 fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size) {
     fs_node_t node;
     node.valid = false;
@@ -370,15 +414,66 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
         else
             ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector,
                     sectors_per_cluster, directory);
+ 
+        bool lfn_ready = false;
+        fat_lfn_entry_t temp_lfn;
+        char entry_name[FILENAME_LIMIT];
+        int namelen = 0;
+        bool found_last_LFN_entry = false;
+        fat_directory_entry_t temp_dir;
 
         bool found = false;
         for(start_index = 0; start_index < cluster_size; start_index += 32) {
-            // TODO: check if the `name` entry is already exists
-
             if(directory[start_index] == 0x00) {
                 found = true;
                 break;
             }
+            if(directory[start_index+11] == 0x0f) {
+                lfn_ready = true;
+                memcpy(&temp_lfn, directory + start_index, sizeof(fat_lfn_entry_t));
+                int order = temp_lfn.order;
+                bool last_LFN_entry = false;
+                if(!found_last_LFN_entry) {
+                    found_last_LFN_entry = true;
+                    last_LFN_entry = true;
+                    order &= 0x3f;
+                }
+                int cnt;
+                int offset = (order - 1) * 13;
+                parse_lfn(&temp_lfn, entry_name, offset, &cnt);
+                if(last_LFN_entry) {
+                    namelen = offset + cnt;
+                    if(namelen >= FILENAME_LIMIT) {
+                        namelen = FILENAME_LIMIT;
+                        entry_name[FILENAME_LIMIT-1] = '\0';
+                    }
+                }
+                continue;
+            }
+            if(!lfn_ready) {
+                // this is a short entry without any LFN entries
+                memcpy(&temp_dir, directory + start_index, sizeof(fat_directory_entry_t));
+                int name_pos = 0;
+                while(temp_dir.name[name_pos] != ' ' && name_pos < 8) {
+                    entry_name[name_pos] = temp_dir.name[name_pos];
+                    name_pos++;
+                }
+                // check if the entry has any extension
+                if(!strcmp((char*)(temp_dir.name+8), "   ")) {
+                    entry_name[name_pos++] = '.';
+                    memcpy(entry_name + name_pos, temp_dir.name+8, 3);
+                }
+                entry_name[11] = '\0';
+            }
+            // name of LFN entries have been parsed at this point
+            if(strcmp(entry_name, name)) {
+                // found duplication
+                // TODO: remove puts
+                puts("entry with the same name is already existed");
+                return node;
+            }
+            lfn_ready = false;
+            found_last_LFN_entry = false;
         }
         if(found) break;
 
@@ -387,7 +482,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
         if(FAT_val >= 0x0ffffff8) { // end of cluster
             // add a new cluster
             current_cluster = fat32_expand_clusters_chain(parent->fs, current_cluster, 1);
-            // nomore space
+            // no more space
             if(current_cluster == 0) return node;
             new_cluster_created = true;
             continue;
@@ -398,10 +493,15 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
 
     // we found a start index in current cluster
 
+    // is this entry is a . or .. entry
+    bool dotdot_entry = strcmp(name, ".") || strcmp(name, "..");
+
     int namelen = strlen(name);
 
     // calculate the number of LFN entries will be generated
-    int lfn_entry_count = (namelen + 13) / 13; // include null char
+    int lfn_entry_count = (namelen + 13) / 13; // include the null char
+    if(dotdot_entry) lfn_entry_count = 0; // no need to create LFN entry for . and ..
+
     // calculate how many clusters are needed to create
     int estimated_new_cluster_count = (lfn_entry_count - (cluster_size - start_index)/sizeof(fat_lfn_entry_t) + 17) /
                                       (cluster_size / sizeof(fat_lfn_entry_t)); // ididthemath
@@ -416,8 +516,8 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     char shortname[11]; memset(shortname, ' ', 11);
 
     // generating short name
-    // '.' and '..' directory need to be handle differently
-    if(strcmp(name, ".") || strcmp(name, "..")) {
+    // . and .. directory need to be handle differently
+    if(dotdot_entry) {
         memcpy(shortname, name, namelen);
     }
     else {
@@ -499,7 +599,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
             temp_lfn.attr = 0x0f;
             temp_lfn.checksum = checksum;
 
-            // TODO: unicode support
+            // TODO: unicode support (optional)
             // not very likely to do it
             // because who tf naming using emoji ???
             for(int j = 0; j < 5; j++) {
@@ -555,13 +655,192 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
 
     if(start_index != 0) {
         // clear the remain bytes
-        memset(directory + start_index, 0, cluster_size - start_index);
+        memset(directory + start_index + 1, 0, cluster_size - start_index);
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
-        ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector,
-                sectors_per_cluster, directory);
+        ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
     }
 
     return node;
+}
+
+bool fat32_remove_entry(fs_node_t* parent, char* name) {
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table;
+    uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
+    uint32_t first_data_sector = fat32_first_data_sector(bootrec);
+    uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
+
+    uint32_t current_cluster = parent->start_cluster;
+    uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
+    uint8_t directory[cluster_size];
+
+    bool lfn_ready = false;
+    fat_lfn_entry_t temp_lfn;
+    char entry_name[FILENAME_LIMIT];
+    int namelen = 0;
+    bool found_last_LFN_entry = false;
+    fat_directory_entry_t temp_dir;
+
+    int lfn_entry_count = 0;
+    int final_index;
+    uint32_t last_cluster = 0;
+    while(true) {
+        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
+
+        bool found = false;
+        for(final_index = 0; (unsigned)final_index < cluster_size; final_index += 32) {
+            if(directory[final_index] == 0x00) return false;
+            if(directory[final_index] == 0xe5) continue;
+            if(directory[final_index+11] == 0x0f) {
+                lfn_ready = true;
+
+                memcpy(&temp_lfn, directory + final_index, sizeof(fat_lfn_entry_t));
+
+                int order = temp_lfn.order;
+                bool last_LFN_entry = false;
+                if(!found_last_LFN_entry) {
+                    found_last_LFN_entry = true;
+                    last_LFN_entry = true;
+                    order &= 0x3f;
+                    lfn_entry_count = order;
+                }
+
+                int cnt;
+                int offset = (order - 1) * 13;
+                parse_lfn(&temp_lfn, entry_name, offset, &cnt);
+                if(last_LFN_entry) {
+                    namelen = offset + cnt;
+                    if(namelen >= FILENAME_LIMIT) {
+                        namelen = FILENAME_LIMIT;
+                        // the name exceeded the limit
+                        // so we need to set the null char manually
+                        entry_name[FILENAME_LIMIT-1] = '\0';
+                    }
+                }
+
+                // skip to the next entry
+                continue;
+            }
+
+            memcpy(&temp_dir, directory + final_index, sizeof(fat_directory_entry_t));
+
+            if(!lfn_ready) {
+                // this is a short entry without any LFN entries
+                int name_pos = 0;
+                while(temp_dir.name[name_pos] != ' ' && name_pos < 8) {
+                    entry_name[name_pos] = temp_dir.name[name_pos];
+                    name_pos++;
+                }
+                // add extension
+                if(temp_dir.name[8] != ' ' && temp_dir.name[9] != ' ' && temp_dir.name[10] != ' ') {
+                    entry_name[name_pos++] = '.';
+                    memcpy(entry_name + name_pos, temp_dir.name+8, 3);
+                    name_pos += 3;
+                }
+                entry_name[name_pos] = '\0';
+                namelen = name_pos+1;
+            }
+            // LFN name is already ready
+            if(strcmp(entry_name, name)) {
+                // entry found
+                found = true;
+                break;
+            }
+
+            // reset control var
+            lfn_ready = false;
+            found_last_LFN_entry = false;
+            lfn_entry_count = 0;
+        }
+        if(found) break;
+
+        uint32_t FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
+
+        if(FAT_val >= 0x0ffffff8)
+            break; // end of cluster
+        if(FAT_val == 0x0ffffff7)
+            break; // bad cluster
+
+        last_cluster = current_cluster;
+        current_cluster = FAT_val;
+    }
+
+    // TODO: if it is a directory then check if it has any entry
+
+    // store for later uses
+    uint32_t final_entry_cluster = current_cluster;
+
+    // check if the next entry is clear
+    int clear_val;
+    if((unsigned)final_index + 32 < cluster_size) {
+        if(directory[final_index+32] == 0x0)
+            clear_val = 0x0;
+        else clear_val = 0xe5;
+    }
+    else {
+        // check next cluster
+        // to see if it is clear or not
+        uint32_t FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
+
+        if(FAT_val >= 0x0ffffff8 || FAT_val == 0x0ffffff7) { // it should never happend
+            clear_val = 0xe5;
+            goto done_check;
+        }
+
+        current_cluster = FAT_val;
+
+        int first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // read the very next sector
+        ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, 1, directory);
+        // now check
+        if(directory[0] == 0x0)
+            clear_val = 0x0;
+        else clear_val = 0xe5;
+
+        // read the original table back
+        first_sector = ((final_entry_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
+    }
+
+    done_check:
+
+    // delete the cluster
+    fat32_free_clusters_chain(parent->fs,
+            (uint16_t)temp_dir.first_cluster_number_high << 16 | temp_dir.first_cluster_number_low);
+    // calculate the start of the chain
+    int lfn_entry_len = 32 * lfn_entry_count;
+    final_index -= lfn_entry_len;
+
+    if(clear_val == 0xe5 || (clear_val == 0x0 && final_index >= 0)) {
+        // delete LFN entries in the current cluster
+        memset(directory+(final_index < 0 ? 0 : final_index), clear_val, 32 * (lfn_entry_count + 1));
+        // write
+        int first_sector = ((final_entry_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
+    }
+    if(final_index < 0) {
+        // go back to the last cluster to delete the LFN entry
+        // note that last_entry == 0 is very unlikely
+        final_index += cluster_size;
+
+        int first_sector = ((last_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
+
+        memset(directory+final_index, clear_val, cluster_size - final_index);
+
+        // write
+        // note that first_sector is set (see above)
+        ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
+
+        if(clear_val == 0x0) {
+            fat32_free_clusters_chain(parent->fs, final_entry_cluster);
+            set_FAT_entry(bootrec, parent->fs, first_FAT_sector, last_cluster, 0x0ffffff8);
+        }
+    }
+
+    // the pain is over
+
+    return true;
 }
 
 fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr) {    
@@ -605,8 +884,6 @@ fs_node_t fat32_init(partition_entry_t part, int id) {
     rootnode.attr = NODE_DIRECTORY;
     rootnode.valid = true;
 
-    // TODO: verify information in fsinfo
-    
     fs.root_node = rootnode;
     return rootnode;
 }
