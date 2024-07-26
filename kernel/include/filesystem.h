@@ -42,6 +42,12 @@ typedef enum {
     FS_EXT4
 } fs_type_t;
 
+typedef enum {
+    FILE_WRITE,
+    FILE_APPEND,
+    FILE_READ
+} FILE_OP;
+
 typedef struct {
     uint8_t drive_attribute;
     uint8_t CHS_start_low;
@@ -104,6 +110,14 @@ struct _fs_t {
     uint8_t info_table[512];
 };
 
+typedef struct {
+    fs_node_t* node;
+    int mode;
+    int position;
+    uint32_t current_cluster;
+    // TODO: add more thing here
+} FILE;
+
 // mbr.c
 bool mbr_load();
 partition_entry_t mbr_get_partition_entry(unsigned int id);
@@ -115,11 +129,15 @@ fs_t* fs_get(int id);
 
 // file_op.c
 FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
-fs_node_t fs_find_node(fs_node_t* parent, const char* path);
-FS_ERR fs_read_node(fs_node_t* node, uint8_t* buff);
+fs_node_t fs_find(fs_node_t* parent, const char* path);
+FS_ERR fs_read(fs_node_t* node, uint8_t* buff);
 fs_node_t fs_mkdir(fs_node_t* parent, char* name);
+fs_node_t fs_touch(fs_node_t* parent, char* name);
 FS_ERR fs_rm(fs_node_t* node, char* name);
 FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name);
+
+FILE file_open(fs_node_t* node, int mode);
+FS_ERR file_write(FILE* file, uint8_t* data, size_t size);
 
 // fat32.c
 fat32_bootrecord_t fat32_get_bootrec(partition_entry_t part);
@@ -130,15 +148,17 @@ uint32_t fat32_first_FAT_sector(fat32_bootrecord_t* bootrec);
 uint32_t fat32_total_data_sectors(fat32_bootrecord_t* bootrec);
 uint32_t fat32_total_clusters(fat32_bootrecord_t* bootrec);
 
+uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count);
+FS_ERR fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
+uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
+FS_ERR fat32_cut_clusters_chain(fs_t* fs, uint32_t start_cluster);
+
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
 
 FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 FS_ERR fat32_read_file(fs_node_t* node, uint8_t* buffer);
-
-uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count);
-FS_ERR fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
-uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
+FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, int size, int cluster_offset);
 
 fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size);
 FS_ERR fat32_remove_entry(fs_node_t* parent, char* name);

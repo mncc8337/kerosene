@@ -56,7 +56,7 @@ FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
 }
 
 // find a node using path
-fs_node_t fs_find_node(fs_node_t* parent, const char* path) {
+fs_node_t fs_find(fs_node_t* parent, const char* path) {
     fs_node_t current_node = *parent;
 
     // make a copy
@@ -77,7 +77,7 @@ fs_node_t fs_find_node(fs_node_t* parent, const char* path) {
 }
 
 // read a node content to the buffer
-FS_ERR fs_read_node(fs_node_t* node, uint8_t* buffer) {
+FS_ERR fs_read(fs_node_t* node, uint8_t* buffer) {
     if(node->fs->type == FS_FAT32)
         return fat32_read_file(node, buffer);
 
@@ -100,6 +100,20 @@ fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
     return ret_node;
 }
 
+// make an empty file in parent node
+fs_node_t fs_touch(fs_node_t* parent, char* name) {
+    fs_node_t node;
+    node.valid = false;
+
+    if(parent->fs->type == FS_FAT32) {
+        uint32_t file_cluster = fat32_allocate_clusters(parent->fs, 1);
+        if(file_cluster == 0) return node;
+        node = fat32_add_entry(parent, name, file_cluster, 0, 0);
+    }
+
+    return node;
+}
+
 // remove a node
 // note that it takes the name not the fs_node_t
 // because we still need to find its location in parent directory
@@ -117,7 +131,7 @@ FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name) {
     // but it didn't work for some reason
 
     // get the node
-    fs_node_t delete_node = fs_find_node(parent, name);
+    fs_node_t delete_node = fs_find(parent, name);
 
     if(delete_node.attr & NODE_DIRECTORY) {
         FS_ERR err;
@@ -135,4 +149,42 @@ FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name) {
 
     // now try remove it. it should success
     return fs_rm(parent, name);
+}
+
+FILE file_open(fs_node_t* node, int mode) {
+    FILE file;
+    file.node = node;
+    if(mode == FILE_WRITE) {
+        file.mode = mode;
+        file.position = 0;
+        file.current_cluster = node->start_cluster;
+    }
+    // TODO: add more mode
+
+    return file;
+}
+
+FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
+    if(file->mode == FILE_READ) return ERR_FS_FAILED;
+
+    if(file->node->fs->type == FS_FAT32) {
+        fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)file->node->fs->info_table;
+        int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
+
+        if(file->position == 0 && file->node->size > (unsigned)cluster_size) {
+            // the file may has some infomation before hand
+            // so we need to free them first
+            FS_ERR err = fat32_cut_clusters_chain(file->node->fs, file->current_cluster);
+            if(err != ERR_FS_SUCCESS) return err;
+        }
+
+        FS_ERR err = fat32_write_file(file->node->fs,
+            &(file->current_cluster), data, size, file->position % cluster_size);
+        if(err != ERR_FS_SUCCESS) return err;
+        file->position += size;
+        file->node->size += size;
+        return ERR_FS_SUCCESS;
+    }
+
+    return ERR_FS_UNKNOWN_FS;
 }

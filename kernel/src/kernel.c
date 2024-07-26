@@ -213,7 +213,7 @@ bool list_dir(fs_node_t node) {
 }
 
 fs_node_t read_file(const char* path) {
-    fs_node_t node = fs_find_node(&current_node, path);
+    fs_node_t node = fs_find(&current_node, path);
     if(!node.valid) {
         printf("file %s not found\n", path);
         return node;
@@ -221,7 +221,7 @@ fs_node_t read_file(const char* path) {
 
     printf("reading %s\n", path);
     puts("---------------------------");
-    fs_read_node(&node, (uint8_t*)freebuff);
+    fs_read(&node, (uint8_t*)freebuff);
     printf(freebuff);
     puts("\n---------------------------");
 
@@ -265,22 +265,28 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     print_debug(LT_IF, "done initializing\n");
 
     if(current_node.valid) {
-        fs_node_t kernel_dir = fs_find_node(&current_node, "kernel-makes-this-dir");
-        if(!kernel_dir.valid) {
-            kernel_dir = fs_mkdir(&current_node, "kernel-makes-this-dir");
+        fs_node_t kern_test_node = fs_find(&current_node, "touch-grass-dude");
+        if(!kern_test_node.valid)
+            kern_test_node = fs_touch(&current_node, "touch-grass-dude");
+        else {
+            fs_rm(&current_node, "touch-grass-dude");
+            kern_test_node.valid = false;
+            puts("deleted 'touch-grass-dude'");
         }
-
-        fs_node_t kernel_file = fs_find_node(&kernel_dir, "kernel-makes-this-file");
-        if(!kernel_file.valid) {
-            uint32_t file_cluster = fat32_allocate_clusters(kernel_dir.fs, 1);
-            kernel_file = fat32_add_entry(&kernel_dir, "kernel-makes-this-file", file_cluster, 0, 1);
-        }
-
-debug:
-        fs_rm_recursive(&current_node, "kernel-makes-this-dir");
 
         puts("root directory");
         fs_list_dir(&current_node, list_dir);
+
+        if(kern_test_node.valid) {
+            FILE kern_test_file = file_open(&kern_test_node, FILE_WRITE);
+
+            char msg1[] = "hi guys im the kernel. please touch grass.\n";
+            char msg2[] = "ty! have a great day.\n";
+            file_write(&kern_test_file, (uint8_t*)msg1, strlen(msg1));
+            file_write(&kern_test_file, (uint8_t*)msg2, strlen(msg2));
+
+            read_file("touch-grass-dude");
+        }
     }
 
     while(true) {
