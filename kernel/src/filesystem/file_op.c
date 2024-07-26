@@ -1,6 +1,7 @@
 #include "filesystem.h"
 
 #include "string.h"
+#include "debug.h"
 
 static char buffer[512];
 static fs_node_t ret_node;
@@ -35,13 +36,23 @@ static fs_node_t find_node(fs_node_t* parent, const char* nodename) {
     return ret_node;
 }
 
-// go through all files and directories in `parent`. call the callback when found one
-bool fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
-    if(parent->fs->type == FS_FAT32) {
-        fat32_read_dir(parent, callback); return true;
-    }
+FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name); // declare it first
+static bool rm_node_callback(fs_node_t node) {
+    // ignore . and ..
+    if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
+    
+    FS_ERR err = fs_rm_recursive(node.parent_node, node.name);
+    if(err != ERR_FS_SUCCESS) return false;
 
-    return false;
+    return true;
+}
+
+// go through all files and directories in `parent`. call the callback when found one
+FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
+    if(parent->fs->type == FS_FAT32)
+        return fat32_read_dir(parent, callback);
+
+    return ERR_FS_UNKNOWN_FS;
 }
 
 // find a node using path
@@ -66,12 +77,11 @@ fs_node_t fs_find_node(fs_node_t* parent, const char* path) {
 }
 
 // read a node content to the buffer
-bool fs_read_node(fs_node_t* node, uint8_t* buffer) {
-    if(node->fs->type == FS_FAT32) {
-        fat32_read_file(node, buffer); return true;
-    }
+FS_ERR fs_read_node(fs_node_t* node, uint8_t* buffer) {
+    if(node->fs->type == FS_FAT32)
+        return fat32_read_file(node, buffer);
 
-    return false;
+    return ERR_FS_UNKNOWN_FS;
 }
 
 // make a directory in parent node
@@ -88,4 +98,41 @@ fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
     }
 
     return ret_node;
+}
+
+// remove a node
+// note that it takes the name not the fs_node_t
+// because we still need to find its location in parent directory
+// thus sending fs_node_t is overkill
+FS_ERR fs_rm(fs_node_t* node, char* name) {
+    if(node->fs->type == FS_FAT32)
+        return fat32_remove_entry(node, name);
+
+    return ERR_FS_UNKNOWN_FS;
+}
+
+// remove a directory and its content recursively
+FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name) {
+    // obviously doing this in low level is way faster
+    // but it didn't work for some reason
+
+    // get the node
+    fs_node_t delete_node = fs_find_node(parent, name);
+
+    if(delete_node.attr & NODE_DIRECTORY) {
+        FS_ERR err;
+
+        // try remove its content recursively
+        if(parent->fs->type == FS_FAT32)
+            err = fat32_read_dir(&delete_node, rm_node_callback);
+        else return ERR_FS_UNKNOWN_FS;
+
+        if(err == ERR_FS_CALLBACK_STOP) {
+            // this only happended when an error occurs
+            return ERR_FS_FAILED;
+        }
+    }
+
+    // now try remove it. it should success
+    return fs_rm(parent, name);
 }

@@ -18,7 +18,7 @@
 #define NODE_ARCHIVE   0x20
 
 typedef enum {
-    ERR_FS_OUT_OF_CLUSTER,
+    ERR_FS_FAILED,
     ERR_FS_SUCCESS,
     ERR_FS_BAD_CLUSTER,
     ERR_FS_NOT_FOUND,
@@ -27,7 +27,8 @@ typedef enum {
     ERR_FS_EXIT_NATURALLY,
     ERR_FS_INVALID_FSINFO,
     ERR_FS_NOT_FILE,
-    ERR_FS_NOT_DIR
+    ERR_FS_NOT_DIR,
+    ERR_FS_UNKNOWN_FS
 } FS_ERR;
 
 // there are some extra fs that might not be implemented
@@ -113,10 +114,12 @@ void fs_add(fs_t fs, int id);
 fs_t* fs_get(int id);
 
 // file_op.c
-bool fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
+FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 fs_node_t fs_find_node(fs_node_t* parent, const char* path);
-bool fs_read_node(fs_node_t* node, uint8_t* buff);
+FS_ERR fs_read_node(fs_node_t* node, uint8_t* buff);
 fs_node_t fs_mkdir(fs_node_t* parent, char* name);
+FS_ERR fs_rm(fs_node_t* node, char* name);
+FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name);
 
 // fat32.c
 fat32_bootrecord_t fat32_get_bootrec(partition_entry_t part);

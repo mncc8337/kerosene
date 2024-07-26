@@ -2,7 +2,6 @@
 #include "ata.h"
 
 #include "string.h"
-#include "debug.h"
 
 // these processes are used very frequently
 // so i define some macros for them
@@ -236,7 +235,7 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
         if(FAT_val >= 0x0ffffff8)
             break; // end of cluster
         if(FAT_val == 0x0ffffff7)
-            break; // bad cluster
+            return ERR_FS_BAD_CLUSTER;
 
         current_cluster = FAT_val;
     }
@@ -370,6 +369,8 @@ FS_ERR fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster) {
         fsinfo_free_cluster_count++;
     }
 
+    if(current_cluster == 0x0ffffff7) return ERR_FS_BAD_CLUSTER;
+
     // update fsinfo
     // only update the start cluster if it is smaller
     if(start_cluster < fsinfo_start_cluster) fsinfo.available_clusters_start = start_cluster;
@@ -465,7 +466,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
             }
 
             // name of LFN entries have been parsed at this point
-            if(strcmp(entry_name, name)) {
+            if(strcmp_case_insensitive(entry_name, name)) {
                 // found duplication
                 return node;
             }
@@ -700,7 +701,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, char* name) {
                 PROCESS_SFN_ENTRY(temp_dir);
             }
             // LFN name is already ready
-            if(strcmp(entry_name, name)) {
+            if(strcmp_case_insensitive(entry_name, name)) {
                 // entry found
                 found = true;
                 break;
@@ -826,16 +827,21 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, char* name) {
 // also create . and .. dir
 // return valid node when success
 // return invalid node when node with the same name has already exists / cannot find free cluster
-fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr) {    
+fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr) {
+    fs_node_t created_dir;
+    created_dir.valid = false;
+
     // remove leading spaces, trailing spaces and trailing periods
     while(name[0] == ' ') name++;
     int namelen = strlen(name);
+    if(namelen == 0) return created_dir;
     while(name[namelen-1] == ' ' || name[namelen-1] == '.') {
         name[namelen-1] = '\0';
         namelen--;
+        if(namelen == 0) return created_dir;
     }
 
-    fs_node_t created_dir = fat32_add_entry(parent, name, start_cluster, attr | NODE_DIRECTORY, 0);
+    created_dir = fat32_add_entry(parent, name, start_cluster, attr | NODE_DIRECTORY, 0);
     if(!created_dir.valid) return created_dir;
 
     // create the '..' and the '.' dir
