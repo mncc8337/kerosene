@@ -1,5 +1,12 @@
 #!/bin/sh
 
+# load backup if available
+if [ -f disk-backup.img ]; then
+    cp disk-backup.img disk.img
+    echo "backup loaded"
+    exit
+fi
+
 # unmount all the things
 sudo umount ./mnt
 sudo losetup -d /dev/loop0
@@ -47,6 +54,8 @@ sudo cp grub.cfg ./mnt/boot/grub
 sudo umount ./mnt
 sudo losetup -d /dev/loop0
 sudo losetup -d /dev/loop1
+
+cp disk.img disk-backup.img
 
 sync
 

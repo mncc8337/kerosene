@@ -271,24 +271,32 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
             kernel_dir = fs_mkdir(&current_node, "kernel-makes-this-dir");
         }
         else {
-            if(fat32_remove_entry(&current_node, "kernel-makes-this-dir") == ERR_FS_SUCCESS) {
-                puts("kernel-makes-this-dir dir is removed");
-            }
-            else {
-                puts("cannot remove the dir for some reason");
+            switch(fat32_remove_entry(&current_node, "kernel-makes-this-dir")) {
+                case ERR_FS_SUCCESS:
+                    puts("kernel-makes-this-dir is removed");
+                    break;
+                case ERR_FS_DIR_NOT_EMPTY:
+                    puts("kernel-makes-this-dir is not empty");
+                    break;
+                case ERR_FS_NOT_FOUND:
+                    puts("kernel-makes-this-dir not found");
+                    break;
+                default:
+                    puts("cannot remove kernel-makes-this-dir for some reason");
+                    break;
             }
             kernel_dir.valid = false;
         }
 
-        if(kernel_dir.valid) {
-            fs_node_t kernel_file = fs_find_node(&kernel_dir, "kernel-makes-this-file");
-            if(!kernel_file.valid) {
-                uint32_t file_cluster = fat32_allocate_clusters(current_node.fs, 1);
-                if(file_cluster != 0) {
-                    kernel_file = fat32_add_entry(&kernel_dir, "kernel-makes-this-file", file_cluster, 0, 0);
-                }
-            }
-        }
+        // if(kernel_dir.valid) {
+        //     fs_node_t kernel_file = fs_find_node(&kernel_dir, "kernel-makes-this-file");
+        //     if(!kernel_file.valid) {
+        //         uint32_t file_cluster = fat32_allocate_clusters(current_node.fs, 1);
+        //         if(file_cluster != 0) {
+        //             kernel_file = fat32_add_entry(&kernel_dir, "kernel-makes-this-file", file_cluster, 0, 0);
+        //         }
+        //     }
+        // }
 
         puts("root directory");
         fs_list_dir(&current_node, list_dir);

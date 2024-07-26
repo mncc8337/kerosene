@@ -33,19 +33,20 @@
         } \
     }
 
-#define PROCESS_SFN_ENTRY() \
+#define PROCESS_SFN_ENTRY(temp_dir) \
     int name_pos = 0; \
     while(temp_dir.name[name_pos] != ' ' && name_pos < 8) { \
         entry_name[name_pos] = temp_dir.name[name_pos]; \
         name_pos++; \
     } \
-    if(temp_dir.name[8] != ' ' && temp_dir.name[9] != ' ' && temp_dir.name[10] != ' ') { \
+    if(temp_dir.name[8] != ' ') { \
         entry_name[name_pos++] = '.'; \
-        memcpy(entry_name + name_pos, temp_dir.name+8, 3); \
-        name_pos += 3; \
+        for(int i = 8; i < 11 && temp_dir.name[i] != ' '; i++) { \
+            entry_name[name_pos++] = temp_dir.name[i]; \
+        } \
     } \
-    entry_name[name_pos] = '\0'; \
-    namelen = name_pos+1;
+    entry_name[name_pos++] = '\0'; \
+    namelen = name_pos;
 
 // the table will be used very frequently
 // so it is a good idea to only declare it once
@@ -202,7 +203,7 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
             memcpy(&temp_dir, directory + i, sizeof(fat_directory_entry_t));
 
             if(!lfn_ready) {
-                PROCESS_SFN_ENTRY();
+                PROCESS_SFN_ENTRY(temp_dir);
             }
             // LFN name is already ready
             fs_node_t node;
@@ -361,7 +362,7 @@ FS_ERR fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster) {
         fsinfo_start_cluster = 2;
 
     uint32_t current_cluster = start_cluster;
-    while(current_cluster != 0x0ffffff8) {
+    while(current_cluster != 0x0ffffff8 && current_cluster != 0x0ffffff7) {
         uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
         // set it to 0 (free)
         set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, 0);
@@ -457,9 +458,12 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
                 PROCESS_LFN_ENTRY(start_index);
                 continue;
             }
+
+            memcpy(&temp_dir, directory + start_index, sizeof(fat_directory_entry_t));
             if(!lfn_ready) {
-                PROCESS_SFN_ENTRY();
+                PROCESS_SFN_ENTRY(temp_dir);
             }
+
             // name of LFN entries have been parsed at this point
             if(strcmp(entry_name, name)) {
                 // found duplication
@@ -693,7 +697,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, char* name) {
             memcpy(&temp_dir, directory + final_index, sizeof(fat_directory_entry_t));
 
             if(!lfn_ready) {
-                PROCESS_SFN_ENTRY();
+                PROCESS_SFN_ENTRY(temp_dir);
             }
             // LFN name is already ready
             if(strcmp(entry_name, name)) {
@@ -737,7 +741,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, char* name) {
             memcpy(&temp_temp_dir, directory + i, sizeof(fat_directory_entry_t));
 
             // at this point this entry should be a SFN
-            PROCESS_SFN_ENTRY();
+            PROCESS_SFN_ENTRY(temp_temp_dir);
             // if it is not . or .. entry then there is a child entry
             if(!strcmp(entry_name, ".") && !strcmp(entry_name, ".."))
                 return ERR_FS_DIR_NOT_EMPTY;
