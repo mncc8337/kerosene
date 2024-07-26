@@ -17,6 +17,19 @@
 #define NODE_DIRECTORY 0x10
 #define NODE_ARCHIVE   0x20
 
+typedef enum {
+    ERR_FS_OUT_OF_CLUSTER,
+    ERR_FS_SUCCESS,
+    ERR_FS_BAD_CLUSTER,
+    ERR_FS_NOT_FOUND,
+    ERR_FS_DIR_NOT_EMPTY,
+    ERR_FS_CALLBACK_STOP,
+    ERR_FS_EXIT_NATURALLY,
+    ERR_FS_INVALID_FSINFO,
+    ERR_FS_NOT_FILE,
+    ERR_FS_NOT_DIR
+} FS_ERR;
+
 // there are some extra fs that might not be implemented
 // i added them for completeness
 typedef enum {
@@ -117,15 +130,15 @@ uint32_t fat32_total_clusters(fat32_bootrecord_t* bootrec);
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
 
-bool fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
-void fat32_read_file(fs_node_t* node, uint8_t* buffer);
+FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
+FS_ERR fat32_read_file(fs_node_t* node, uint8_t* buffer);
 
 uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count);
-bool fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
+FS_ERR fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
 
 fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size);
-bool fat32_remove_entry(fs_node_t* parent, char* name);
+FS_ERR fat32_remove_entry(fs_node_t* parent, char* name);
 fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr);
 
 fs_node_t fat32_init(partition_entry_t part, int id);

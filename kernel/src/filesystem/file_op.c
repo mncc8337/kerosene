@@ -25,7 +25,7 @@ static fs_node_t find_node(fs_node_t* parent, const char* nodename) {
     memcpy(buffer, nodename, strlen(nodename) + 1);
 
     if(parent->fs->type == FS_FAT32) {
-        if(!fat32_read_dir(parent, find_node_callback)) ret_node.valid = true;
+        if(fat32_read_dir(parent, find_node_callback) == ERR_FS_CALLBACK_STOP) ret_node.valid = true;
         else ret_node.valid = false;
         return ret_node;
     }

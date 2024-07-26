@@ -266,39 +266,32 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     if(current_node.valid) {
         fs_node_t kernel_dir = fs_find_node(&current_node, "kernel-makes-this-dir");
+
         if(!kernel_dir.valid) {
             kernel_dir = fs_mkdir(&current_node, "kernel-makes-this-dir");
         }
         else {
-            // REMOVE !!!!!
-            bool removed = fat32_remove_entry(&current_node, "kernel-makes-this-dir");
-            if(removed) {
+            if(fat32_remove_entry(&current_node, "kernel-makes-this-dir") == ERR_FS_SUCCESS) {
                 puts("kernel-makes-this-dir dir is removed");
             }
             else {
                 puts("cannot remove the dir for some reason");
             }
+            kernel_dir.valid = false;
+        }
+
+        if(kernel_dir.valid) {
+            fs_node_t kernel_file = fs_find_node(&kernel_dir, "kernel-makes-this-file");
+            if(!kernel_file.valid) {
+                uint32_t file_cluster = fat32_allocate_clusters(current_node.fs, 1);
+                if(file_cluster != 0) {
+                    kernel_file = fat32_add_entry(&kernel_dir, "kernel-makes-this-file", file_cluster, 0, 0);
+                }
+            }
         }
 
         puts("root directory");
         fs_list_dir(&current_node, list_dir);
-
-        // if(kernel_dir.valid) {
-        //     puts("");
-        //     fs_node_t kernel_file = fs_find_node(&kernel_dir, "kernel-makes-this-file");
-        //     if(!kernel_file.valid) {
-        //         uint32_t file_cluster = fat32_allocate_clusters(current_node.fs, 1);
-        //         if(file_cluster != 0) {
-        //             kernel_file = fat32_add_entry(&kernel_dir, "kernel-makes-this-file", file_cluster, 0, 0);
-        //             puts("root directory");
-        //             fs_list_dir(&current_node, list_dir);
-        //         }
-        //     }
-        //
-        //     puts("");
-        //     puts("kernel-makes-this-dir");
-        //     fs_list_dir(&kernel_dir, list_dir);
-        // }
     }
 
     while(true) {
