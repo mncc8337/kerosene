@@ -49,7 +49,7 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
         - [x] touch files
         - [x] read
         - [x] write file
-        - [ ] move
+        - [x] move
         - [ ] copy
     - [ ] ext2
         - [ ] detect

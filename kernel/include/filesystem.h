@@ -32,15 +32,10 @@ typedef enum {
     ERR_FS_EOF
 } FS_ERR;
 
-// there are some extra fs that might not be implemented
-// i added them for completeness
 typedef enum {
     FS_EMPTY,
-    FS_FAT_12_16,
     FS_FAT32,
-    FS_EXT2,
-    FS_EXT3,
-    FS_EXT4
+    FS_EXT2
 } fs_type_t;
 
 typedef enum {
@@ -140,6 +135,7 @@ fs_node_t fs_mkdir(fs_node_t* parent, char* name);
 fs_node_t fs_touch(fs_node_t* parent, char* name);
 FS_ERR fs_rm(fs_node_t* node, char* name);
 FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name);
+FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
 
 FILE file_open(fs_node_t* node, int mode);
 FS_ERR file_write(FILE* file, uint8_t* data, size_t size);
@@ -169,7 +165,7 @@ FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_
 FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset);
 
 fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size);
-FS_ERR fat32_remove_entry(fs_node_t* parent, char* name);
+FS_ERR fat32_remove_entry(fs_node_t* parent, char* name, bool remove_content);
 FS_ERR fat32_update_entry(fs_node_t* node);
 fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr);
 

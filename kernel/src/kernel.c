@@ -15,7 +15,7 @@
 
 const unsigned int TIMER_PHASE = 100;
 
-char freebuff[512 * 2];
+char freebuff[512];
 
 int FS_ID = 0;
 fs_node_t current_node;
@@ -166,10 +166,6 @@ void disk_init() {
             case FS_EMPTY:
                 puts("unknown");
                 break;
-            case FS_FAT_12_16:
-                puts("FAT 12/16");
-                print_debug(LT_WN, "FAT 12/16 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
-                break;
             case FS_FAT32:
                 puts("FAT 32");
                 current_node = fat32_init(part, FS_ID);
@@ -178,14 +174,6 @@ void disk_init() {
             case FS_EXT2:
                 puts("ext2");
                 print_debug(LT_WN, "EXT2 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
-                break;
-            case FS_EXT3:
-                puts("ext3");
-                print_debug(LT_WN, "EXT3 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
-                break;
-            case FS_EXT4:
-                puts("ext4");
-                print_debug(LT_WN, "EXT3 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
                 break;
         }
     }
@@ -257,9 +245,6 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
             puts("created touch-grass-dude");
         }
 
-        puts("root directory");
-        fs_list_dir(&current_node, list_dir);
-
         if(kern_test_node.valid) {
             if(just_created_file) {
                 FILE kern_test_file_write = file_open(&kern_test_node, FILE_WRITE);
@@ -288,6 +273,27 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
                 putchar(chr);
             puts("---------------------------------------");
         }
+
+        fs_node_t kern_test_move_node = fs_find(&current_node, "moving-grass-dude");
+        if(!kern_test_move_node.valid) {
+            kern_test_move_node = fs_touch(&current_node, "moving-grass-dude");
+            puts("created moving-grass-dude");
+        }
+
+        if(kern_test_move_node.valid) {
+            char fname[] = "no----moving-grass-dude";
+            FS_ERR err = 0;
+            int i = 1;
+            while(err != ERR_FS_SUCCESS) {
+                itoa(i, freebuff, 10);
+                memcpy(fname+3, freebuff, strlen(freebuff));
+                err = fs_move(&kern_test_move_node, &current_node, fname);
+                i++;
+            }
+        }
+
+        puts("root directory");
+        fs_list_dir(&current_node, list_dir);
     }
 
     while(true) {

@@ -6,13 +6,13 @@ static char buffer[512];
 static fs_node_t ret_node;
 
 static bool find_node_callback(fs_node_t node) {
-    if(node.fs->type == FS_FAT32 || node.fs->type == FS_FAT_12_16) {
+    if(node.fs->type == FS_FAT32) {
         if(strcmp_case_insensitive(node.name, buffer)) {
             ret_node = node;
             return false;
         }
     }
-    else if(node.fs->type == FS_EXT2 || node.fs->type == FS_EXT3 || node.fs->type == FS_EXT4) {
+    else if(node.fs->type == FS_EXT2) {
         if(strcmp(node.name, buffer)) {
             ret_node = node;
             return false;
@@ -111,13 +111,13 @@ fs_node_t fs_touch(fs_node_t* parent, char* name) {
 // thus sending fs_node_t is overkill
 FS_ERR fs_rm(fs_node_t* node, char* name) {
     if(node->fs->type == FS_FAT32)
-        return fat32_remove_entry(node, name);
+        return fat32_remove_entry(node, name, true);
 
     return ERR_FS_UNKNOWN_FS;
 }
 
 // remove a directory and its content recursively
-FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name) {
+FS_ERR fs_rm_recursive(fs_node_t* parent, char* name) {
     // obviously doing this in low level is way faster
     // but it didn't work for some reason
 
@@ -140,6 +140,29 @@ FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name) {
 
     // now try remove it. it should success
     return fs_rm(parent, name);
+}
+
+// move a node to new parent
+// set new_name to NULL to reuse the old name
+FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
+    fs_node_t copied;
+
+    if(new_parent->fs->type == FS_FAT32)
+        copied = fat32_add_entry(new_parent,
+                (new_name == NULL ? node->name : new_name),
+                node->start_cluster, node->attr, node->size);
+    else return ERR_FS_UNKNOWN_FS;
+
+    if(!copied.valid) return ERR_FS_FAILED;
+
+    FS_ERR err;
+    if(node->fs->type == FS_FAT32)
+        err = fat32_remove_entry(node->parent_node, node->name, false); // do not delete the node content
+    else return ERR_FS_UNKNOWN_FS;
+
+    if(err != ERR_FS_SUCCESS) return err;
+    *node = copied;
+    return ERR_FS_SUCCESS;
 }
 
 FILE file_open(fs_node_t* node, int mode) {
@@ -218,9 +241,15 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
 }
 
 FS_ERR file_close(FILE* file) {
+    if(file->mode == FILE_READ) {
+        file->valid = false;
+        return ERR_FS_SUCCESS;
+    }
+
     if(file->node->fs->type == FS_FAT32) {
         fat32_update_entry(file->node);
         file->valid = false;
+        return ERR_FS_SUCCESS;
     }
 
     return ERR_FS_UNKNOWN_FS;
