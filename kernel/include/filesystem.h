@@ -28,7 +28,8 @@ typedef enum {
     ERR_FS_INVALID_FSINFO,
     ERR_FS_NOT_FILE,
     ERR_FS_NOT_DIR,
-    ERR_FS_UNKNOWN_FS
+    ERR_FS_UNKNOWN_FS,
+    ERR_FS_EOF
 } FS_ERR;
 
 // there are some extra fs that might not be implemented
@@ -99,6 +100,10 @@ struct _fs_node_t {
     uint16_t last_access_date;
     uint16_t last_mod_time;
     uint16_t last_mod_date;
+    // filesystem infomation
+    // may change when i add support for other filesystem
+    uint32_t parent_cluster;
+    int parent_cluster_index;
 };
 
 struct _fs_t {
@@ -112,8 +117,9 @@ struct _fs_t {
 
 typedef struct {
     fs_node_t* node;
+    bool valid;
     int mode;
-    int position;
+    unsigned int position;
     uint32_t current_cluster;
     // TODO: add more thing here
 } FILE;
@@ -130,7 +136,6 @@ fs_t* fs_get(int id);
 // file_op.c
 FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 fs_node_t fs_find(fs_node_t* parent, const char* path);
-FS_ERR fs_read(fs_node_t* node, uint8_t* buff);
 fs_node_t fs_mkdir(fs_node_t* parent, char* name);
 fs_node_t fs_touch(fs_node_t* parent, char* name);
 FS_ERR fs_rm(fs_node_t* node, char* name);
@@ -138,6 +143,8 @@ FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name);
 
 FILE file_open(fs_node_t* node, int mode);
 FS_ERR file_write(FILE* file, uint8_t* data, size_t size);
+FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size);
+FS_ERR file_close(FILE* file);
 
 // fat32.c
 fat32_bootrecord_t fat32_get_bootrec(partition_entry_t part);
@@ -152,16 +159,20 @@ uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count);
 FS_ERR fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
 FS_ERR fat32_cut_clusters_chain(fs_t* fs, uint32_t start_cluster);
+uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster);
 
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
 
 FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
-FS_ERR fat32_read_file(fs_node_t* node, uint8_t* buffer);
-FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, int size, int cluster_offset);
+FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset);
+FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset);
 
 fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size);
 FS_ERR fat32_remove_entry(fs_node_t* parent, char* name);
+FS_ERR fat32_update_entry(fs_node_t* node);
 fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr);
+
+FS_ERR fat32_save_entry();
 
 fs_node_t fat32_init(partition_entry_t part, int id);

@@ -1,7 +1,6 @@
 #include "filesystem.h"
 
 #include "string.h"
-#include "debug.h"
 
 static char buffer[512];
 static fs_node_t ret_node;
@@ -76,14 +75,6 @@ fs_node_t fs_find(fs_node_t* parent, const char* path) {
     return current_node;
 }
 
-// read a node content to the buffer
-FS_ERR fs_read(fs_node_t* node, uint8_t* buffer) {
-    if(node->fs->type == FS_FAT32)
-        return fat32_read_file(node, buffer);
-
-    return ERR_FS_UNKNOWN_FS;
-}
-
 // make a directory in parent node
 // return invalid node when failed to find free cluster / fs not defined / directory already exists
 fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
@@ -153,13 +144,26 @@ FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name) {
 
 FILE file_open(fs_node_t* node, int mode) {
     FILE file;
+    file.valid = false;
     file.node = node;
-    if(mode == FILE_WRITE) {
-        file.mode = mode;
-        file.position = 0;
-        file.current_cluster = node->start_cluster;
+    file.mode = mode;
+    switch(mode) {
+        case FILE_WRITE:
+            file.valid = true;
+            file.position = 0;
+            file.current_cluster = node->start_cluster;
+            break;
+        case FILE_READ:
+            file.valid = true;
+            file.position = 0;
+            file.current_cluster = node->start_cluster;
+            break;
+        case FILE_APPEND:
+            file.valid = true;
+            file.position = node->size;
+            file.current_cluster = fat32_get_last_cluster_of_chain(node->fs, node->start_cluster);
+            break;
     }
-    // TODO: add more mode
 
     return file;
 }
@@ -173,17 +177,50 @@ FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
 
         if(file->position == 0 && file->node->size > (unsigned)cluster_size) {
             // the file may has some infomation before hand
-            // so we need to free them first
+            // so we need to "delete" them first
             FS_ERR err = fat32_cut_clusters_chain(file->node->fs, file->current_cluster);
             if(err != ERR_FS_SUCCESS) return err;
+            // reset size since position is 0
+            file->node->size = 0;
         }
 
         FS_ERR err = fat32_write_file(file->node->fs,
             &(file->current_cluster), data, size, file->position % cluster_size);
         if(err != ERR_FS_SUCCESS) return err;
+
         file->position += size;
         file->node->size += size;
         return ERR_FS_SUCCESS;
+    }
+
+    return ERR_FS_UNKNOWN_FS;
+}
+
+FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
+    if(file->mode != FILE_READ) return ERR_FS_FAILED;
+
+    if(file->position == file->node->size) return ERR_FS_EOF;
+
+    if(file->node->fs->type == FS_FAT32) {
+        fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)file->node->fs->info_table;
+        int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
+
+        FS_ERR err = fat32_read_file(file->node->fs, &(file->current_cluster), buffer, size, file->position % cluster_size);
+        if(err != ERR_FS_SUCCESS) return err;
+
+        file->position += size;
+        if(file->position > file->node->size) file->position = file->node->size;
+        return ERR_FS_SUCCESS;
+    }
+
+    return ERR_FS_UNKNOWN_FS;
+
+}
+
+FS_ERR file_close(FILE* file) {
+    if(file->node->fs->type == FS_FAT32) {
+        fat32_update_entry(file->node);
+        file->valid = false;
     }
 
     return ERR_FS_UNKNOWN_FS;

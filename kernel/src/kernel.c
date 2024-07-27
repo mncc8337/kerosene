@@ -212,22 +212,6 @@ bool list_dir(fs_node_t node) {
     return true;
 }
 
-fs_node_t read_file(const char* path) {
-    fs_node_t node = fs_find(&current_node, path);
-    if(!node.valid) {
-        printf("file %s not found\n", path);
-        return node;
-    }
-
-    printf("reading %s\n", path);
-    puts("---------------------------");
-    fs_read(&node, (uint8_t*)freebuff);
-    printf(freebuff);
-    puts("\n---------------------------");
-
-    return node;
-}
-
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // greeting msg to let us know we are in the kernel
     tty_set_attr(LIGHT_CYAN);  puts("hello");
@@ -266,26 +250,43 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     if(current_node.valid) {
         fs_node_t kern_test_node = fs_find(&current_node, "touch-grass-dude");
-        if(!kern_test_node.valid)
+        bool just_created_file = false;
+        if(!kern_test_node.valid) {
             kern_test_node = fs_touch(&current_node, "touch-grass-dude");
-        else {
-            fs_rm(&current_node, "touch-grass-dude");
-            kern_test_node.valid = false;
-            puts("deleted 'touch-grass-dude'");
+            just_created_file = true;
+            puts("created touch-grass-dude");
         }
 
         puts("root directory");
         fs_list_dir(&current_node, list_dir);
 
         if(kern_test_node.valid) {
-            FILE kern_test_file = file_open(&kern_test_node, FILE_WRITE);
+            if(just_created_file) {
+                FILE kern_test_file_write = file_open(&kern_test_node, FILE_WRITE);
 
-            char msg1[] = "hi guys im the kernel. please touch grass.\n";
-            char msg2[] = "ty! have a great day.\n";
-            file_write(&kern_test_file, (uint8_t*)msg1, strlen(msg1));
-            file_write(&kern_test_file, (uint8_t*)msg2, strlen(msg2));
+                char msg1[] = "hi guys im the kernel. please touch grass.\n";
+                char msg2[] = "ty! have a great day.\n";
+                file_write(&kern_test_file_write, (uint8_t*)msg1, strlen(msg1));
+                file_write(&kern_test_file_write, (uint8_t*)msg2, strlen(msg2));
+                file_close(&kern_test_file_write);
+            }
+            else {
+                FILE kern_test_file_write = file_open(&kern_test_node, FILE_APPEND);
 
-            read_file("touch-grass-dude");
+                char msg3[] = "did you touch them?\n";
+                file_write(&kern_test_file_write, (uint8_t*)msg3, strlen(msg3));
+                file_close(&kern_test_file_write);
+                puts("touch-grass-dude edited");
+            }
+            
+            FILE kern_test_file_read = file_open(&kern_test_node, FILE_READ);
+
+            puts("reading touch-grass-dude");
+            puts("---------------------------------------");
+            uint8_t chr = 'n';
+            while(file_read(&kern_test_file_read, &chr, 1) != ERR_FS_EOF)
+                putchar(chr);
+            puts("---------------------------------------");
         }
     }
 

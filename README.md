@@ -48,7 +48,9 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
         - [x] remove dir
         - [x] touch files
         - [x] read
-        - [ ] write file
+        - [x] write file
+        - [ ] move
+        - [ ] copy
     - [ ] ext2
         - [ ] detect
         - [ ] list
@@ -57,6 +59,8 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
         - [ ] touch files
         - [ ] read
         - [ ] write file
+        - [ ] move
+        - [ ] copy
 - [ ] load and run ELF file
 - [x] load kernel with ELF binary instead of flat binary
 - [ ] higher half kernel
