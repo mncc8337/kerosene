@@ -165,6 +165,21 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     return ERR_FS_SUCCESS;
 }
 
+FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
+    if(new_parent->fs->type == FS_FAT32) {
+        uint32_t start_cluster = fat32_copy_cluster_chain(new_parent->fs, node->start_cluster);
+        if(start_cluster == 0) return ERR_FS_FAILED;
+
+        *copied = fat32_add_entry(new_parent,
+                (new_name == NULL ? node->name : new_name),
+                start_cluster, node->attr, node->size);
+    }
+    else return ERR_FS_UNKNOWN_FS;
+
+    if(!copied->valid) return ERR_FS_FAILED;
+    return ERR_FS_SUCCESS;
+}
+
 FILE file_open(fs_node_t* node, int mode) {
     FILE file;
     file.valid = false;
@@ -201,7 +216,7 @@ FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
         if(file->position == 0 && file->node->size > (unsigned)cluster_size) {
             // the file may has some infomation before hand
             // so we need to "delete" them first
-            FS_ERR err = fat32_cut_clusters_chain(file->node->fs, file->current_cluster);
+            FS_ERR err = fat32_cut_cluster_chain(file->node->fs, file->current_cluster);
             if(err != ERR_FS_SUCCESS) return err;
             // reset size since position is 0
             file->node->size = 0;

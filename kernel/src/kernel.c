@@ -278,18 +278,28 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         if(!kern_test_move_node.valid) {
             kern_test_move_node = fs_touch(&current_node, "moving-grass-dude");
             puts("created moving-grass-dude");
+
+            char strrr[] = "im a test file\n";
+            FILE temp = file_open(&kern_test_move_node, FILE_WRITE);
+            file_write(&temp, (uint8_t*)strrr, strlen(strrr));
+            file_close(&temp);
         }
 
         if(kern_test_move_node.valid) {
             char fname[] = "no----moving-grass-dude";
+            fs_node_t copied;
             FS_ERR err = 0;
             int i = 1;
             while(err != ERR_FS_SUCCESS) {
                 itoa(i, freebuff, 10);
                 memcpy(fname+3, freebuff, strlen(freebuff));
-                err = fs_move(&kern_test_move_node, &current_node, fname);
+                err = fs_copy(&kern_test_move_node, &current_node, &copied, fname);
                 i++;
             }
+
+            FILE copied_file = file_open(&copied, FILE_APPEND);
+            file_write(&copied_file, (uint8_t*)fname, strlen(fname));
+            file_close(&copied_file);
         }
 
         puts("root directory");

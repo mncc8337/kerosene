@@ -136,6 +136,7 @@ fs_node_t fs_touch(fs_node_t* parent, char* name);
 FS_ERR fs_rm(fs_node_t* node, char* name);
 FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name);
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
+FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 
 FILE file_open(fs_node_t* node, int mode);
 FS_ERR file_write(FILE* file, uint8_t* data, size_t size);
@@ -152,10 +153,11 @@ uint32_t fat32_total_data_sectors(fat32_bootrecord_t* bootrec);
 uint32_t fat32_total_clusters(fat32_bootrecord_t* bootrec);
 
 uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count);
-FS_ERR fat32_free_clusters_chain(fs_t* fs, uint32_t start_cluster);
-uint32_t fat32_expand_clusters_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
-FS_ERR fat32_cut_clusters_chain(fs_t* fs, uint32_t start_cluster);
+FS_ERR fat32_free_cluster_chain(fs_t* fs, uint32_t start_cluster);
+uint32_t fat32_expand_cluster_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
+FS_ERR fat32_cut_cluster_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster);
+uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster);
 
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
 void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
