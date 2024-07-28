@@ -302,6 +302,13 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
             file_close(&copied_file);
         }
 
+        // copy testdir
+        fs_node_t testdir = fs_find(&current_node, "testdir");
+        fs_node_t testdir_copy = fs_find(&current_node, "testdir-copy");
+        if(testdir.valid && !testdir_copy.valid) {
+            fs_copy_recursive(&testdir, &current_node, NULL, "testdir-copy");
+        }
+
         puts("root directory");
         fs_list_dir(&current_node, list_dir);
     }

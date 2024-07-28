@@ -137,6 +137,7 @@ FS_ERR fs_rm(fs_node_t* node, char* name);
 FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name);
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
+FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 
 FILE file_open(fs_node_t* node, int mode);
 FS_ERR file_write(FILE* file, uint8_t* data, size_t size);

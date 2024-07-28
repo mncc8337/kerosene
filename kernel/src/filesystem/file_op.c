@@ -46,6 +46,18 @@ static bool rm_node_callback(fs_node_t node) {
     return true;
 }
 
+FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name); // declare it first
+static fs_node_t copy_current_dir;
+static bool cp_node_callback(fs_node_t node) {
+    // ignore . and ..
+    if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
+    
+    FS_ERR err = fs_copy_recursive(&node, &copy_current_dir, NULL, NULL);
+    if(err != ERR_FS_SUCCESS) return false;
+
+    return true;
+}
+
 // go through all files and directories in `parent`. call the callback when found one
 FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
     if(parent->fs->type == FS_FAT32)
@@ -118,9 +130,6 @@ FS_ERR fs_rm(fs_node_t* node, char* name) {
 
 // remove a directory and its content recursively
 FS_ERR fs_rm_recursive(fs_node_t* parent, char* name) {
-    // obviously doing this in low level is way faster
-    // but it didn't work for some reason
-
     // get the node
     fs_node_t delete_node = fs_find(parent, name);
 
@@ -177,6 +186,34 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
     else return ERR_FS_UNKNOWN_FS;
 
     if(!copied->valid) return ERR_FS_FAILED;
+    return ERR_FS_SUCCESS;
+}
+
+FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
+    if(!(node->attr & NODE_DIRECTORY)) return fs_copy(node, new_parent, copied, new_name);
+
+    // the node we need to copy is a directory at this point
+
+    if(new_parent->fs->type == FS_FAT32) {
+        // save current dir
+        fs_node_t current_dir_bck = copy_current_dir;
+        // create a new dir first
+        uint32_t start_cluster = fat32_allocate_clusters(new_parent->fs, 1);
+        if(start_cluster == 0) return ERR_FS_FAILED;
+
+        *copied = fat32_mkdir(new_parent, (new_name == NULL ? node->name : new_name), start_cluster, node->attr);
+        if(!copied->valid) return ERR_FS_FAILED;
+        copy_current_dir = *copied;
+
+        // try copy all of its content to the new dir
+        if(fat32_read_dir(node, cp_node_callback) != ERR_FS_CALLBACK_STOP)
+            return ERR_FS_FAILED;
+
+        // load current dir back up
+        copy_current_dir = current_dir_bck;
+    }
+    else return ERR_FS_UNKNOWN_FS;
+
     return ERR_FS_SUCCESS;
 }
 

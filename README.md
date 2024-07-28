@@ -3,9 +3,9 @@ a x86 os written from scratch
 this is an attempt of me to learn about osdev  
 it's a working-in-progress project and should not be used as references for osdev (it's full of bad practices if you ask)  
 ## features
-- ~~a (bad/suck/horrible) custom 2-stage bootloader~~ i switched to GRUB
 - a proper keyboard driver (which lacks of LED indicating, shortcuts support lol)
 - it can print text! (with colors!)
+- FAT32 filesystem support
 - yeah that's all
 ## build and run
 to compile and run the project you will need:
@@ -41,7 +41,7 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
 - [x] MBR support
 - [ ] GPT support
 - [ ] filesystem
-    - [ ] FAT32
+    - [x] FAT32
         - [x] detect
         - [x] list
         - [x] make dir
@@ -50,17 +50,8 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
         - [x] read
         - [x] write file
         - [x] move
-        - [ ] copy
+        - [x] copy
     - [ ] ext2
-        - [ ] detect
-        - [ ] list
-        - [ ] make dir
-        - [ ] remove dir
-        - [ ] touch files
-        - [ ] read
-        - [ ] write file
-        - [ ] move
-        - [ ] copy
 - [ ] load and run ELF file
 - [x] load kernel with ELF binary instead of flat binary
 - [ ] higher half kernel
