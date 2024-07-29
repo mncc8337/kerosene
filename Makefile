@@ -57,7 +57,7 @@ $(BIN)libk.a: $(LIBC_OBJ)
 $(BIN)libc.a: $(LIBC_OBJ)
 	@echo libc is not ready for build, yet
 
-$(BIN)multiboot-header.o: multiboot-header.asm
+$(BIN)kernel_entry.o: kernel/src/kernel_entry.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
 $(BIN)%.o: kernel/src/%.c
@@ -78,7 +78,7 @@ $(BIN)%.asm.o: kernel/src/system/%.asm
 $(BIN)%.asm.o: kernel/src/mem/%.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
-$(BIN)kernel.bin: $(BIN)multiboot-header.o $(OBJ) $(BIN)libk.a
+$(BIN)kernel.bin: $(BIN)kernel_entry.o $(OBJ) $(BIN)libk.a
 	@echo $(OBJ)
 	# use GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lk

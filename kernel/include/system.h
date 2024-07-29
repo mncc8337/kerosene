@@ -2,9 +2,6 @@
 
 #define IDT_MAX_DESCRIPTORS 256
 
-#define SYS_SLEEP() asm volatile("sti; hlt; cli")
-#define SYS_HALT() asm volatile("cli; hlt")
-
 #include <stdint.h>
 #include <stdbool.h>
 

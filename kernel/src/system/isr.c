@@ -1,4 +1,5 @@
 #include "system.h"
+#include "kpanic.h"
 #include "tty.h"
 
 static char* exception_message[] = {
@@ -40,7 +41,7 @@ void exception_handler(regs* r) {
     tty_print_string("Exception: ", -1, WHITE, true);
     tty_print_string(exception_message[r->int_no], -1, LIGHT_RED, true);
     tty_print_string(".\nSystem Halted!", -1, WHITE, true);
-    SYS_HALT(); 
+    kpanic();
 }
 
 extern void* isr_table[];
