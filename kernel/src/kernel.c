@@ -36,6 +36,8 @@ void print_typed_char(key_t k) {
 extern uint32_t startkernel;
 extern uint32_t endkernel;
 void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
+    // TODO: init vmmngr first
+
     // get memsize
     size_t memsize = 0;
     for(unsigned int i = 0; i < mmap_length; i += sizeof(multiboot_memory_map_t)) {
@@ -47,7 +49,7 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
 
         memsize += mmmt->len;
     }
-    pmmngr_init(endkernel + 1, memsize);
+    pmmngr_init(endkernel+1, memsize);
 
     // init regions
     for(unsigned int i = 0; i < mmap_length; i += sizeof(multiboot_memory_map_t)) {
@@ -65,7 +67,7 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
 
     // deinit regions
     pmmngr_deinit_region(startkernel, endkernel - startkernel + 1); // kernel
-    pmmngr_deinit_region(endkernel, pmmngr_get_size()/MMNGR_BLOCK_SIZE); // pmmngr
+    pmmngr_deinit_region(endkernel+1, pmmngr_get_size()/MMNGR_BLOCK_SIZE); // pmmngr
 
     pmmngr_update_usage(); // always run this after init and deinit regions
     print_debug(LT_OK, "initialized pmmngr with %d MiB\n", pmmngr_get_free_size()/1024/1024);
@@ -111,6 +113,7 @@ void disk_init() {
     }
 }
 
+extern uint16_t kernel_stack_top;
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // greeting msg to let us know we are in the kernel
     tty_set_attr(LIGHT_CYAN);  puts("hello");
@@ -130,12 +133,10 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     idt_init();
     irq_init();
 
-    // start receiving interrupts
-    // after initialize all interrupt handlers
-    asm volatile("sti");
+    // TSS
+    tss_install(0x10, kernel_stack_top);
+    print_debug(LT_OK, "TSS installed\n");
 
-    if(mbd->flags & (1 << 1))
-        print_debug(LT_IF, "boot drive: %x\n", mbd->boot_device >> 24);
     disk_init();
 
     if(!(mbd->flags & (1 << 6))) {

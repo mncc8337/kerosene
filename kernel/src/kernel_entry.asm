@@ -24,16 +24,19 @@ align 4
     dd 25 ; video height
     dd 0  ; video depth
 
+global kernel_stack_bottom
+global kernel_stack_top
+
 section .bss
 align 16
-stack_bottom:
-resb 16384 ; 16 KiB
-stack_top:
+kernel_stack_bottom:
+resb 16384 ; 16 KiB for kernel stack
+kernel_stack_top:
 
 section .text
-global _start:function (_start.end - _start)
+global _start: function (_start.end - _start)
 _start:
-	mov esp, stack_top
+	mov esp, kernel_stack_top
     push eax ; magic value
     push ebx ; multiboot infomation structure
     extern kmain

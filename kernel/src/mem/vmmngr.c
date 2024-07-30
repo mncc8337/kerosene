@@ -30,7 +30,7 @@ pdir* vmmngr_get_directory() {
 }
 
 void vmmngr_flush_tlb_entry(uint32_t addr) {
-	asm volatile("invlpg (%0)" ::"r" (addr) : "memory");
+	asm volatile("invlpg (%0)" : : "r" (addr) : "memory");
 }
 
 MEM_ERR vmmngr_alloc_page(uint32_t* e) {
