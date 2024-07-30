@@ -19,57 +19,70 @@ these scripts will need sudo privilege to setup loopback device for the hard dis
 > YOU SHOULD NOT RUN THE OS ON REAL HARDWARE.  
 > if you wish to do it any way, run `sudo dd if=disk.img of=/dev/sdX && sync` (MAKE SURE /dev/sdX IS AN USB DEVICE) or any program to burn the disk image into an usb device, restart the pc and choose the usb in the boot menu.
 ## progress
-- [x] boot to the kernel
-- [x] print some text in the kernel
+### baby first step
+- [x] basic bootloader
+- [x] load the kernel
 - [x] 2-stage bootloader
+- [x] print some text in the kernel
+- [x] switch to GRUB
+### kernel stuffs
 - [x] load GDT in the kernel
 - [x] load IDT in the kernel
 - [x] handle exception interrupt
 - [x] handle interrupts send by PIC
+- [x] load kernel with ELF binary instead of flat binary
+- [x] support multiboot
+- [ ] higher half kernel
+### hardware drivers
 - [ ] keyboard driver
     + [x] get key scancode
     + [x] translate scancode to keycode
-    + [ ] handle key combination
-- [x] play with the PIT
-- [ ] memory manager
-    + [x] physical memory manager
-    + [x] virtual memory manager
-    + [ ] the heap
-- [ ] get current datetime (RTC, CMOS)
-- [x] support multiboot (i switched to GRUB so it should be lol)
-- [x] read disk
-- [x] MBR support
-- [ ] GPT support
-- [ ] filesystem
-    - [x] FAT32
-        - [x] detect
-        - [x] list
-        - [x] make dir
-        - [x] remove dir
-        - [x] touch files
-        - [x] read
-        - [x] write file
-        - [x] move
-        - [x] copy
-    - [ ] ext2
-- [ ] load and run ELF file
-- [x] load kernel with ELF binary instead of flat binary
-- [ ] higher half kernel
-- [ ] multi-processing
-- [ ] userland
-    - [x] TSS setup
+    + [ ] LED indicating
+- [ ] PIT
+    - [x] generate ticks
+    - [ ] PC speaker (beep beep boop boop)
+- [ ] CMOS
+    - [ ] get datetime
 - [ ] APCI
 - [ ] mouse driver
 - [ ] GUI
     - [ ] render rectangle
-    - [ ] render mouse
-    - [ ] render image
     - [ ] render fonts
+    - [ ] render image
+    - [ ] render mouse
 - [ ] sound
 - [ ] video
 - [ ] im not gonna touch networking
+- [ ] memory manager
+    + [x] physical memory manager
+    + [x] virtual memory manager
+    + [ ] the heap
+- [ ] ATA
+    - [x] PIO mode
+    - [ ] to be updated
+### filesystem
+- [x] MBR support
+- [ ] GPT support
+- [x] FAT32 fs
+    - [x] detect
+    - [x] list
+    - [x] make dir
+    - [x] remove dir
+    - [x] touch files
+    - [x] read
+    - [x] write file
+    - [x] move
+    - [x] copy
+- [ ] ext2 fs
+### userland
+- [ ] load and run ELF file
+- [ ] multi-processing
+- [ ] userland
+    - [x] TSS setup
+    - [ ] to be updated
 - [ ] port some program
     + [ ] GNU GCC
+    + [ ] to be updated
 ## known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
 ## learning resources
