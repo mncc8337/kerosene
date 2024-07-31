@@ -8,13 +8,29 @@ it's a working-in-progress project and should not be used as references for osde
 - FAT32 filesystem support
 - yeah that's all
 ## build and run
-to compile and run the project you will need:
+### prerequisite
 - a [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a normal x86_64 elf GCC will compile it without any errors (by adding some flags, see the commented CFLAGS lines in Makefile), the osdev wiki said we should use a cross compiler to avoid any unexpected errors
 - nasm
 - grub (and xorriso to gen iso image)
-- qemu  
-to build `./build.sh`. to run `./run.sh`. to add file to the disk image `./cpyfile.sh $filename ./mnt/path/to/dir`  
-these scripts will need sudo privilege to setup loopback device for the hard disk image.
+- qemu
+### build and run
+```
+# build
+chmod +x script/*.sh
+make all
+# run
+./script/run.sh # or make run
+# make iso
+./script/geniso.sh
+# editing the disk files
+./script/mount-device.sh
+cd mnt/
+## do some stuffs here
+./script/umount-device.sh # you also want to run this if you ever encountered errors like disk image is in use or whatever
+# if you dont want to run mount-device and then umount-device
+./script/cpyfile.sh file/or/directory/in/somewhere ./mnt/some/DIRECTORY/in/the/disk
+```
+note that scripts in `script/` will need sudo privilege to setup loopback device for the hard disk image.
 > [!WARNING]  
 > YOU SHOULD NOT RUN THE OS ON REAL HARDWARE.  
 > if you wish to do it any way, run `sudo dd if=disk.img of=/dev/sdX && sync` (MAKE SURE /dev/sdX IS AN USB DEVICE) or any program to burn the disk image into an usb device, restart the pc and choose the usb in the boot menu.

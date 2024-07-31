@@ -38,9 +38,9 @@ CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -std=gnu99 -g -MMD -MP
 LDFLAGS = -T linker.ld -nostdlib -lgcc
 NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
 
-.PHONY: all libc libk kernel disk clean
+.PHONY: all libc libk kernel disk copyfs run run-debug clean clean-all
 
-all: $(BIN) $(BIN)kernel.bin
+all: $(BIN) $(BIN)kernel.bin disk copyfs
 
 $(BIN):
 	mkdir $(BIN)
@@ -89,8 +89,25 @@ libk: $(BIN)libk.a
 
 kernel: $(BIN)kernel.bin
 
+disk: kernel
+	if [ ! -f disk.img ]; then ./script/gendiskimage.sh 65536; fi
+
+copyfs: disk
+	./script/cpyfile.sh grub.cfg ./mnt/boot/grub/ # update grub config
+	./script/cpyfile.sh bin/kernel.bin ./mnt/boot/ # update kernel
+	for file in fsfiles/*; do ./script/cpyfile.sh $$file ./mnt/; done
+
+run:
+	./script/run.sh
+
+run-debug:
+	./script/run.sh debug
+
 clean:
 	rm -r $(BIN)
+
+clean-all: clean
+	rm disk.img disk-backup.img
 
 DEPS  = $(patsubst %.o,%.d,$(OBJ))
 DEPS += $(patsubst %.o,%.d,$(LIBC_OBJ))

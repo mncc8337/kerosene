@@ -1,13 +1,17 @@
-# my cross compiler
+# cross compiler dir
 cross
 
 # dir use to put files onto the image
 mnt
 
-# bins
-bin
+# lsp
+compile_commands.json
+
+# dotfiles
+.*
 
 # various bins
+bin
 *.o
 *.a
 *.d
