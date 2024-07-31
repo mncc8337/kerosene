@@ -1,4 +1,6 @@
 #include "debug.h"
+#include "tty.h"
+#include "stdio.h"
 
 static void print_log_tag(int lt) {
     putchar('[');

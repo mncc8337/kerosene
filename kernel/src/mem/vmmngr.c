@@ -35,7 +35,7 @@ void vmmngr_flush_tlb_entry(uint32_t addr) {
 
 MEM_ERR vmmngr_alloc_page(uint32_t* e) {
     void* p = pmmngr_alloc_block();
-    if(!p) return ERR_MEM_OUT_OF_MEM;
+    if(!p) return ERR_MEM_FAILED;
 
     pte_set_frame(e, (uint32_t)p);
     pte_add_attrib(e, I86_PTE_PRESENT);
@@ -59,7 +59,7 @@ MEM_ERR vmmngr_map_page(uint32_t phys, uint32_t virt) {
     if((*e & I86_PTE_PRESENT) != I86_PTE_PRESENT) {
         // if page table not present then allocate it
         ptable* table = (ptable*)pmmngr_alloc_block();
-        if(!table) return ERR_MEM_OUT_OF_MEM;
+        if(!table) return ERR_MEM_FAILED;
 
         // clear page table
         memset(table, 0, sizeof(ptable));
@@ -84,10 +84,10 @@ MEM_ERR vmmngr_map_page(uint32_t phys, uint32_t virt) {
 
 MEM_ERR vmmngr_init() {
     ptable* ptable1 = (ptable*)pmmngr_alloc_block();
-    if(!ptable1) return ERR_MEM_OUT_OF_MEM;
+    if(!ptable1) return ERR_MEM_FAILED;
 
     ptable* ptable2 = (ptable*)pmmngr_alloc_block();
-    if(!ptable2) return ERR_MEM_OUT_OF_MEM;
+    if(!ptable2) return ERR_MEM_FAILED;
 
     int frame = 0;
     int virt = 0;
@@ -112,7 +112,7 @@ MEM_ERR vmmngr_init() {
     }
 
     pdir* page_directory = (pdir*)pmmngr_alloc_multi_block(3);
-    if(!page_directory) return ERR_MEM_OUT_OF_MEM;
+    if(!page_directory) return ERR_MEM_FAILED;
 
     for(int i = 0; i < 1024; i++)
         page_directory->entry[i] = 0x00000002;

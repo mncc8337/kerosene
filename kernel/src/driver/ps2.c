@@ -1,4 +1,5 @@
 #include "ps2.h"
+#include "system.h"
 
 unsigned char ps2_read_data() {
     return port_inb(PORT_PS2_DATA);

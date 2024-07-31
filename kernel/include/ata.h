@@ -3,8 +3,6 @@
 #include "stdbool.h"
 #include "stdint.h"
 
-#include "system.h"
-
 typedef enum {
     ERR_ATA_PIO_UNKNOWN,
     ERR_ATA_PIO_SUCCESS,

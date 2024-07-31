@@ -1,4 +1,5 @@
 #include "ata.h"
+#include "system.h"
 
 static bool LBA28_mode;
 static bool LBA48_mode;

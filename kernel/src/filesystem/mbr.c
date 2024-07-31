@@ -1,9 +1,6 @@
 #include "filesystem.h"
 #include "ata.h"
 
-#include "string.h"
-#include "stdio.h"
-
 #include "debug.h"
 
 static mbr_t MBR;

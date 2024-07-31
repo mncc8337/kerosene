@@ -2,9 +2,6 @@
 
 #include "stdarg.h"
 
-#include "tty.h"
-#include "stdio.h"
-
 enum LOG_TAG{
     LT_IF,
     LT_OK,

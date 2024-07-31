@@ -31,7 +31,7 @@ cd mnt/
 ## do some stuffs here
 ./script/umount-device.sh # you also want to run this if you ever encountered errors like disk image is in use or whatever
 
-# if you dont want to run mount-device and then umount-device
+# if you want to copy some files/dirs and dont want to run mount-device and then umount-device
 ./script/cpyfile.sh file/or/directory/in/somewhere ./mnt/some/DIRECTORY/in/the/disk
 ```
 note that scripts in `script/` will need sudo privilege to setup loopback device for the hard disk image.
@@ -61,6 +61,13 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
 - [ ] PIT
     - [x] generate ticks
     - [ ] PC speaker (beep beep boop boop)
+- [ ] memory manager
+    - [x] physical memory manager
+    - [x] virtual memory manager
+    - [ ] the heap
+- [ ] ATA
+    - [x] PIO mode
+    - [ ] to be updated
 - [ ] CMOS
     - [ ] get datetime
 - [ ] APCI
@@ -73,13 +80,6 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
 - [ ] sound
 - [ ] video
 - [ ] im not gonna touch networking
-- [ ] memory manager
-    + [x] physical memory manager
-    + [x] virtual memory manager
-    + [ ] the heap
-- [ ] ATA
-    - [x] PIO mode
-    - [ ] to be updated
 ### filesystem
 - [x] MBR support
 - [ ] GPT support
@@ -101,8 +101,8 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
     - [x] TSS setup
     - [ ] to be updated
 - [ ] port some program
-    + [ ] GNU GCC
-    + [ ] to be updated
+    - [ ] GNU GCC
+    - [ ] to be updated
 ## known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
 ## learning resources

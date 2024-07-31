@@ -1,4 +1,5 @@
 #include "tty.h"
+#include "system.h"
 
 static unsigned char* vid_mem = (unsigned char*)0xb8000;
 

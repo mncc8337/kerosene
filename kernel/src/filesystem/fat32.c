@@ -2,7 +2,6 @@
 #include "ata.h"
 
 #include "string.h"
-#include "debug.h"
 
 // these processes are used very frequently
 // so i define some macros for them
@@ -766,7 +765,6 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
                 if(temp_lfn->chars_3[j] == '\0') goto done_parsing_name;
             }
 
-            done_parsing_name:
         }
         else if(i == 0) { // directory entry
             fat_directory_entry_t* dir_entry = (fat_directory_entry_t*)(directory + start_index);
@@ -782,6 +780,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
             dir_entry->first_cluster_number_low = start_cluster & 0xffff;
             dir_entry->size = size;
         }
+        done_parsing_name:
 
         node.parent_cluster = current_cluster;
         node.parent_cluster_index = start_index;

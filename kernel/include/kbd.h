@@ -1,7 +1,6 @@
 #pragma once
 
-#include "system.h"
-#include "ps2.h"
+#include "stdbool.h"
 
 #define EXTENDED_BYTE 0xe0
 

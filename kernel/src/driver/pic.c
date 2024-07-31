@@ -1,4 +1,5 @@
 #include "pic.h"
+#include "system.h"
 
 void pic_send_eoi(unsigned char irq) {
     if(irq >= 8)

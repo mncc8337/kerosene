@@ -1,5 +1,9 @@
 #include "kbd.h"
 
+#include "system.h"
+#include "ps2.h"
+
+
 static unsigned char keycode[] = {
     0, // nothing
     // escape
@@ -237,7 +241,9 @@ static void kbd_trash_int_handler() {
 }
 
 static bool extended_byte = false;
-static void kbd_handler() {
+static void kbd_handler(regs* r) {
+    (void)(r); // avoid unused arg
+
     ps2_wait_for_reading_data();
     unsigned char scancode = ps2_read_data();
 

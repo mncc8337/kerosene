@@ -5,11 +5,9 @@
 #include "kbd.h"
 #include "ata.h"
 #include "filesystem.h"
-
 #include "multiboot.h"
 
 #include "stdio.h"
-
 #include "debug.h"
 
 const unsigned int TIMER_PHASE = 100;

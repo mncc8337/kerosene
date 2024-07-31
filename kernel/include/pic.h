@@ -1,7 +1,5 @@
 #pragma once
 
-#include "system.h"
-
 #define PORT_PIC1_COMM  0x20
 #define PORT_PIC1_DATA  0x21
 #define PORT_PIC2_COMM  0xa0

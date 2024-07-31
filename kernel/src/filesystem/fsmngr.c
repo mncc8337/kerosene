@@ -1,9 +1,6 @@
 #include "filesystem.h"
 #include "ata.h"
 
-#include "string.h"
-#include "debug.h"
-
 static fs_t FS[26];
 
 static bool is_field_fs_type(uint8_t* buff, int cnt) {
