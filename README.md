@@ -18,15 +18,19 @@ it's a working-in-progress project and should not be used as references for osde
 # build
 chmod +x script/*.sh
 make all
+
 # run
 ./script/run.sh # or make run
+
 # make iso
 ./script/geniso.sh
+
 # editing the disk files
 ./script/mount-device.sh
 cd mnt/
 ## do some stuffs here
 ./script/umount-device.sh # you also want to run this if you ever encountered errors like disk image is in use or whatever
+
 # if you dont want to run mount-device and then umount-device
 ./script/cpyfile.sh file/or/directory/in/somewhere ./mnt/some/DIRECTORY/in/the/disk
 ```
