@@ -107,9 +107,12 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
 - ATA PIO mode initialization some time failed (very rare): address mark not found
 - enter_usermode() crash after run `iretd`
 ## learning resources
+note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
+### great tutorials
 - https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
 - http://www.osdever.net/bkerndev/Docs/gettingstarted.htm
-- http://wiki.osdev.org/Expanded_Main_Page
 - http://www.brokenthorn.com/Resources/OSDevIndex.html
+- https://web.archive.org/web/20160313134414/http://www.jamesmolloy.co.uk/tutorial_html/index.html
+### documentations
 - https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
 - https://download.microsoft.com/download/1/6/1/161ba512-40e2-4cc9-843a-923143f3456c/fatgen103.doc
