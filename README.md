@@ -105,6 +105,7 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
     - [ ] to be updated
 ## known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
+- enter_usermode() crash after run `iretd`
 ## learning resources
 - https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
 - http://www.osdever.net/bkerndev/Docs/gettingstarted.htm

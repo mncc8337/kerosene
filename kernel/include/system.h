@@ -38,7 +38,7 @@ typedef struct {
     unsigned int edi, esi, ebp, esp, ebx, edx, ecx, eax;
     unsigned int int_no, err_code;
     unsigned int eip, cs, eflags, useresp, ss; 
-} __attribute__((packed)) regs;
+} __attribute__((packed)) regs_t;
 
 typedef struct {
     uint32_t prev_tss;
@@ -86,13 +86,14 @@ void idt_init();
 void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags);
 
 // isr.c
-void isr_init();
-
-// irq.c
-void irq_init();
-void irq_install_handler(int irq, void (*handler)(regs *r));
+void irq_install_handler(int irq, void (*handler)(regs_t *r));
 void irq_uninstall_handler(int irq);
+void isr_new_interrupt(int isr, uint8_t flags, void (*handler)(regs_t* r));
+void isr_init();
 
 // tss.c
 void tss_set_stack(uint16_t kernel_ss, uint16_t kernel_esp);
 void tss_install(uint16_t kernel_ss, uint16_t kernel_esp);
+
+// usermode.asm
+void enter_usermode();

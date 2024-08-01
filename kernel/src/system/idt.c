@@ -24,7 +24,5 @@ void idt_init() {
     idtr.base = (uint32_t)idt;
     idtr.limit = sizeof(idt_entry_t) * IDT_MAX_DESCRIPTORS - 1;
 
-    isr_init();
-
     load_idt();
 }

@@ -16,12 +16,12 @@ void tss_install(uint16_t kernel_ss, uint16_t kernel_esp) {
     memset((void*)&tss, 0, sizeof(tss_entry_t));
 
     tss_set_stack(kernel_ss, kernel_esp);
-    // tss.cs = 0x0b;
-    // tss.ss = 0x13;
-    // tss.es = 0x13;
-    // tss.ds = 0x13;
-    // tss.fs = 0x13;
-    // tss.gs = 0x13;
+    tss.cs = 0x0b;
+    tss.ss = 0x13;
+    tss.es = 0x13;
+    tss.ds = 0x13;
+    tss.fs = 0x13;
+    tss.gs = 0x13;
 
     tss_flush();
 }

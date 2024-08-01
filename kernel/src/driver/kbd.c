@@ -224,7 +224,7 @@ static key_t current_key;
 static void (*key_listener)(key_t);
 
 // predefined it here to be used in trash interrupt handler
-static void kbd_handler(regs* r);
+static void kbd_handler(regs_t* r);
 
 static unsigned char interrupt_progress_cnt = 0;
 static unsigned char interrupt_loop_cnt = 0;
@@ -241,7 +241,7 @@ static void kbd_trash_int_handler() {
 }
 
 static bool extended_byte = false;
-static void kbd_handler(regs* r) {
+static void kbd_handler(regs_t* r) {
     (void)(r); // avoid unused arg
 
     ps2_wait_for_reading_data();

@@ -4,6 +4,7 @@
 #include "tty.h"
 #include "kbd.h"
 #include "ata.h"
+#include "syscall.h"
 #include "filesystem.h"
 #include "multiboot.h"
 
@@ -125,14 +126,6 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     if(mbd->flags & (1 << 9))
         print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name);
 
-    gdt_init();
-    idt_init();
-    irq_init();
-
-    // TSS
-    tss_install(0x10, kernel_stack_top);
-    print_debug(LT_OK, "TSS installed\n");
-
     disk_init();
 
     if(!(mbd->flags & (1 << 6))) {
@@ -140,6 +133,21 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         kpanic();
     }
     mem_init(mbd->mmap_addr, mbd->mmap_length);
+
+    asm volatile("cli");
+    gdt_init();
+    print_debug(LT_OK, "GDT initialized\n");
+    idt_init();
+    print_debug(LT_OK, "IDT initialized\n");
+    isr_init();
+    print_debug(LT_OK, "ISR initialized\n");
+    asm volatile("sti");
+
+    tss_install(0x10, kernel_stack_top);
+    print_debug(LT_OK, "TSS installed\n");
+
+    syscall_init();
+    print_debug(LT_OK, "syscall initialized\n");
 
     kbd_init();
 
@@ -149,6 +157,15 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     set_key_listener(print_typed_char);
 
     print_debug(LT_IF, "done initializing\n");
+
+    // i cannot get this to works
+    // it just crash after run iretd
+    // enter_usermode();
+
+    // test syscall
+    // the privilege is still ring 0, though
+    asm volatile("xor %eax, %eax; int $0x80"); // SYS_SYSCALL_TEST
+    asm volatile("xor %eax, %eax; inc %eax; int $0x80"); // SYS_PUTCHAR
 
     while(true) asm volatile("sti; hlt; cli");
 }
