@@ -2,20 +2,28 @@
 
 global enter_usermode
 enter_usermode:
-    mov ax, (4 * 8) | 3
+    cli
+
+    mov ax, 0x23
     mov ds, ax
     mov es, ax
     mov fs, ax
     mov gs, ax
 
-    push (4 * 8) | 3
     mov eax, esp
+    push 0x23
     push eax
-    pushfd
-    push (3 * 8) | 3
+    pushf
+
+    pop eax
+    or eax, 0x200
+    push eax
+
+    push 0x1b
     lea eax, [usr_start]
     push eax
-    iretd
+
+    iret
 usr_start:
     add esp, 4
     ret

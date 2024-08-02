@@ -92,7 +92,7 @@ void isr_new_interrupt(int isr, uint8_t flags, void (*handler)(regs_t* r));
 void isr_init();
 
 // tss.c
-void tss_set_stack(uint16_t kernel_ss, uint16_t kernel_esp);
+void tss_set_stack(uint32_t esp);
 void tss_install(uint16_t kernel_ss, uint16_t kernel_esp);
 
 // usermode.asm

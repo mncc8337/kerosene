@@ -24,9 +24,6 @@ align 4
     dd 25 ; video height
     dd 0  ; video depth
 
-global kernel_stack_bottom
-global kernel_stack_top
-
 section .bss
 align 16
 kernel_stack_bottom:

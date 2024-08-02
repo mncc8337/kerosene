@@ -18,11 +18,9 @@ void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags) {
     vectors[vector] = true;
 }
 
-extern void load_idt();
-
 void idt_init() {
     idtr.base = (uint32_t)idt;
     idtr.limit = sizeof(idt_entry_t) * IDT_MAX_DESCRIPTORS - 1;
 
-    load_idt();
+    asm volatile("lidt %0" : : "m" (idtr));
 }

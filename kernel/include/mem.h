@@ -17,40 +17,36 @@ typedef enum {
 #define PAGE_TABLE_INDEX(x) (((x) >> 12) & 0x3ff)
 #define PAGE_GET_PHYSICAL_ADDRESS(x) (*(x) & ~0xfff)
 
+#define PTE_PRESENT       1
+#define PTE_WRITABLE      2
+#define PTE_USER          4
+#define PTE_WRITETHOUGH   8
+#define PTE_NOT_CACHEABLE 0x10
+#define PTE_ACCESSED      0x20
+#define PTE_DIRTY         0x40
+#define PTE_PAT           0x80
+#define PTE_CPU_GLOBAL    0x100
+#define PTE_LV4_GLOBAL    0x200
+#define PTE_FRAME         0x7ffff000
+
+#define PDE_PRESENT    1
+#define PDE_WRITABLE   2
+#define PDE_USER       4
+#define PDE_PWT        8
+#define PDE_PCD        0x10
+#define PDE_ACCESSED   0x20
+#define PDE_DIRTY      0x40
+#define PDE_4MB        0x80
+#define PDE_CPU_GLOBAL 0x100
+#define PDE_LV4_GLOBAL 0x200
+#define PDE_FRAME      0x7ffff000
+
 typedef struct {
     uint32_t entry[1024] __attribute__((aligned(4096)));
 } __attribute__((packed)) ptable;
 typedef struct {
     uint32_t entry[1024] __attribute__((aligned(4096)));
 } __attribute__((packed)) pdir;
-
-enum PAGE_PTE_FLAGS {
-    I86_PTE_PRESENT = 1,
-    I86_PTE_WRITABLE = 2,
-    I86_PTE_USER = 4,
-    I86_PTE_WRITETHOUGH = 8,
-    I86_PTE_NOT_CACHEABLE = 0x10,
-    I86_PTE_ACCESSED = 0x20,
-    I86_PTE_DIRTY = 0x40,
-    I86_PTE_PAT = 0x80,
-    I86_PTE_CPU_GLOBAL = 0x100,
-    I86_PTE_LV4_GLOBAL = 0x200,
-    I86_PTE_FRAME = 0x7ffff000
-};
-
-enum PAGE_PDE_FLAGS {
-    I86_PDE_PRESENT = 1,
-    I86_PDE_WRITABLE = 2,
-    I86_PDE_USER = 4,
-    I86_PDE_PWT = 8,
-    I86_PDE_PCD = 0x10,
-    I86_PDE_ACCESSED = 0x20,
-    I86_PDE_DIRTY = 0x40,
-    I86_PDE_4MB = 0x80,
-    I86_PDE_CPU_GLOBAL = 0x100,
-    I86_PDE_LV4_GLOBAL = 0x200,
-    I86_PDE_FRAME = 0x7ffff000
-};
 
 // pmmngr.c
 void pmmngr_update_usage();
@@ -85,14 +81,12 @@ uint32_t pde_pfn(uint32_t e);
 void pde_enable_global(uint32_t e);
 
 // vmmngr.c
-void load_page_directory(uint32_t* pd);
-void enable_paging();
-uint32_t* vmmngr_ptable_lookup_entry(ptable* p, uint32_t addr);
-uint32_t* vmmngr_pdirectory_lookup_entry(pdir* p, uint32_t addr);
+uint32_t* vmmngr_ptable_lookup_entry(ptable* p, uint64_t addr);
+uint32_t* vmmngr_pdirectory_lookup_entry(pdir* p, uint64_t addr);
 MEM_ERR vmmngr_switch_pdirectory(pdir* dir);
 pdir* vmmngr_get_directory();
 void vmmngr_flush_tlb_entry(uint32_t addr);
 MEM_ERR vmmngr_alloc_page(uint32_t* e);
 void vmmngr_free_page(uint32_t* e);
-MEM_ERR vmmngr_map_page(uint32_t phys, uint32_t virt);
+MEM_ERR vmmngr_map_page(uint32_t phys, uint64_t virt);
 MEM_ERR vmmngr_init();

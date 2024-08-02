@@ -33,7 +33,6 @@ void print_typed_char(key_t k) {
 extern uint32_t startkernel;
 extern uint32_t endkernel;
 void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
-    // TODO: init vmmngr first
 
     // get memsize
     size_t memsize = 0;
@@ -143,7 +142,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     print_debug(LT_OK, "ISR initialized\n");
     asm volatile("sti");
 
-    tss_install(0x10, kernel_stack_top);
+    tss_install(0x10, 0);
     print_debug(LT_OK, "TSS installed\n");
 
     syscall_init();
@@ -158,8 +157,10 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     print_debug(LT_IF, "done initializing\n");
 
-    // i cannot get this to works
-    // it just crash after run iretd
+    uint32_t esp = 0;
+    asm volatile("mov %%esp, %%eax" : "=a" (esp));
+    tss_set_stack(esp);
+    // i cannot get this to work :(
     // enter_usermode();
 
     // test syscall
@@ -167,5 +168,5 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     asm volatile("xor %eax, %eax; int $0x80"); // SYS_SYSCALL_TEST
     asm volatile("xor %eax, %eax; inc %eax; int $0x80"); // SYS_PUTCHAR
 
-    while(true) asm volatile("sti; hlt; cli");
+    while(true);
 }

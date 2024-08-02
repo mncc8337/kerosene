@@ -1,6 +1,5 @@
 [bits 32]
 
-; paging stuff
 global load_page_directory
 load_page_directory:
     push ebp

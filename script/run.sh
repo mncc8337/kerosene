@@ -1,7 +1,8 @@
 #!/bin/sh
 
 QEMUFLAGS="-m 128M \
-          -debugcon stdio \
+          -serial stdio \
+          -no-shutdown \
           -no-reboot \
           -accel tcg,thread=single \
           -usb"
@@ -15,5 +16,5 @@ if [ "$1" == "debug" ]; then
         -ex 'break kmain' \
         -ex 'continue'
 else
-    qemu-system-i386 -hda disk.img $QEMUFLAGS
+    qemu-system-i386 -drive format=raw,file=disk.img $QEMUFLAGS
 fi

@@ -25,13 +25,13 @@ void gdt_init() {
     // NULL descriptor
     gdt_set_gate(0, 0, 0, 0, 0);
     // kernelmode code segment
-    gdt_set_gate(1, 0, 0xffffffff, 0x9a, 0xc);
+    gdt_set_gate(1, 0, 0xfffff, 0x9a, 0xc);
     // kernelmode data segment
-    gdt_set_gate(2, 0, 0xffffffff, 0x92, 0xc);
+    gdt_set_gate(2, 0, 0xfffff, 0x92, 0xc);
     // usermode code segment
-    gdt_set_gate(3, 0, 0xffffffff, 0xfa, 0xc);
+    gdt_set_gate(3, 0, 0xfffff, 0xfa, 0xc);
     // usermode data segment
-    gdt_set_gate(4, 0, 0xffffffff, 0xf2, 0xc);
+    gdt_set_gate(4, 0, 0xfffff, 0xf2, 0xc);
 
     gdt_flush();
 }
