@@ -1,17 +1,18 @@
 #include "system.h"
 #include "kpanic.h"
-#include "mem.h"
+#include "multiboot.h"
 #include "tty.h"
-#include "kbd.h"
+#include "mem.h"
 #include "ata.h"
+#include "kbd.h"
+#include "timer.h"
 #include "syscall.h"
 #include "filesystem.h"
-#include "multiboot.h"
 
 #include "stdio.h"
+#include "stdlib.h"
+#include "string.h"
 #include "debug.h"
-
-const unsigned int TIMER_PHASE = 100;
 
 char freebuff[512];
 
@@ -25,9 +26,12 @@ void print_typed_char(key_t k) {
         tty_set_cursor(tty_get_cursor() - 1); // move back
         tty_print_char(' ', -1, 0, false); // delete printed char
     }
-    else {
+    else
         putchar(k.mapped);
-    }
+}
+void print_elapsed_time(unsigned int ticks) {
+    tty_print_string(itoa(ticks/TIMER_PHASE, freebuff, 10), 0, 0, 0);
+    tty_print_string("seconds passed", strlen(freebuff)+1, 0, 0);
 }
 
 extern uint32_t startkernel;
@@ -66,7 +70,7 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
     pmmngr_deinit_region(endkernel+1, pmmngr_get_size()/MMNGR_BLOCK_SIZE); // pmmngr
 
     pmmngr_update_usage(); // always run this after init and deinit regions
-    print_debug(LT_OK, "initialized pmmngr with %d MiB\n", pmmngr_get_free_size()/1024/1024);
+    print_debug(LT_OK, "initialised pmmngr with %d MiB\n", pmmngr_get_free_size()/1024/1024);
 
     // vmmngr init
     MEM_ERR merr = vmmngr_init();
@@ -78,11 +82,11 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
 }
 void disk_init() {
     if(!ata_pio_init((uint16_t*)freebuff)) {
-        print_debug(LT_WN, "failed to initialize ATA PIO mode\n");
+        print_debug(LT_WN, "failed to initialise ATA PIO mode\n");
         return;
     }
 
-    print_debug(LT_OK, "ATA PIO mode initialized\n");
+    print_debug(LT_OK, "ATA PIO mode initialised\n");
 
     bool mbr_ok = mbr_load();
     if(!mbr_ok) {
@@ -100,7 +104,7 @@ void disk_init() {
                 break;
             case FS_FAT32:
                 current_node = fat32_init(part, FS_ID);
-                print_debug(LT_OK, "initialized FAT 32 filesystem in partition %d\n", i+1);
+                print_debug(LT_OK, "initialised FAT 32 filesystem in partition %d\n", i+1);
                 break;
             case FS_EXT2:
                 print_debug(LT_WN, "EXT2 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
@@ -135,35 +139,38 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     asm volatile("cli");
     gdt_init();
-    print_debug(LT_OK, "GDT initialized\n");
+    print_debug(LT_OK, "GDT initialised\n");
+    uint32_t esp = 0;
+    asm volatile("mov %%esp, %%eax" : "=a" (esp));
+    tss_install(0x10, esp);
+    print_debug(LT_OK, "TSS installed\n");
     idt_init();
-    print_debug(LT_OK, "IDT initialized\n");
+    print_debug(LT_OK, "IDT initialised\n");
     isr_init();
-    print_debug(LT_OK, "ISR initialized\n");
+    print_debug(LT_OK, "ISR initialised\n");
     asm volatile("sti");
 
-    tss_install(0x10, 0);
-    print_debug(LT_OK, "TSS installed\n");
-
     syscall_init();
-    print_debug(LT_OK, "syscall initialized\n");
+    print_debug(LT_OK, "syscall initialised\n");
 
     kbd_init();
+    install_key_listener(print_typed_char);
+
+    timer_init_PIT();
+    install_tick_listener(print_elapsed_time);
 
     // make cursor slimmer
     tty_enable_cursor(13, 14);
 
-    set_key_listener(print_typed_char);
+    print_debug(LT_IF, "done initialising\n");
 
-    print_debug(LT_IF, "done initializing\n");
+    // wait for 3 sec
+    timer_wait(3000);
 
-    uint32_t esp = 0;
-    asm volatile("mov %%esp, %%eax" : "=a" (esp));
-    tss_set_stack(esp);
     // i cannot get this to work :(
     // enter_usermode();
 
-    // test syscall
+    // test "syscall"
     // the privilege is still ring 0, though
     asm volatile("xor %eax, %eax; int $0x80"); // SYS_SYSCALL_TEST
     asm volatile("xor %eax, %eax; inc %eax; int $0x80"); // SYS_PUTCHAR

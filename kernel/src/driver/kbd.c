@@ -1,8 +1,6 @@
 #include "kbd.h"
-
 #include "system.h"
 #include "ps2.h"
-
 
 static unsigned char keycode[] = {
     0, // nothing
@@ -221,7 +219,7 @@ static bool scrolllock_on = false;
 static bool numlock_on = false;
 
 static key_t current_key;
-static void (*key_listener)(key_t);
+static void (*key_listener)(key_t) = 0;
 
 // predefined it here to be used in trash interrupt handler
 static void kbd_handler(regs_t* r);
@@ -308,7 +306,7 @@ static void kbd_handler(regs_t* r) {
     current_key.released = released;
     
 call_key_listener:
-    key_listener(current_key);
+    if(key_listener) key_listener(current_key);
 
     // reset extended_byte status
     extended_byte = false;
@@ -343,8 +341,11 @@ bool is_capslock_on() { return capslock_on; }
 bool is_scrolllock_on() { return scrolllock_on; }
 bool is_numlock_on() { return numlock_on; }
 
-void set_key_listener(void (*klis)(key_t)) {
+void install_key_listener(void (*klis)(key_t)) {
     key_listener = klis;
+}
+void uninstall_key_listener() {
+    key_listener = 0;
 }
 
 void kbd_init() {

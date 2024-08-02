@@ -21,5 +21,5 @@ void tss_install(uint16_t kernel_ss, uint16_t kernel_esp) {
     tss.fs = 0x13;
     tss.gs = 0x13;
 
-    asm volatile("cli; ltr %0; sti" : : "r" (0x28));
+    asm volatile("ltr %0" : : "r" (0x28));
 }

@@ -4,7 +4,7 @@
 #include "pic.h"
 #include "string.h"
 
-static void* isr_routines[IDT_MAX_DESCRIPTORS];
+static void* routines[IDT_MAX_DESCRIPTORS];
 // from isr.asm
 extern void* isr_table[IDT_MAX_DESCRIPTORS];
 
@@ -51,11 +51,11 @@ static void exception_handler(regs_t* r) {
     kpanic();
 }
 
-// default ISR handler. every interrupt will be "handled" by this function
+// default ISR. every interrupt will be "handled" by this function
 void isr_handler(regs_t* reg) {
     void (*handler)(regs_t*);
 
-    handler = isr_routines[reg->int_no];
+    handler = routines[reg->int_no];
     if(handler) handler(reg);
 
     // if is an IRQ
@@ -65,23 +65,23 @@ void isr_handler(regs_t* reg) {
 
 void irq_install_handler(int irq, void (*handler)(regs_t* r)) {
     if(irq > 15) return;
-    isr_routines[irq+32] = handler;
+    routines[irq+32] = handler;
 }
 void irq_uninstall_handler(int irq) {
     if(irq > 15) return;
-    isr_routines[irq+32] = 0;
+    routines[irq+32] = 0;
 }
 
 void isr_new_interrupt(int isr, uint8_t flags, void (*handler)(regs_t* r)) {
     idt_set_descriptor(isr, isr_table[isr], flags);
-    isr_routines[isr] = handler;
+    routines[isr] = handler;
 }
 
 void isr_init() {
     // set exception handler
     for(unsigned char vector = 0; vector < 32; vector++) {
         idt_set_descriptor(vector, isr_table[vector], 0x8e);
-        isr_routines[vector] = exception_handler;
+        routines[vector] = exception_handler;
     }
 
     // set IRQ handler
@@ -90,6 +90,6 @@ void isr_init() {
     for(int vector = 32; vector < 48; vector++)
         idt_set_descriptor(vector, isr_table[vector], 0x8e);
 
-    memset(isr_routines + 32, 0, 223);
+    memset(routines + 32, 0, 223);
 }
 
