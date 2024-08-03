@@ -8,3 +8,4 @@ __attribute__((__noreturn__))
 void abort(void);
 
 char* itoa(int num, char* buff, int radix);
+int atoi(char* buff);

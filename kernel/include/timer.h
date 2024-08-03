@@ -1,6 +1,6 @@
 #pragma once
 
-#define TIMER_PHASE 1000
+#define TIMER_FREQUENCY 1000
 
 unsigned int timer_get_ticks();
 

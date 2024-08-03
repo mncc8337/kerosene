@@ -103,9 +103,13 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
 - [ ] port some program
     - [ ] GNU GCC
     - [ ] to be updated
+### misc
+- [ ] get current timestamp
+- [ ] set file timestamp
 ## known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
-- enter_usermode() crash after run `iretd`
+- enter_usermode() crash after run `iret`
+- `cd ..` command not working properly,i think it's time to make a real tree
 ## learning resources
 note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
 ### great tutorials

@@ -1,6 +1,6 @@
+#include "multiboot.h"
 #include "system.h"
 #include "kpanic.h"
-#include "multiboot.h"
 #include "tty.h"
 #include "mem.h"
 #include "ata.h"
@@ -10,34 +10,18 @@
 #include "filesystem.h"
 
 #include "stdio.h"
-#include "stdlib.h"
-#include "string.h"
 #include "debug.h"
+
+#include "kshell.h"
 
 char freebuff[512];
 
 int FS_ID = 0;
 fs_node_t current_node;
 
-void print_typed_char(key_t k) {
-    if(k.released) return;
-
-    if(k.mapped == '\b') {
-        tty_set_cursor(tty_get_cursor() - 1); // move back
-        tty_print_char(' ', -1, 0, false); // delete printed char
-    }
-    else
-        putchar(k.mapped);
-}
-void print_elapsed_time(unsigned int ticks) {
-    tty_print_string(itoa(ticks/TIMER_PHASE, freebuff, 10), 0, 0, 0);
-    tty_print_string("seconds passed", strlen(freebuff)+1, 0, 0);
-}
-
 extern uint32_t startkernel;
 extern uint32_t endkernel;
 void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
-
     // get memsize
     size_t memsize = 0;
     for(unsigned int i = 0; i < mmap_length; i += sizeof(multiboot_memory_map_t)) {
@@ -111,9 +95,13 @@ void disk_init() {
                 break;
         }
     }
+
+    if(current_node.valid) {
+        current_node.name[0] = '/';
+        current_node.name[1] = '\0';
+    }
 }
 
-extern uint16_t kernel_stack_top;
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // greeting msg to let us know we are in the kernel
     tty_set_attr(LIGHT_CYAN);  puts("hello");
@@ -154,26 +142,24 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     print_debug(LT_OK, "syscall initialised\n");
 
     kbd_init();
-    install_key_listener(print_typed_char);
 
     timer_init_PIT();
-    install_tick_listener(print_elapsed_time);
 
     // make cursor slimmer
     tty_enable_cursor(13, 14);
 
     print_debug(LT_IF, "done initialising\n");
 
-    // wait for 3 sec
-    timer_wait(3000);
+    shell_set_current_node(current_node);
+    shell_start();
 
-    // i cannot get this to work :(
-    // enter_usermode();
-
-    // test "syscall"
-    // the privilege is still ring 0, though
-    asm volatile("xor %eax, %eax; int $0x80"); // SYS_SYSCALL_TEST
-    asm volatile("xor %eax, %eax; inc %eax; int $0x80"); // SYS_PUTCHAR
+    // // i cannot get this to work :(
+    // // enter_usermode();
+    //
+    // // test "syscall"
+    // // the privilege is still ring 0, though
+    // asm volatile("xor %eax, %eax; int $0x80"); // SYS_SYSCALL_TEST
+    // asm volatile("xor %eax, %eax; inc %eax; int $0x80"); // SYS_PUTCHAR
 
     while(true);
 }

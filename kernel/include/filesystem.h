@@ -10,13 +10,6 @@
 // the limit is 256
 #define FILENAME_LIMIT 64
 
-#define NODE_READ_ONLY 0x01
-#define NODE_HIDDEN    0x02
-#define NODE_SYSTEM    0x04
-#define NODE_VOLUME_ID 0x08
-#define NODE_DIRECTORY 0x10
-#define NODE_ARCHIVE   0x20
-
 typedef enum {
     ERR_FS_FAILED,
     ERR_FS_SUCCESS,
@@ -87,7 +80,8 @@ struct _fs_node_t {
     struct _fs_t* fs;
     struct _fs_node_t* parent_node;
     uint32_t start_cluster;
-    uint8_t attr;
+    bool isdir;
+    bool hidden;
     uint32_t size;
     uint8_t centisecond;
     uint16_t creation_time;

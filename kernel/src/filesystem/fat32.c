@@ -344,7 +344,7 @@ uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster) {
 // loop through all files/entries in a dir
 // call the callback when find one
 FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
-    if(!(parent->attr & NODE_DIRECTORY)) return ERR_FS_NOT_DIR;
+    if(!parent->isdir) return ERR_FS_NOT_DIR;
 
     fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
@@ -383,10 +383,10 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
             }
             // LFN name is already ready
             fs_node_t node;
-            node.fs = parent->fs;
-            node.parent_node = parent;
             memcpy(node.name, entry_name, namelen);
 
+            node.fs = parent->fs;
+            node.parent_node = parent;
             node.start_cluster = (uint32_t)temp_dir.first_cluster_number_high << 16
                                 | temp_dir.first_cluster_number_low;
             node.centisecond = temp_dir.centisecond;
@@ -395,7 +395,8 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
             node.last_access_date = temp_dir.last_access_date;
             node.last_mod_time = temp_dir.last_mod_time;
             node.last_mod_date = temp_dir.last_mod_date;
-            node.attr = temp_dir.attr;
+            node.isdir = temp_dir.attr & FAT_ATTR_DIRECTORY;
+            node.hidden = temp_dir.attr & FAT_ATTR_HIDDEN;
 
             node.size = temp_dir.size;
             node.parent_cluster = current_cluster;
@@ -575,7 +576,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     bool dotdot_entry = strcmp(name, ".") || strcmp(name, "..");
 
     // if is creating a directory and not a dotdot entry
-    if((attr & NODE_DIRECTORY) && !dotdot_entry) {
+    if((attr & FAT_ATTR_DIRECTORY) && !dotdot_entry) {
         // clear target cluster
         memset(directory, 0, cluster_size);
         uint32_t first_sector = ((start_cluster - 2) * sectors_per_cluster) + first_data_sector;
@@ -673,7 +674,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     else {
         // it's only needed to be different from the others short name entries
         // so we can actually using a random number generator to do this
-        bool isdir = attr & NODE_DIRECTORY;
+        bool isdir = attr & FAT_ATTR_DIRECTORY;
         // find the last embedded period
         int dot_pos;
         for(dot_pos = namelen-1; dot_pos > 0; dot_pos--)
@@ -728,7 +729,8 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     node.fs = parent->fs;
     node.parent_node = parent;
     node.start_cluster = start_cluster;
-    node.attr = attr;
+    node.isdir = attr & FAT_ATTR_DIRECTORY;
+    node.hidden = attr & FAT_ATTR_HIDDEN;
     node.size = size;
     // TODO: set correct time attr
     // these are dummy value
@@ -880,7 +882,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, char* name, bool remove_content) {
     uint32_t delete_node_start_cluster = (uint32_t)temp_dir.first_cluster_number_high << 16 | temp_dir.first_cluster_number_low;
 
     // check if it has any child entry
-    if((temp_dir.attr & NODE_DIRECTORY) && remove_content) {
+    if((temp_dir.attr & FAT_ATTR_DIRECTORY) && remove_content) {
         uint32_t first_sector = ((delete_node_start_cluster - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
@@ -994,7 +996,7 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
     dir->last_access_date = node->last_access_date;
     dir->last_mod_time = node->last_mod_time;
     dir->last_mod_date = node->last_mod_date;
-    dir->attr = node->attr;
+    dir->attr = node->isdir | node->hidden;
     dir->size = node->size;
     // name updating is very problematic
     // so i you want to update the name
@@ -1024,15 +1026,15 @@ fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uin
         if(namelen == 0) return created_dir;
     }
 
-    created_dir = fat32_add_entry(parent, name, start_cluster, attr | NODE_DIRECTORY, 0);
+    created_dir = fat32_add_entry(parent, name, start_cluster, attr | FAT_ATTR_DIRECTORY, 0);
     if(!created_dir.valid) return created_dir;
 
     // create the '..' and the '.' dir
     // in linux you need to create them
     // so that `ls` will not show input/output error
-    fs_node_t dot_dir = fat32_add_entry(&created_dir, ".", start_cluster, NODE_DIRECTORY, 0);
+    fs_node_t dot_dir = fat32_add_entry(&created_dir, ".", start_cluster, FAT_ATTR_DIRECTORY, 0);
     if(!dot_dir.valid) return dot_dir;
-    fs_node_t dotdot_dir = fat32_add_entry(&created_dir, "..", parent->start_cluster, NODE_DIRECTORY, 0);
+    fs_node_t dotdot_dir = fat32_add_entry(&created_dir, "..", parent->start_cluster, FAT_ATTR_DIRECTORY, 0);
     if(!dotdot_dir.valid) return dotdot_dir;
 
     return created_dir;
@@ -1053,7 +1055,8 @@ fs_node_t fat32_init(partition_entry_t part, int id) {
     rootnode.fs = fs_get(id);
     rootnode.start_cluster = bootrec.ebpb.rootdir_cluster;
     rootnode.parent_node = 0; // no parent
-    rootnode.attr = NODE_DIRECTORY;
+    rootnode.isdir = true;
+    rootnode.hidden = false;
     rootnode.valid = true;
 
     fs.root_node = rootnode;

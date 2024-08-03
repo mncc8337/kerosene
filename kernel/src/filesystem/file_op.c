@@ -2,18 +2,18 @@
 
 #include "string.h"
 
-static char buffer[512];
+static char name_buffer[FILENAME_LIMIT];
 static fs_node_t ret_node;
 
 static bool find_node_callback(fs_node_t node) {
     if(node.fs->type == FS_FAT32) {
-        if(strcmp_case_insensitive(node.name, buffer)) {
+        if(strcmp_case_insensitive(node.name, name_buffer)) {
             ret_node = node;
             return false;
         }
     }
     else if(node.fs->type == FS_EXT2) {
-        if(strcmp(node.name, buffer)) {
+        if(strcmp(node.name, name_buffer)) {
             ret_node = node;
             return false;
         }
@@ -22,7 +22,7 @@ static bool find_node_callback(fs_node_t node) {
 }
 
 static fs_node_t find_node(fs_node_t* parent, const char* nodename) {
-    memcpy(buffer, nodename, strlen(nodename) + 1);
+    memcpy(name_buffer, nodename, strlen(nodename) + 1);
 
     if(parent->fs->type == FS_FAT32) {
         if(fat32_read_dir(parent, find_node_callback) == ERR_FS_CALLBACK_STOP) ret_node.valid = true;
@@ -78,8 +78,10 @@ fs_node_t fs_find(fs_node_t* parent, const char* path) {
     char* nodename = strtok(path_cpy, "/");
 
     while(nodename != NULL) {
-        current_node = find_node(&current_node, nodename);
-        if(!current_node.valid) break;
+        if(!strcmp(nodename, ".")) {
+            current_node = find_node(&current_node, nodename);
+            if(!current_node.valid) break;
+        }
 
         nodename = strtok(NULL, "/");
     }
@@ -96,7 +98,7 @@ fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
         uint32_t dir_cluster = fat32_allocate_clusters(parent->fs, 1);
         if(dir_cluster == 0) return ret_node;
 
-        ret_node = fat32_mkdir(parent, name, dir_cluster, NODE_DIRECTORY);
+        ret_node = fat32_mkdir(parent, name, dir_cluster, FAT_ATTR_DIRECTORY);
         return ret_node;
     }
 
@@ -133,7 +135,7 @@ FS_ERR fs_rm_recursive(fs_node_t* parent, char* name) {
     // get the node
     fs_node_t delete_node = fs_find(parent, name);
 
-    if(delete_node.attr & NODE_DIRECTORY) {
+    if(delete_node.isdir) {
         FS_ERR err;
 
         // try remove its content recursively
@@ -159,7 +161,7 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     if(new_parent->fs->type == FS_FAT32)
         copied = fat32_add_entry(new_parent,
                 (new_name == NULL ? node->name : new_name),
-                node->start_cluster, node->attr, node->size);
+                node->start_cluster, node->isdir | node->hidden, node->size);
     else return ERR_FS_UNKNOWN_FS;
 
     if(!copied.valid) return ERR_FS_FAILED;
@@ -181,7 +183,7 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
 
         *copied = fat32_add_entry(new_parent,
                 (new_name == NULL ? node->name : new_name),
-                start_cluster, node->attr, node->size);
+                start_cluster, node->isdir | node->hidden, node->size);
     }
     else return ERR_FS_UNKNOWN_FS;
 
@@ -190,7 +192,7 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
 }
 
 FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
-    if(!(node->attr & NODE_DIRECTORY)) return fs_copy(node, new_parent, copied, new_name);
+    if(!node->isdir) return fs_copy(node, new_parent, copied, new_name);
 
     // the node we need to copy is a directory at this point
 
@@ -201,7 +203,7 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
         uint32_t start_cluster = fat32_allocate_clusters(new_parent->fs, 1);
         if(start_cluster == 0) return ERR_FS_FAILED;
 
-        *copied = fat32_mkdir(new_parent, (new_name == NULL ? node->name : new_name), start_cluster, node->attr);
+        *copied = fat32_mkdir(new_parent, (new_name == NULL ? node->name : new_name), start_cluster, node->hidden | FAT_ATTR_DIRECTORY);
         if(!copied->valid) return ERR_FS_FAILED;
         copy_current_dir = *copied;
 

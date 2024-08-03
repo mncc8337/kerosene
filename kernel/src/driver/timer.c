@@ -27,7 +27,7 @@ void uninstall_tick_listener() {
 void timer_wait(unsigned int ms) {
     if(!initialised) return;
 
-    unsigned long eticks = ticks + ms * TIMER_PHASE / 1000;
+    unsigned long eticks = ticks + ms * TIMER_FREQUENCY / 1000;
     while(ticks < eticks)
         asm volatile("sti; hlt; cli");
     asm volatile("sti");
@@ -36,7 +36,7 @@ void timer_wait(unsigned int ms) {
 void timer_init_PIT() {
     if(initialised) return;
 
-    pit_timer_phase(TIMER_PHASE);
+    pit_timer_phase(TIMER_FREQUENCY);
     irq_install_handler(0, tick_handler);
     initialised = true;
 }
