@@ -7,10 +7,7 @@ static fs_node_t ret_node;
 
 static bool find_node_callback(fs_node_t node) {
     if(node.fs->type == FS_FAT32) {
-        if(strcmp_case_insensitive(node.name, name_buffer)
-            || (strcmp(name_buffer, ".") && node.dotdir)
-            || (strcmp(name_buffer, "..") && node.dotdotdir)
-        ) {
+        if(strcmp_case_insensitive(node.name, name_buffer)) {
             ret_node = node;
             return false;
         }
@@ -27,7 +24,7 @@ static bool find_node_callback(fs_node_t node) {
 FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name); // declare it first
 static bool rm_node_callback(fs_node_t node) {
     // ignore . and ..
-    if(node.dotdir || node.dotdotdir) return true;
+    if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
     
     FS_ERR err = fs_rm_recursive(node.parent_node, node.name);
     if(err != ERR_FS_SUCCESS) return false;
@@ -39,7 +36,7 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
 static fs_node_t copy_current_dir;
 static bool cp_node_callback(fs_node_t node) {
     // ignore . and ..
-    if(node.dotdir || node.dotdotdir) return true;
+    if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
     
     FS_ERR err = fs_copy_recursive(&node, &copy_current_dir, NULL, NULL);
     if(err != ERR_FS_SUCCESS) return false;

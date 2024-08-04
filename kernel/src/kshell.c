@@ -49,7 +49,7 @@ static int indent_level = 0;
 static int max_depth = 2;
 static bool show_hidden = false;
 static bool list_dir(fs_node_t node) {
-    if((node.hidden || node.name[0] == '.' || node.dotdir || node.dotdotdir) && !show_hidden) return true;
+    if((node.hidden || node.name[0] == '.') && !show_hidden) return true;
     if(indent_level >= max_depth) return true;
     indent_level++;
 
@@ -58,12 +58,10 @@ static bool list_dir(fs_node_t node) {
     printf("|---");
 
     if(node.isdir) tty_set_attr(LIGHT_BLUE);
-    if(node.dotdir) puts(".");
-    else if(node.dotdotdir) puts("..");
-    else puts(node.name);
+    puts(node.name);
     if(node.isdir) tty_set_attr(LIGHT_GREY);
 
-    if(node.isdir && !node.dotdir && !node.dotdotdir)
+    if(node.isdir && !strcmp(node.name, ".") && !strcmp(node.name, ".."))
         fs_list_dir(&node, list_dir);
 
     indent_level--;

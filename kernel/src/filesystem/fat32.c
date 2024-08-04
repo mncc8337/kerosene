@@ -383,24 +383,13 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
             }
             // LFN name is already ready
             fs_node_t node;
-
-            node.dotdir = false;
-            node.dotdotdir = false;
-            if(strcmp(entry_name, ".")) {
-                node.dotdir = true;
-                memcpy(node.name, parent->name, strlen(parent->name)+1);
-            }
-            else if(strcmp(entry_name, "..")) {
-                node.dotdotdir = true;
-                memcpy(node.name, parent->parent_node->name, strlen(parent->parent_node->name)+1);
-            }
-            else memcpy(node.name, entry_name, namelen);
+            memcpy(node.name, entry_name, namelen);
 
             node.fs = parent->fs;
             node.parent_node = parent;
             node.start_cluster = (uint32_t)temp_dir.first_cluster_number_high << 16
                                 | temp_dir.first_cluster_number_low;
-            if(node.start_cluster == 0 && node.dotdotdir) {
+            if(node.start_cluster == 0 && strcmp(node.name, "..")) {
                 // in linux the .. dir of a root's child directory is pointed to cluster 0
                 // we need to fix it because root directory is in cluster 2
                 // else we would destroy cluster 0 which contain filesystem infomation
@@ -830,7 +819,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
 
 // remove an entry from parent
 FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_content) {
-    if(remove_node.dotdir || remove_node.dotdotdir)
+    if(strcmp(remove_node.name, ".") || strcmp(remove_node.name, ".."))
         return ERR_FS_FAILED;
 
     fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table;
@@ -842,7 +831,6 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
     uint8_t directory[cluster_size];
 
     int lfn_entry_count = (strlen(remove_node.name) + 12) / 13;
-    if(remove_node.dotdir || remove_node.dotdotdir) lfn_entry_count = 0; // just for safety
 
     int node_index = remove_node.parent_cluster_index;
     uint32_t current_cluster = remove_node.parent_cluster;

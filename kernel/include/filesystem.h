@@ -80,8 +80,6 @@ struct _fs_node_t {
     struct _fs_t* fs;
     struct _fs_node_t* parent_node;
     uint32_t start_cluster;
-    bool dotdir;
-    bool dotdotdir;
     bool isdir;
     bool hidden;
     uint32_t size;
