@@ -129,7 +129,7 @@ FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 fs_node_t fs_find(fs_node_t* parent, const char* path);
 fs_node_t fs_mkdir(fs_node_t* parent, char* name);
 fs_node_t fs_touch(fs_node_t* parent, char* name);
-FS_ERR fs_rm(fs_node_t* node, char* name);
+FS_ERR fs_rm(fs_node_t* node, fs_node_t delete_node);
 FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name);
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
@@ -164,7 +164,7 @@ FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_
 FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset);
 
 fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size);
-FS_ERR fat32_remove_entry(fs_node_t* parent, char* name, bool remove_content);
+FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_content);
 FS_ERR fat32_update_entry(fs_node_t* node);
 fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr);
 

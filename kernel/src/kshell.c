@@ -8,7 +8,6 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "timer.h"
-#include <stdbool.h>
 
 static char input[512];
 static unsigned int input_len = 0;
@@ -56,7 +55,7 @@ static bool list_dir(fs_node_t node) {
 
     for(int i = 0; i < indent_level-1; i++)
         printf("|   ");
-    if(indent_level > 1) printf("|---");
+    printf("|---");
 
     if(node.isdir) tty_set_attr(LIGHT_BLUE);
     if(node.dotdir) puts(".");
@@ -140,7 +139,11 @@ static void ls() {
     else {
         fs_node_t node = fs_find(current_node, ls_name);
         if(!node.valid) {
-            printf("directory '%s' not found\n", ls_name);
+            printf("no such directory '%s'\n", ls_name);
+            return;
+        }
+        if(!node.isdir) {
+            puts("not a directory");
             return;
         }
         fs_list_dir(&node, list_dir);
@@ -222,30 +225,16 @@ static void mkdir() {
         return;
     }
 
-    char* dirname;
     current_token = strtok(NULL, " ");
     if(current_token == NULL) {
         puts("no name provided");
         return;
     }
-    dirname = current_token;
 
-    bool recursive = false;
-    for(int i = 0; current_token[i] != '\0'; i++) {
-        if(current_token[i] == '/') {
-            recursive = true;
-            current_token = strtok(current_token, "/");
-            break;
-        }
-    }
     fs_node_t _curr_node = *current_node;
 
-    while(current_token != NULL) {
-        if(recursive) {
-            dirname = current_token;
-            current_token = strtok(NULL, "/");
-        }
-
+    char* dirname = strtok(current_token, "/");
+    while(dirname != NULL) {
         fs_node_t node = fs_find(&_curr_node, dirname);
         if(node.valid) {
             printf("a file or directory with name '%s' has already existed\n", dirname);
@@ -257,8 +246,8 @@ static void mkdir() {
             printf("failed to create '%s'\n", dirname);
             return;
         }
-        if(!recursive) return;
-        else _curr_node = newdir;
+        _curr_node = newdir;
+        dirname = strtok(NULL, "/");
     }
 }
 
@@ -273,10 +262,23 @@ static void rm() {
         puts("no name provided");
         return;
     }
-    FS_ERR err = fs_rm_recursive(current_node, current_token);
-    if(err == ERR_FS_NOT_FOUND) {
-        puts("file or dir not found");
+    
+    char* nodename = strtok(current_token, "/");
+    fs_node_t _curr_dir = *current_node;
+    fs_node_t _curr_dir_parent;
+    while(nodename != NULL) {
+        _curr_dir_parent = _curr_dir;
+        _curr_dir = fs_find(&_curr_dir, nodename);
+        if(!_curr_dir.valid) {
+            printf("no such file or directory '%s'\n", nodename);
+            return;
+        }
+        nodename = strtok(NULL, "/");
     }
+
+    FS_ERR err = fs_rm_recursive(&_curr_dir_parent, _curr_dir.name);
+    if(err != ERR_FS_SUCCESS)
+        printf("cannot remove '%s'. error code %d\n", _curr_dir.name, err);
 }
 
 static void touch() {
@@ -386,6 +388,9 @@ void shell_start() {
     while(true) {
         if(key_handled) continue; // wait for new key
         key_handled = true;
+
+        // ignore non printable characters
+        if(current_key.mapped == '\0') continue;
 
         if(current_key.mapped == '\b') {
             if(input_len == 0) continue;

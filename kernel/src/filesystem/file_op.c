@@ -99,20 +99,18 @@ fs_node_t fs_touch(fs_node_t* parent, char* name) {
 }
 
 // remove a node
-// note that it takes the name not the fs_node_t
-// because we still need to find its location in parent directory
-// thus sending fs_node_t is overkill
-FS_ERR fs_rm(fs_node_t* node, char* name) {
+FS_ERR fs_rm(fs_node_t* node, fs_node_t delete_node) {
     if(node->fs->type == FS_FAT32)
-        return fat32_remove_entry(node, name, true);
+        return fat32_remove_entry(node, delete_node, true);
 
     return ERR_FS_UNKNOWN_FS;
 }
 
-// remove a directory and its content recursively
+// remove a directory or a file and its content recursively if is a directory
 FS_ERR fs_rm_recursive(fs_node_t* parent, char* name) {
     // get the node
     fs_node_t delete_node = fs_find(parent, name);
+    if(!delete_node.valid) return ERR_FS_NOT_FOUND;
 
     if(delete_node.isdir) {
         FS_ERR err;
@@ -129,7 +127,7 @@ FS_ERR fs_rm_recursive(fs_node_t* parent, char* name) {
     }
 
     // now try remove it. it should success
-    return fs_rm(parent, name);
+    return fs_rm(parent, delete_node);
 }
 
 // move a node to new parent
@@ -147,7 +145,7 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
 
     FS_ERR err;
     if(node->fs->type == FS_FAT32)
-        err = fat32_remove_entry(node->parent_node, node->name, false); // do not delete the node content
+        err = fat32_remove_entry(node->parent_node, *node, false); // do not delete the node content
     else return ERR_FS_UNKNOWN_FS;
 
     if(err != ERR_FS_SUCCESS) return err;

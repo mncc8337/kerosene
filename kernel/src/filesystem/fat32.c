@@ -401,9 +401,9 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
             node.start_cluster = (uint32_t)temp_dir.first_cluster_number_high << 16
                                 | temp_dir.first_cluster_number_low;
             if(node.start_cluster == 0 && node.dotdotdir) {
-                // in linux the .. dir of a root's child directory is point to cluster 0
-                // we need to fix it be cause root directory is in cluster 2
-                // else we would write in to cluster 0 which contain filesystem infomation
+                // in linux the .. dir of a root's child directory is pointed to cluster 0
+                // we need to fix it because root directory is in cluster 2
+                // else we would destroy cluster 0 which contain filesystem infomation
                 node.start_cluster = 2;
             }
             node.centisecond = temp_dir.centisecond;
@@ -829,78 +829,29 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
 }
 
 // remove an entry from parent
-// TODO: change param char* name to fs_node_t and use node.parent_cluster and node.parent_cluster t remove it
-FS_ERR fat32_remove_entry(fs_node_t* parent, char* name, bool remove_content) {
+FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_content) {
+    if(remove_node.dotdir || remove_node.dotdotdir)
+        return ERR_FS_FAILED;
+
     fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
 
-    uint32_t current_cluster = parent->start_cluster;
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t directory[cluster_size];
 
-    bool lfn_ready = false;
-    fat_lfn_entry_t temp_lfn;
+    int lfn_entry_count = (strlen(remove_node.name) + 12) / 13;
+    if(remove_node.dotdir || remove_node.dotdotdir) lfn_entry_count = 0; // just for safety
+
+    int node_index = remove_node.parent_cluster_index;
+    uint32_t current_cluster = remove_node.parent_cluster;
+
+    int namelen; (void)(namelen); // avoid unused param
     char entry_name[FILENAME_LIMIT];
-    int namelen = 0;
-    bool found_last_LFN_entry = false;
-    fat_directory_entry_t temp_dir;
-
-    int lfn_entry_count = 0;
-    int final_index;
-    uint32_t last_cluster = 0;
-    while(true) {
-        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
-        ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
-
-        bool found = false;
-        for(final_index = 0; (unsigned)final_index < cluster_size; final_index += 32) {
-            if(directory[final_index] == 0x00) return ERR_FS_NOT_FOUND;
-            if(directory[final_index] == 0xe5) continue;
-            if(directory[final_index+11] == 0x0f) {
-                PROCESS_LFN_ENTRY(final_index);
-                if(last_LFN_entry) { // see the macro
-                    lfn_entry_count = order;
-                }
-                continue;
-            }
-
-            memcpy(&temp_dir, directory + final_index, sizeof(fat_directory_entry_t));
-
-            if(!lfn_ready) {
-                PROCESS_SFN_ENTRY(temp_dir);
-            }
-            // LFN name is already ready
-            if(strcmp_case_insensitive(entry_name, name)) {
-                // entry found
-                found = true;
-                break;
-            }
-
-            // reset control var
-            lfn_ready = false;
-            found_last_LFN_entry = false;
-            lfn_entry_count = 0;
-        }
-        if(found) break;
-
-        uint32_t FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
-
-        if(FAT_val >= 0x0ffffff8)
-            return ERR_FS_NOT_FOUND; // end of cluster
-        if(FAT_val == 0x0ffffff7)
-            return ERR_FS_BAD_CLUSTER; // bad cluster
-
-        last_cluster = current_cluster;
-        current_cluster = FAT_val;
-    }
-
-    uint32_t delete_node_start_cluster = (uint32_t)temp_dir.first_cluster_number_high << 16 | temp_dir.first_cluster_number_low;
-
-    // check if it has any child entry
-    if((temp_dir.attr & FAT_ATTR_DIRECTORY) && remove_content) {
-        uint32_t first_sector = ((delete_node_start_cluster - 2) * sectors_per_cluster) + first_data_sector;
+    if(remove_node.isdir && remove_content) {
+        // check if it has any child entry
+        uint32_t first_sector = ((remove_node.start_cluster - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
         fat_directory_entry_t temp_temp_dir; // im good at naming things
@@ -918,18 +869,14 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, char* name, bool remove_content) {
             if(!strcmp(entry_name, ".") && !strcmp(entry_name, ".."))
                 return ERR_FS_DIR_NOT_EMPTY;
         }
-
         // so we only found . and .. entry
-        // read back the original table
-        first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
-        ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
     }
     // now we are good to remove the entry
 
     // check if the next entry is clear
     int clear_val;
-    if((unsigned)final_index + 32 < cluster_size) {
-        if(directory[final_index+32] == 0x0)
+    if((unsigned)node_index + 32 < cluster_size) {
+        if(directory[node_index+32] == 0x0)
             clear_val = 0x0;
         else clear_val = 0xe5;
     }
@@ -949,39 +896,45 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, char* name, bool remove_content) {
             if(directory[0] == 0x0)
                 clear_val = 0x0;
             else clear_val = 0xe5;
-
-            // read the original table back
-            first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
-            ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
         }
     }
 
+    // read the cluster that contain the node
+    uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+    ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
+
     // delete the cluster
-    if(remove_content) fat32_free_cluster_chain(parent->fs, delete_node_start_cluster);
+    if(remove_content) fat32_free_cluster_chain(parent->fs, remove_node.start_cluster);
 
     // calculate the start of the chain
     int lfn_entry_len = 32 * lfn_entry_count;
-    final_index -= lfn_entry_len;
+    node_index -= lfn_entry_len;
 
-    if(clear_val == 0xe5 || (clear_val == 0x0 && final_index >= 0)) {
+    if(clear_val == 0xe5 || (clear_val == 0x0 && node_index >= 0)) {
         // delete LFN entries in the current cluster
-        memset(directory+(final_index < 0 ? 0 : final_index), clear_val, 32 * (lfn_entry_count + 1));
+        memset(directory+(node_index < 0 ? 0 : node_index), clear_val, 32 * (lfn_entry_count + 1));
         // write
         int first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
     }
-    if(final_index < 0) {
+    if(node_index < 0) {
         // go back to the last cluster to delete the LFN entry
-        // note that last_entry == 0 is very unlikely
-        final_index += cluster_size;
+        node_index += cluster_size;
+
+        // find previous cluster of current cluster
+        uint32_t last_cluster = parent->start_cluster;
+        uint32_t FAT_val = parent->start_cluster;
+        while(FAT_val != current_cluster) {
+            last_cluster = FAT_val;
+            FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, FAT_val);
+        }
 
         int first_sector = ((last_cluster - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
-        memset(directory+final_index, clear_val, cluster_size - final_index);
+        memset(directory+node_index, clear_val, cluster_size - node_index);
 
         // write
-        // note that first_sector is set (see above)
         ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
         if(clear_val == 0x0) {
