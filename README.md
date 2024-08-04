@@ -94,6 +94,7 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
     - [x] move
     - [x] copy
 - [ ] ext2 fs
+- [ ] vfs
 ### userland
 - [ ] load and run ELF file
 - [ ] multi-processing
@@ -108,8 +109,9 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
 - [ ] set file timestamp
 ## known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
+- sometime keyboard is not working
 - enter_usermode() crash after run `iret`
-- `cd ..` command not working properly,i think it's time to make a real tree
+- remove directory which was not created by the kernel will destroy the disk image
 ## learning resources
 note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
 ### great tutorials

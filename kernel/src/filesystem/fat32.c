@@ -383,12 +383,29 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
             }
             // LFN name is already ready
             fs_node_t node;
-            memcpy(node.name, entry_name, namelen);
+
+            node.dotdir = false;
+            node.dotdotdir = false;
+            if(strcmp(entry_name, ".")) {
+                node.dotdir = true;
+                memcpy(node.name, parent->name, strlen(parent->name)+1);
+            }
+            else if(strcmp(entry_name, "..")) {
+                node.dotdotdir = true;
+                memcpy(node.name, parent->parent_node->name, strlen(parent->parent_node->name)+1);
+            }
+            else memcpy(node.name, entry_name, namelen);
 
             node.fs = parent->fs;
             node.parent_node = parent;
             node.start_cluster = (uint32_t)temp_dir.first_cluster_number_high << 16
                                 | temp_dir.first_cluster_number_low;
+            if(node.start_cluster == 0 && node.dotdotdir) {
+                // in linux the .. dir of a root's child directory is point to cluster 0
+                // we need to fix it be cause root directory is in cluster 2
+                // else we would write in to cluster 0 which contain filesystem infomation
+                node.start_cluster = 2;
+            }
             node.centisecond = temp_dir.centisecond;
             node.creation_time = temp_dir.creation_time;
             node.creation_date = temp_dir.creation_date;

@@ -80,6 +80,8 @@ struct _fs_node_t {
     struct _fs_t* fs;
     struct _fs_node_t* parent_node;
     uint32_t start_cluster;
+    bool dotdir;
+    bool dotdotdir;
     bool isdir;
     bool hidden;
     uint32_t size;
@@ -92,7 +94,7 @@ struct _fs_node_t {
     // filesystem infomation
     // may change when i add support for other filesystem
     uint32_t parent_cluster;
-    int parent_cluster_index;
+    unsigned int parent_cluster_index;
 };
 
 struct _fs_t {

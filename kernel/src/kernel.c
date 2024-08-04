@@ -117,13 +117,6 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     if(mbd->flags & (1 << 9))
         print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name);
 
-    disk_init();
-
-    if(!(mbd->flags & (1 << 6))) {
-        print_debug(LT_CR, "no memory map given by bootloader. system halted\n");
-        kpanic();
-    }
-    mem_init(mbd->mmap_addr, mbd->mmap_length);
 
     asm volatile("cli");
     gdt_init();
@@ -138,6 +131,14 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     print_debug(LT_OK, "ISR initialised\n");
     asm volatile("sti");
 
+    disk_init();
+
+    if(!(mbd->flags & (1 << 6))) {
+        print_debug(LT_CR, "no memory map given by bootloader. system halted\n");
+        kpanic();
+    }
+    mem_init(mbd->mmap_addr, mbd->mmap_length);
+
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
 
@@ -150,7 +151,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    shell_set_current_node(current_node);
+    shell_set_root_node(current_node);
     shell_start();
 
     // // i cannot get this to work :(

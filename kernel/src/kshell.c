@@ -8,12 +8,29 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "timer.h"
+#include <stdbool.h>
 
 static char input[512];
 static unsigned int input_len = 0;
 static char* current_token;
 
-static fs_node_t current_node;
+// a stack that contain the path of current dir
+static fs_node_t node_stack[NODE_STACK_MAX_LENGTH];
+static unsigned int node_stack_offset = 0;
+
+static fs_node_t* node_stack_top() {
+    return node_stack + node_stack_offset;
+}
+static bool node_stack_push(fs_node_t node) {
+    if(node_stack_offset == NODE_STACK_MAX_LENGTH - 1)
+        return false;
+
+    node_stack[++node_stack_offset] = node;
+    return true;
+}
+static void node_stack_pop() {
+    if(node_stack_offset > 0) node_stack_offset--;
+}
 
 static volatile bool key_handled = true;
 static volatile key_t current_key;
@@ -33,16 +50,21 @@ static int indent_level = 0;
 static int max_depth = 2;
 static bool show_hidden = false;
 static bool list_dir(fs_node_t node) {
-    if((node.hidden || node.name[0] == '.') && !show_hidden) return true;
+    if((node.hidden || node.name[0] == '.' || node.dotdir || node.dotdotdir) && !show_hidden) return true;
     if(indent_level >= max_depth) return true;
     indent_level++;
 
     for(int i = 0; i < indent_level-1; i++)
         printf("|   ");
-    printf("|---");
-    printf("%s (%s)\n", node.name, node.isdir ? "directory" : "file");
+    if(indent_level > 1) printf("|---");
 
-    if(node.isdir && !strcmp(node.name, ".") && !strcmp(node.name, ".."))
+    if(node.isdir) tty_set_attr(LIGHT_BLUE);
+    if(node.dotdir) puts(".");
+    else if(node.dotdotdir) puts("..");
+    else puts(node.name);
+    if(node.isdir) tty_set_attr(LIGHT_GREY);
+
+    if(node.isdir && !node.dotdir && !node.dotdotdir)
         fs_list_dir(&node, list_dir);
 
     indent_level--;
@@ -53,10 +75,11 @@ static bool list_dir(fs_node_t node) {
 static void help() {
     current_token = strtok(NULL, " ");
     if(current_token == NULL) {
-        puts("help echo ticks ls read cd mkdir rm touch write");
+        puts("help .<n dot> echo ticks ls read cd mkdir rm touch write");
     }
     else {
-        if(strcmp(current_token, "echo")) puts("echo <string>");
+        if(current_token[0] == '.') printf("go back %d dir\n", strlen(current_token)-1);
+        else if(strcmp(current_token, "echo")) puts("echo <string>");
         else if(strcmp(current_token, "ticks")) puts("ticks <no arg>");
         else if(strcmp(current_token, "ls")) puts(
                 "ls <args> <directory>\n"
@@ -82,7 +105,8 @@ static void ticks() {
 }
 
 static void ls() {
-    if(!current_node.valid) {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
@@ -110,11 +134,11 @@ static void ls() {
 
     if(ls_name == NULL) {
         // list current dir
-        fs_list_dir(&current_node, list_dir);
+        fs_list_dir(current_node, list_dir);
         return;
     }
     else {
-        fs_node_t node = fs_find(&current_node, ls_name);
+        fs_node_t node = fs_find(current_node, ls_name);
         if(!node.valid) {
             printf("directory '%s' not found\n", ls_name);
             return;
@@ -124,7 +148,8 @@ static void ls() {
 }
 
 static void read() {
-    if(!current_node.valid) {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
@@ -134,7 +159,7 @@ static void read() {
         return;
     }
 
-    fs_node_t node = fs_find(&current_node, current_token);
+    fs_node_t node = fs_find(current_node, current_token);
     if(!node.valid) {
         printf("file '%s' not found\n", current_token);
         return;
@@ -152,7 +177,8 @@ static void read() {
 }
 
 static void cd() {
-    if(!current_node.valid) {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
@@ -161,20 +187,37 @@ static void cd() {
         puts("no path provided");
         return;
     }
-    fs_node_t node = fs_find(&current_node, current_token);
-    if(!node.valid) {
-        printf("no such directory %s\n", current_token);
-        return;
+
+    // now current token contain the path
+    char* nodename = strtok(current_token, "/");
+    while(nodename != NULL) {
+        if(strcmp(nodename, ".."))
+            node_stack_pop();
+        else if(!strcmp(nodename, ".")) {
+            fs_node_t tmp = fs_find(node_stack_top(), nodename);
+            if(!tmp.valid) {
+                printf("no such directory '%s'\n", nodename);
+                return;
+            }
+            if(!tmp.isdir) {
+                printf("'%s' is not a directory\n", nodename);
+                return;
+            }
+
+            bool pushed = node_stack_push(tmp);
+            if(!pushed) {
+                printf("reached node stack limit, cannot cd into '%s'\n", nodename);
+                return;
+            }
+        }
+
+        nodename = strtok(NULL, "/");
     }
-    if(!node.isdir) {
-        puts("not a directory");
-        return;
-    }
-    current_node = node;
 }
 
 static void mkdir() {
-    if(!current_node.valid) {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
@@ -195,7 +238,7 @@ static void mkdir() {
             break;
         }
     }
-    fs_node_t _curr_node = current_node;
+    fs_node_t _curr_node = *current_node;
 
     while(current_token != NULL) {
         if(recursive) {
@@ -220,7 +263,8 @@ static void mkdir() {
 }
 
 static void rm() {
-    if(!current_node.valid) {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
@@ -229,14 +273,15 @@ static void rm() {
         puts("no name provided");
         return;
     }
-    FS_ERR err = fs_rm_recursive(&current_node, current_token);
+    FS_ERR err = fs_rm_recursive(current_node, current_token);
     if(err == ERR_FS_NOT_FOUND) {
         puts("file or dir not found");
     }
 }
 
 static void touch() {
-    if(!current_node.valid) {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
@@ -245,14 +290,15 @@ static void touch() {
         puts("no name provided");
         return;
     }
-    fs_node_t node = fs_touch(&current_node, current_token);
+    fs_node_t node = fs_touch(current_node, current_token);
     if(!node.valid) {
         printf("a file or directory with name '%s' has already existed (or out of memory? idk)\n", current_token);
     }
 }
 
 static void write() {
-    if(!current_node.valid) {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
@@ -261,9 +307,9 @@ static void write() {
         puts("no name provided");
         return;
     }
-    fs_node_t node = fs_find(&current_node, current_token);
+    fs_node_t node = fs_find(current_node, current_token);
     if(!node.valid) {
-        node = fs_touch(&current_node, current_token);
+        node = fs_touch(current_node, current_token);
         if(!node.valid) {
             puts("cannot create file");
             return;
@@ -304,6 +350,12 @@ static void process_prompt() {
     current_token = strtok(input, " ");
 
     if(strcmp(current_token, "help")) help();
+    else if(current_token[0] == '.') { // special command to go to parent dir
+        unsigned int back_cnt = input_len - 1;
+        if(back_cnt > node_stack_offset) node_stack_offset = 0;
+        else node_stack_offset -= back_cnt;
+    }
+    else if(strcmp(current_token, "echo")) echo();
     else if(strcmp(current_token, "echo")) echo();
     else if(strcmp(current_token, "ticks")) ticks();
     else if(strcmp(current_token, "ls")) ls();
@@ -315,21 +367,21 @@ static void process_prompt() {
     else if(strcmp(current_token, "write")) write();
     else if(input_len == 0); // just skip
     else puts("unknow command");
-    printf("[kernel@kshell %s]$ ", current_node.name);
+    printf("[kernel@kshell %s ]$ ", node_stack[node_stack_offset].name);
     input_len = 0;
     input[0] = '\0';
 }
 
-void shell_set_current_node(fs_node_t node) {
-    current_node = node;
+void shell_set_root_node(fs_node_t node) {
+    node_stack[0] = node;
+    node_stack_offset = 0;
 }
 void shell_start() {
     install_tick_listener(tick_listener);
     install_key_listener(kbd_listener);
     puts("welcome to the shell");
-    puts("please dont use `cd PATH` and PATH contain `..` dir");
     puts("type `help` t show all command. `help <command>` to see all available argument");
-    printf("[kernel@kshell %s]$ ", current_node.name);
+    printf("[kernel@kshell %s ]$ ", node_stack[node_stack_offset].name);
 
     while(true) {
         if(key_handled) continue; // wait for new key

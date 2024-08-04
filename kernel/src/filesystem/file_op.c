@@ -7,7 +7,10 @@ static fs_node_t ret_node;
 
 static bool find_node_callback(fs_node_t node) {
     if(node.fs->type == FS_FAT32) {
-        if(strcmp_case_insensitive(node.name, name_buffer)) {
+        if(strcmp_case_insensitive(node.name, name_buffer)
+            || (strcmp(name_buffer, ".") && node.dotdir)
+            || (strcmp(name_buffer, "..") && node.dotdotdir)
+        ) {
             ret_node = node;
             return false;
         }
@@ -21,24 +24,10 @@ static bool find_node_callback(fs_node_t node) {
     return true;
 }
 
-static fs_node_t find_node(fs_node_t* parent, const char* nodename) {
-    memcpy(name_buffer, nodename, strlen(nodename) + 1);
-
-    if(parent->fs->type == FS_FAT32) {
-        if(fat32_read_dir(parent, find_node_callback) == ERR_FS_CALLBACK_STOP) ret_node.valid = true;
-        else ret_node.valid = false;
-        return ret_node;
-    }
-
-    // default return
-    ret_node.valid = false;
-    return ret_node;
-}
-
 FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name); // declare it first
 static bool rm_node_callback(fs_node_t node) {
     // ignore . and ..
-    if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
+    if(node.dotdir || node.dotdotdir) return true;
     
     FS_ERR err = fs_rm_recursive(node.parent_node, node.name);
     if(err != ERR_FS_SUCCESS) return false;
@@ -50,7 +39,7 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
 static fs_node_t copy_current_dir;
 static bool cp_node_callback(fs_node_t node) {
     // ignore . and ..
-    if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
+    if(node.dotdir || node.dotdotdir) return true;
     
     FS_ERR err = fs_copy_recursive(&node, &copy_current_dir, NULL, NULL);
     if(err != ERR_FS_SUCCESS) return false;
@@ -66,27 +55,18 @@ FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
     return ERR_FS_UNKNOWN_FS;
 }
 
-// find a node using path
-fs_node_t fs_find(fs_node_t* parent, const char* path) {
-    fs_node_t current_node = *parent;
+// find a node in parent
+fs_node_t fs_find(fs_node_t* parent, const char* nodename) {
+    memcpy(name_buffer, nodename, strlen(nodename) + 1);
 
-    // make a copy
-    int path_len = strlen(path);
-    char path_cpy[path_len+1];
-    memcpy(path_cpy, path, path_len+1);
+    ret_node.valid = false;
 
-    char* nodename = strtok(path_cpy, "/");
-
-    while(nodename != NULL) {
-        if(!strcmp(nodename, ".")) {
-            current_node = find_node(&current_node, nodename);
-            if(!current_node.valid) break;
-        }
-
-        nodename = strtok(NULL, "/");
+    if(parent->fs->type == FS_FAT32) {
+        if(fat32_read_dir(parent, find_node_callback) == ERR_FS_CALLBACK_STOP) ret_node.valid = true;
+        else ret_node.valid = false;
     }
 
-    return current_node;
+    return ret_node;
 }
 
 // make a directory in parent node
@@ -99,7 +79,6 @@ fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
         if(dir_cluster == 0) return ret_node;
 
         ret_node = fat32_mkdir(parent, name, dir_cluster, FAT_ATTR_DIRECTORY);
-        return ret_node;
     }
 
     return ret_node;
