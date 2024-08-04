@@ -119,6 +119,6 @@ note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.or
 - http://www.osdever.net/bkerndev/Docs/gettingstarted.htm
 - http://www.brokenthorn.com/Resources/OSDevIndex.html
 - https://web.archive.org/web/20160313134414/http://www.jamesmolloy.co.uk/tutorial_html/index.html
-### documentations
+### documents
 - https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
 - https://download.microsoft.com/download/1/6/1/161ba512-40e2-4cc9-843a-923143f3456c/fatgen103.doc
