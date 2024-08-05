@@ -116,7 +116,7 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
 - ATA PIO mode initialization some time failed (very rare): address mark not found
 - sometime keyboard is not working (seem like it only appears in QEMU)
 - enter_usermode() crash after run `iret`
-- remove a copy instance or the original file will remove other copy instances 
+- remove a copy instance or the original file will remove other copy instances
 ## learning resources
 note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
 ### great tutorials

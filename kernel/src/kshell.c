@@ -50,7 +50,7 @@ static void tick_listener(unsigned int ticks) {
 }
 
 static int indent_level = 0;
-static int max_depth = 2;
+static int max_depth = 0;
 static bool show_hidden = false;
 static bool list_dir(fs_node_t node) {
     if((node.hidden || node.name[0] == '.') && !show_hidden) return true;
@@ -106,12 +106,12 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help .<n dot> echo ticks ls read cd mkdir rm touch write");
+        puts("help .<n dot> echo ticks ls read cd mkdir rm touch write mv cp stat pwd");
     }
     else {
         if(arg[0] == '.') printf("go back %d dir\n", strlen(arg)-1);
         else if(strcmp(arg, "echo")) puts("echo <string>");
-        else if(strcmp(arg, "ticks")) puts("ticks <no arg>");
+        else if(strcmp(arg, "ticks")) puts("ticks <no-args>");
         else if(strcmp(arg, "ls")) puts(
                 "ls <args> <directory>\n"
                 "available arg:\n"
@@ -125,6 +125,8 @@ static void help(char* arg) {
         else if(strcmp(arg, "write")) puts("write <path>");
         else if(strcmp(arg, "mv")) puts("mv <source-path> <destination-path>");
         else if(strcmp(arg, "cp")) puts("cp <source-path> <destination-path>");
+        else if(strcmp(arg, "stat")) puts("stat <path>");
+        else if(strcmp(arg, "pwd")) puts("pwd <no-args>");
     }
 }
 
@@ -234,7 +236,12 @@ static void cd(char* path) {
         return;
     }
 
-    // now current token contain the path
+    if(path[0] == '/') {
+        // to rootdir
+        node_stack_offset = 0;
+        path++;
+    }
+
     char* nodename = strtok(path, "/");
     while(nodename != NULL) {
         if(strcmp(nodename, "..")) node_stack_pop();
@@ -273,6 +280,11 @@ static void mkdir(char* path) {
     }
 
     fs_node_t _curr_node = *current_node;
+
+    if(path[0] == '/') {
+        _curr_node = node_stack[0];
+        path++;
+    }
 
     char* dirname = strtok(path, "/");
     while(dirname != NULL) {
@@ -514,6 +526,59 @@ static void cp(char* args) {
         printf("failed to copy %s to %s with name %s. error code %d\n", source_node.name, target_node_parent.name, target_node.name, ferr);
 }
 
+static void stat(char* path) {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
+        puts("no fs installed");
+        return;
+    }
+
+    if(path == NULL) {
+        puts("no input");
+        return;
+    }
+
+    fs_node_t node_parent;
+    fs_node_t node;
+    SHELL_ERR err = path_find_last_node(path, &node_parent, &node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", node.name);
+        return;
+    }
+    if(err == ERR_SHELL_TARGET_NOT_FOUND || node.isdir) {
+        printf("no such file '%s'\n", node.name);
+        return;
+    }
+
+    printf("stat of '%s':\n", node.name);
+    printf("    filesystem: %s\n", (node.fs->type == 1 ? "FAT32" : (node.fs->type == 2 ? "ext2" : "unknown")));
+    printf("    parent: '%s'\n", node.parent_node->name);
+    printf("    type: %s\n", (node.isdir ? "directory" : "file"));
+    printf("    hidden: %s\n", (node.hidden ? "true" : "false"));
+    printf("    size: %d bytes\n", node.size);
+    // TODO: creation/last access/modified datetime
+    printf("    start cluster: 0x%x\n", node.start_cluster);
+}
+
+static void pwd(char* args) {
+    (void)(args);
+
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
+        puts("no fs installed");
+        return;
+    }
+
+    if(node_stack_offset == 0) {
+        puts("/");
+        return;
+    }
+
+    for(unsigned int i = 1; i <= node_stack_offset; i++)
+        printf("/%s", node_stack[i].name);
+    putchar('\n');
+}
+
 static void process_prompt() {
     char* cmd_name = strtok(input, " ");
     char* remain_arg = cmd_name + strlen(cmd_name) + 1;
@@ -527,7 +592,6 @@ static void process_prompt() {
         else node_stack_offset -= back_cnt;
     }
     else if(strcmp(cmd_name, "echo")) echo(remain_arg);
-    else if(strcmp(cmd_name, "echo")) echo(remain_arg);
     else if(strcmp(cmd_name, "ticks")) ticks(remain_arg);
     else if(strcmp(cmd_name, "ls")) ls(remain_arg);
     else if(strcmp(cmd_name, "read")) read(remain_arg);
@@ -538,6 +602,8 @@ static void process_prompt() {
     else if(strcmp(cmd_name, "write")) write(remain_arg);
     else if(strcmp(cmd_name, "mv")) mv(remain_arg);
     else if(strcmp(cmd_name, "cp")) cp(remain_arg);
+    else if(strcmp(cmd_name, "stat")) stat(remain_arg);
+    else if(strcmp(cmd_name, "pwd")) pwd(remain_arg);
     else if(input_len == 0); // just skip
     else puts("unknow command");
     printf("[kernel@kshell %s ]$ ", node_stack[node_stack_offset].name);
