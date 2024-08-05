@@ -156,7 +156,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     // // i cannot get this to work :(
     // // enter_usermode();
-    //
+
     // // test "syscall"
     // // the privilege is still ring 0, though
     // asm volatile("xor %eax, %eax; int $0x80"); // SYS_SYSCALL_TEST
