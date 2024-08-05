@@ -106,17 +106,14 @@ FS_ERR fs_rm(fs_node_t* node, fs_node_t delete_node) {
 // remove a directory or a file and its content recursively if is a directory
 FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t delete_node) {
     if(delete_node.isdir) {
-        FS_ERR err;
-
         // try remove its content recursively
-        if(parent->fs->type == FS_FAT32)
-            err = fat32_read_dir(&delete_node, rm_node_callback);
+        if(parent->fs->type == FS_FAT32) {
+            // this only happended when an error occurs
+            if(fat32_read_dir(&delete_node, rm_node_callback) == ERR_FS_CALLBACK_STOP)
+                return ERR_FS_FAILED;
+        }
         else return ERR_FS_UNKNOWN_FS;
 
-        if(err == ERR_FS_CALLBACK_STOP) {
-            // this only happended when an error occurs
-            return ERR_FS_FAILED;
-        }
     }
 
     // now try remove it. it should success
@@ -178,7 +175,7 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
         copy_current_dir = *copied;
 
         // try copy all of its content to the new dir
-        if(fat32_read_dir(node, cp_node_callback) != ERR_FS_CALLBACK_STOP)
+        if(fat32_read_dir(node, cp_node_callback) == ERR_FS_CALLBACK_STOP)
             return ERR_FS_FAILED;
 
         // load current dir back up

@@ -17,7 +17,6 @@ typedef enum {
 
 static char input[512];
 static unsigned int input_len = 0;
-static char* current_token;
 
 // a stack that contain the path of current dir
 static fs_node_t node_stack[NODE_STACK_MAX_LENGTH];
@@ -75,11 +74,22 @@ static bool list_dir(fs_node_t node) {
 }
 static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
     node->valid = false;
+    *parent = *(node_stack_top());
+
+    if(path[0] == '/') {
+        *node = node_stack[0];
+        *parent = node_stack[0];
+        path++;
+    }
 
     char* nodename = strtok(path, "/");
     while(nodename != NULL) {
         if(node->valid) *parent = *node;
-        *node = fs_find(parent, nodename);
+        // root dir does not have the . and .. dir so we need to handle it differently
+        if((strcmp(nodename, ".") || strcmp(nodename, ".."))
+                && parent->name[0] == '/')
+            *node = node_stack[0];
+        else *node = fs_find(parent, nodename);
         if(!node->valid) {
             memcpy(node->name, nodename, strlen(nodename)+1);
             if(strtok(NULL, "/") != NULL)
@@ -94,39 +104,40 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
     return ERR_SHELL_SUCCESS;
 }
 
-static void help() {
-    current_token = strtok(NULL, " ");
-    if(current_token == NULL) {
+static void help(char* arg) {
+    if(arg == NULL) {
         puts("help .<n dot> echo ticks ls read cd mkdir rm touch write");
     }
     else {
-        if(current_token[0] == '.') printf("go back %d dir\n", strlen(current_token)-1);
-        else if(strcmp(current_token, "echo")) puts("echo <string>");
-        else if(strcmp(current_token, "ticks")) puts("ticks <no arg>");
-        else if(strcmp(current_token, "ls")) puts(
+        if(arg[0] == '.') printf("go back %d dir\n", strlen(arg)-1);
+        else if(strcmp(arg, "echo")) puts("echo <string>");
+        else if(strcmp(arg, "ticks")) puts("ticks <no arg>");
+        else if(strcmp(arg, "ls")) puts(
                 "ls <args> <directory>\n"
                 "available arg:\n"
                 "    -a          show hidden\n"
                 "    -d <num>    tree depth");
-        else if(strcmp(current_token, "read")) puts("read <filename>");
-        else if(strcmp(current_token, "cd")) puts("cd path/to/child/dir");
-        else if(strcmp(current_token, "mkdir")) puts("mkdir path/to/dir1/dir2/dir3");
-        else if(strcmp(current_token, "rm")) puts("rm dir/or/file");
-        else if(strcmp(current_token, "touch")) puts("touch <filename>");
-        else if(strcmp(current_token, "write")) puts("write <filename>");
+        else if(strcmp(arg, "read")) puts("read <path>");
+        else if(strcmp(arg, "cd")) puts("cd <path>");
+        else if(strcmp(arg, "mkdir")) puts("mkdir <path>");
+        else if(strcmp(arg, "rm")) puts("rm <path>");
+        else if(strcmp(arg, "touch")) puts("touch <path>");
+        else if(strcmp(arg, "write")) puts("write <path>");
+        else if(strcmp(arg, "mv")) puts("mv <source-path> <destination-path>");
+        else if(strcmp(arg, "cp")) puts("cp <source-path> <destination-path>");
     }
 }
 
-static void echo() {
-    current_token += strlen(current_token) + 1;
-    puts(current_token);
+static void echo(char* args) {
+    puts(args);
 }
 
-static void ticks() {
+static void ticks(char* args) {
+    (void)(args);
     printf("%d\n", timer_get_ticks());
 }
 
-static void ls() {
+static void ls(char* args) {
     fs_node_t* current_node = node_stack_top();
     if(!current_node->valid) {
         puts("no fs installed");
@@ -136,28 +147,28 @@ static void ls() {
     show_hidden = false;
     char* ls_name = NULL;
 
-    current_token = strtok(NULL, " ");
-    while(current_token != NULL) {
-        if(current_token[0] == '-') {
-            if(strcmp(current_token, "-d")) {
-                current_token = strtok(NULL, " ");
-                if(current_token == NULL) {
+    char* arg = strtok(args, " ");
+    while(arg != NULL) {
+        if(arg[0] == '-') {
+            if(strcmp(arg, "-d")) {
+                arg = strtok(NULL, " ");
+                if(arg == NULL) {
                     puts("not enough arguement");
                     return;
                 }
-                max_depth = atoi(current_token);
+                max_depth = atoi(arg);
             }
-            else if(strcmp(current_token, "-a"))
+            else if(strcmp(arg, "-a"))
                 show_hidden = true;
             else {
-                printf("unknown argument: %s\n", current_token);
+                printf("unknown argument: %s\n", arg);
                 return;
             }
         }
         else
-            ls_name = current_token;
+            ls_name = arg;
 
-        current_token = strtok(NULL, " ");
+        arg = strtok(NULL, " ");
     }
 
     if(ls_name == NULL) {
@@ -166,7 +177,7 @@ static void ls() {
         return;
     }
     else {
-        fs_node_t node_parent = *current_node;
+        fs_node_t node_parent;
         fs_node_t node;
         SHELL_ERR err = path_find_last_node(ls_name, &node_parent, &node);
         if(err == ERR_SHELL_NOT_FOUND
@@ -181,21 +192,21 @@ static void ls() {
     }
 }
 
-static void read() {
+static void read(char* path) {
     fs_node_t* current_node = node_stack_top();
     if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
-    current_token = strtok(NULL, " ");
-    if(current_token == NULL) {
+
+    if(path == NULL) {
         puts("no file input");
         return;
     }
 
-    fs_node_t node_parent = *current_node;
+    fs_node_t node_parent;
     fs_node_t node;
-    SHELL_ERR err = path_find_last_node(current_token, &node_parent, &node);
+    SHELL_ERR err = path_find_last_node(path, &node_parent, &node);
     if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
         printf("no such directory '%s'\n", node.name);
         return;
@@ -212,20 +223,19 @@ static void read() {
     }
 }
 
-static void cd() {
+static void cd(char* path) {
     fs_node_t* current_node = node_stack_top();
     if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
-    current_token = strtok(NULL, " ");
-    if(current_token == NULL) {
+    if(path == NULL) {
         puts("no path provided");
         return;
     }
 
     // now current token contain the path
-    char* nodename = strtok(current_token, "/");
+    char* nodename = strtok(path, "/");
     while(nodename != NULL) {
         if(strcmp(nodename, "..")) node_stack_pop();
         else if(!strcmp(nodename, ".")) {
@@ -250,22 +260,21 @@ static void cd() {
     }
 }
 
-static void mkdir() {
+static void mkdir(char* path) {
     fs_node_t* current_node = node_stack_top();
     if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
 
-    current_token = strtok(NULL, " ");
-    if(current_token == NULL) {
+    if(path == NULL) {
         puts("no name provided");
         return;
     }
 
     fs_node_t _curr_node = *current_node;
 
-    char* dirname = strtok(current_token, "/");
+    char* dirname = strtok(path, "/");
     while(dirname != NULL) {
         fs_node_t node = fs_find(&_curr_node, dirname);
         if(node.valid) {
@@ -283,21 +292,20 @@ static void mkdir() {
     }
 }
 
-static void rm() {
+static void rm(char* path) {
     fs_node_t* current_node = node_stack_top();
     if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
-    current_token = strtok(NULL, " ");
-    if(current_token == NULL) {
+    if(path == NULL) {
         puts("no name provided");
         return;
     }
     
-    fs_node_t node_parent = *current_node;
+    fs_node_t node_parent;
     fs_node_t node;
-    SHELL_ERR serr = path_find_last_node(current_token, &node_parent, &node);
+    SHELL_ERR serr = path_find_last_node(path, &node_parent, &node);
     if(serr == ERR_SHELL_NOT_FOUND || serr == ERR_SHELL_NOT_A_DIR) {
         printf("no such directory '%s'\n", node.name);
         return;
@@ -312,28 +320,27 @@ static void rm() {
         printf("cannot remove '%s'. error code %d\n", node.name, err);
 }
 
-static void touch() {
+static void touch(char* path) {
     fs_node_t* current_node = node_stack_top();
     if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
-    current_token = strtok(NULL, " ");
-    if(current_token == NULL) {
+    if(path == NULL) {
         puts("no name provided");
         return;
     }
 
-    fs_node_t node_parent = *current_node;
+    fs_node_t node_parent;
     fs_node_t node;
-    SHELL_ERR err = path_find_last_node(current_token, &node_parent, &node);
+    SHELL_ERR err = path_find_last_node(path, &node_parent, &node);
     if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
         printf("'%s' is not a directory\n", node.name);
         return;
     }
     if(err == ERR_SHELL_SUCCESS) {
         // we dont want it to find a valid node
-        printf("a file or directory with name '%s' has already existed\n", current_token);
+        printf("a file or directory with name '%s' has already existed\n", path);
         return;
     }
     // at this point the error should be ERR_SHELL_TARGET_NOT_FOUND
@@ -343,21 +350,20 @@ static void touch() {
     if(!node.valid) printf("cannot create '%s', out of space\n", node.name);
 }
 
-static void write() {
+static void write(char* path) {
     fs_node_t* current_node = node_stack_top();
     if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
-    current_token = strtok(NULL, " ");
-    if(current_token == NULL) {
+    if(path == NULL) {
         puts("no name provided");
         return;
     }
 
-    fs_node_t node_parent = *current_node;
+    fs_node_t node_parent;
     fs_node_t node;
-    SHELL_ERR err = path_find_last_node(current_token, &node_parent, &node);
+    SHELL_ERR err = path_find_last_node(path, &node_parent, &node);
     if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
         printf("no such directory '%s'\n", node.name);
         return;
@@ -401,45 +407,137 @@ static void write() {
     file_close(&f);
 }
 
-static void mv() {
+static void mv(char* args) {
     fs_node_t* current_node = node_stack_top();
     if(!current_node->valid) {
         puts("no fs installed");
         return;
     }
-    char* source = strtok(NULL, " ");
-    if(source == NULL) {
+
+    char* source_path = strtok(args, " ");
+    if(source_path == NULL) {
         puts("no source provided");
         return;
     }
-    char* target = strtok(NULL, " ");
-    if(target == NULL) {
+    char* target_path = strtok(NULL, " ");
+    if(target_path == NULL) {
         puts("no target provided");
         return;
     }
-    puts("not implemented");
+
+    fs_node_t source_node_parent;
+    fs_node_t source_node;
+    SHELL_ERR err = path_find_last_node(source_path, &source_node_parent, &source_node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", source_node.name);
+        return;
+    }
+    if(err == ERR_SHELL_TARGET_NOT_FOUND) {
+        printf("no such file or directory '%s'\n", source_node.name);
+        return;
+    }
+
+    fs_node_t target_node_parent;
+    fs_node_t target_node;
+    err = path_find_last_node(target_path, &target_node_parent, &target_node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", target_node.name);
+        return;
+    }
+    if(err == ERR_SHELL_SUCCESS) {
+        if(!target_node.isdir) {
+            printf("a file with name '%s' has already existed\n", target_node.name);
+            return;
+        }
+        else {
+            target_node_parent = target_node;
+            memcpy(target_node.name, source_node.name, strlen(source_node.name)+1);
+        }
+    }
+
+    FS_ERR ferr = fs_move(&source_node, &target_node_parent, target_node.name);
+    if(ferr != ERR_FS_SUCCESS)
+        printf("failed to move %s to %s with name %s. error code %d\n", source_node.name, target_node_parent.name, target_node.name, ferr);
+}
+
+static void cp(char* args) {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
+        puts("no fs installed");
+        return;
+    }
+
+    char* source_path = strtok(args, " ");
+    if(source_path == NULL) {
+        puts("no source provided");
+        return;
+    }
+    char* target_path = strtok(NULL, " ");
+    if(target_path == NULL) {
+        puts("no target provided");
+        return;
+    }
+
+    fs_node_t source_node_parent;
+    fs_node_t source_node;
+    SHELL_ERR err = path_find_last_node(source_path, &source_node_parent, &source_node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", source_node.name);
+        return;
+    }
+    if(err == ERR_SHELL_TARGET_NOT_FOUND) {
+        printf("no such file or directory '%s'\n", source_node.name);
+        return;
+    }
+
+    fs_node_t target_node_parent;
+    fs_node_t target_node;
+    err = path_find_last_node(target_path, &target_node_parent, &target_node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", target_node.name);
+        return;
+    }
+    if(err == ERR_SHELL_SUCCESS) {
+        if(!target_node.isdir) {
+            printf("a file with name '%s' has already existed\n", target_node.name);
+            return;
+        }
+        else {
+            target_node_parent = target_node;
+            memcpy(target_node.name, source_node.name, strlen(source_node.name)+1);
+        }
+    }
+
+    fs_node_t copied;
+    FS_ERR ferr = fs_copy_recursive(&source_node, &target_node_parent, &copied, target_node.name);
+    if(ferr != ERR_FS_SUCCESS)
+        printf("failed to copy %s to %s with name %s. error code %d\n", source_node.name, target_node_parent.name, target_node.name, ferr);
 }
 
 static void process_prompt() {
-    current_token = strtok(input, " ");
+    char* cmd_name = strtok(input, " ");
+    char* remain_arg = cmd_name + strlen(cmd_name) + 1;
+    while(remain_arg[0] == '\0' || remain_arg[0] == ' ') remain_arg++;
+    if(remain_arg - cmd_name >= (signed)input_len) remain_arg = NULL;
 
-    if(strcmp(current_token, "help")) help();
-    else if(current_token[0] == '.') { // special command to go to parent dir
-        unsigned int back_cnt = input_len - 1;
+    if(strcmp(cmd_name, "help")) help(remain_arg);
+    else if(cmd_name[0] == '.') { // special command to go to parent dir
+        unsigned int back_cnt = strlen(cmd_name) - 1;
         if(back_cnt > node_stack_offset) node_stack_offset = 0;
         else node_stack_offset -= back_cnt;
     }
-    else if(strcmp(current_token, "echo")) echo();
-    else if(strcmp(current_token, "echo")) echo();
-    else if(strcmp(current_token, "ticks")) ticks();
-    else if(strcmp(current_token, "ls")) ls();
-    else if(strcmp(current_token, "read")) read();
-    else if(strcmp(current_token, "cd")) cd();
-    else if(strcmp(current_token, "mkdir")) mkdir();
-    else if(strcmp(current_token, "rm")) rm();
-    else if(strcmp(current_token, "touch")) touch();
-    else if(strcmp(current_token, "write")) write();
-    else if(strcmp(current_token, "mv")) mv();
+    else if(strcmp(cmd_name, "echo")) echo(remain_arg);
+    else if(strcmp(cmd_name, "echo")) echo(remain_arg);
+    else if(strcmp(cmd_name, "ticks")) ticks(remain_arg);
+    else if(strcmp(cmd_name, "ls")) ls(remain_arg);
+    else if(strcmp(cmd_name, "read")) read(remain_arg);
+    else if(strcmp(cmd_name, "cd")) cd(remain_arg);
+    else if(strcmp(cmd_name, "mkdir")) mkdir(remain_arg);
+    else if(strcmp(cmd_name, "rm")) rm(remain_arg);
+    else if(strcmp(cmd_name, "touch")) touch(remain_arg);
+    else if(strcmp(cmd_name, "write")) write(remain_arg);
+    else if(strcmp(cmd_name, "mv")) mv(remain_arg);
+    else if(strcmp(cmd_name, "cp")) cp(remain_arg);
     else if(input_len == 0); // just skip
     else puts("unknow command");
     printf("[kernel@kshell %s ]$ ", node_stack[node_stack_offset].name);
