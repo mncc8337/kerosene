@@ -21,12 +21,12 @@ static bool find_node_callback(fs_node_t node) {
     return true;
 }
 
-FS_ERR fs_rm_recursive(fs_node_t*  parent, char* name); // declare it first
+FS_ERR fs_rm_recursive(fs_node_t*  parent, fs_node_t delete_node); // declare it first
 static bool rm_node_callback(fs_node_t node) {
     // ignore . and ..
     if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
     
-    FS_ERR err = fs_rm_recursive(node.parent_node, node.name);
+    FS_ERR err = fs_rm_recursive(node.parent_node, node);
     if(err != ERR_FS_SUCCESS) return false;
 
     return true;
@@ -104,11 +104,7 @@ FS_ERR fs_rm(fs_node_t* node, fs_node_t delete_node) {
 }
 
 // remove a directory or a file and its content recursively if is a directory
-FS_ERR fs_rm_recursive(fs_node_t* parent, char* name) {
-    // get the node
-    fs_node_t delete_node = fs_find(parent, name);
-    if(!delete_node.valid) return ERR_FS_NOT_FOUND;
-
+FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t delete_node) {
     if(delete_node.isdir) {
         FS_ERR err;
 

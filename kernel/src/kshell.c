@@ -7,7 +7,13 @@
 #include "string.h"
 #include "stdio.h"
 #include "stdlib.h"
-#include "timer.h"
+
+typedef enum {
+    ERR_SHELL_NOT_FOUND,
+    ERR_SHELL_SUCCESS,
+    ERR_SHELL_TARGET_NOT_FOUND,
+    ERR_SHELL_NOT_A_DIR
+} SHELL_ERR;
 
 static char input[512];
 static unsigned int input_len = 0;
@@ -38,7 +44,6 @@ static void kbd_listener(key_t k) {
     key_handled = false;
     current_key = k;
 }
-
 static void tick_listener(unsigned int ticks) {
     (void)(ticks);
 
@@ -67,6 +72,26 @@ static bool list_dir(fs_node_t node) {
     indent_level--;
 
     return true;
+}
+static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
+    node->valid = false;
+
+    char* nodename = strtok(path, "/");
+    while(nodename != NULL) {
+        if(node->valid) *parent = *node;
+        *node = fs_find(parent, nodename);
+        if(!node->valid) {
+            memcpy(node->name, nodename, strlen(nodename)+1);
+            if(strtok(NULL, "/") != NULL)
+                return ERR_SHELL_NOT_FOUND;
+            return ERR_SHELL_TARGET_NOT_FOUND;
+        }
+        nodename = strtok(NULL, "/");
+        if(nodename != NULL && !node->isdir) // this is illegal
+            return ERR_SHELL_NOT_A_DIR;
+    }
+
+    return ERR_SHELL_SUCCESS;
 }
 
 static void help() {
@@ -113,16 +138,22 @@ static void ls() {
 
     current_token = strtok(NULL, " ");
     while(current_token != NULL) {
-        if(strcmp(current_token, "-d")) {
-            current_token = strtok(NULL, " ");
-            if(current_token == NULL) {
-                puts("not enough arguement");
+        if(current_token[0] == '-') {
+            if(strcmp(current_token, "-d")) {
+                current_token = strtok(NULL, " ");
+                if(current_token == NULL) {
+                    puts("not enough arguement");
+                    return;
+                }
+                max_depth = atoi(current_token);
+            }
+            else if(strcmp(current_token, "-a"))
+                show_hidden = true;
+            else {
+                printf("unknown argument: %s\n", current_token);
                 return;
             }
-            max_depth = atoi(current_token);
         }
-        else if(strcmp(current_token, "-a"))
-            show_hidden = true;
         else
             ls_name = current_token;
 
@@ -135,15 +166,17 @@ static void ls() {
         return;
     }
     else {
-        fs_node_t node = fs_find(current_node, ls_name);
-        if(!node.valid) {
-            printf("no such directory '%s'\n", ls_name);
+        fs_node_t node_parent = *current_node;
+        fs_node_t node;
+        SHELL_ERR err = path_find_last_node(ls_name, &node_parent, &node);
+        if(err == ERR_SHELL_NOT_FOUND
+                || err == ERR_SHELL_NOT_A_DIR
+                || err == ERR_SHELL_TARGET_NOT_FOUND
+                || !node.isdir) {
+            printf("no such directory '%s'\n", node.name);
             return;
         }
-        if(!node.isdir) {
-            puts("not a directory");
-            return;
-        }
+
         fs_list_dir(&node, list_dir);
     }
 }
@@ -160,13 +193,15 @@ static void read() {
         return;
     }
 
-    fs_node_t node = fs_find(current_node, current_token);
-    if(!node.valid) {
-        printf("file '%s' not found\n", current_token);
+    fs_node_t node_parent = *current_node;
+    fs_node_t node;
+    SHELL_ERR err = path_find_last_node(current_token, &node_parent, &node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", node.name);
         return;
     }
-    if(node.isdir) {
-        puts("not a file");
+    if(err == ERR_SHELL_TARGET_NOT_FOUND || node.isdir) {
+        printf("no such file '%s'\n", node.name);
         return;
     }
 
@@ -192,8 +227,7 @@ static void cd() {
     // now current token contain the path
     char* nodename = strtok(current_token, "/");
     while(nodename != NULL) {
-        if(strcmp(nodename, ".."))
-            node_stack_pop();
+        if(strcmp(nodename, "..")) node_stack_pop();
         else if(!strcmp(nodename, ".")) {
             fs_node_t tmp = fs_find(node_stack_top(), nodename);
             if(!tmp.valid) {
@@ -201,7 +235,7 @@ static void cd() {
                 return;
             }
             if(!tmp.isdir) {
-                printf("'%s' is not a directory\n", nodename);
+                printf("no such directory '%s'\n", nodename);
                 return;
             }
 
@@ -241,7 +275,7 @@ static void mkdir() {
 
         fs_node_t newdir = fs_mkdir(&_curr_node, dirname);
         if(!newdir.valid) {
-            printf("failed to create '%s'\n", dirname);
+            printf("failed to create directory '%s'\n", dirname);
             return;
         }
         _curr_node = newdir;
@@ -261,22 +295,21 @@ static void rm() {
         return;
     }
     
-    char* nodename = strtok(current_token, "/");
-    fs_node_t _curr_dir = *current_node;
-    fs_node_t _curr_dir_parent;
-    while(nodename != NULL) {
-        _curr_dir_parent = _curr_dir;
-        _curr_dir = fs_find(&_curr_dir, nodename);
-        if(!_curr_dir.valid) {
-            printf("no such file or directory '%s'\n", nodename);
-            return;
-        }
-        nodename = strtok(NULL, "/");
+    fs_node_t node_parent = *current_node;
+    fs_node_t node;
+    SHELL_ERR serr = path_find_last_node(current_token, &node_parent, &node);
+    if(serr == ERR_SHELL_NOT_FOUND || serr == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", node.name);
+        return;
+    }
+    if(serr == ERR_SHELL_TARGET_NOT_FOUND) {
+        printf("no such file or directory '%s'\n", node.name);
+        return;
     }
 
-    FS_ERR err = fs_rm_recursive(&_curr_dir_parent, _curr_dir.name);
+    FS_ERR err = fs_rm_recursive(&node_parent, node);
     if(err != ERR_FS_SUCCESS)
-        printf("cannot remove '%s'. error code %d\n", _curr_dir.name, err);
+        printf("cannot remove '%s'. error code %d\n", node.name, err);
 }
 
 static void touch() {
@@ -290,10 +323,24 @@ static void touch() {
         puts("no name provided");
         return;
     }
-    fs_node_t node = fs_touch(current_node, current_token);
-    if(!node.valid) {
-        printf("a file or directory with name '%s' has already existed (or out of memory? idk)\n", current_token);
+
+    fs_node_t node_parent = *current_node;
+    fs_node_t node;
+    SHELL_ERR err = path_find_last_node(current_token, &node_parent, &node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("'%s' is not a directory\n", node.name);
+        return;
     }
+    if(err == ERR_SHELL_SUCCESS) {
+        // we dont want it to find a valid node
+        printf("a file or directory with name '%s' has already existed\n", current_token);
+        return;
+    }
+    // at this point the error should be ERR_SHELL_TARGET_NOT_FOUND
+    // which is what we wanted
+
+    node = fs_touch(&node_parent, node.name);
+    if(!node.valid) printf("cannot create '%s', out of space\n", node.name);
 }
 
 static void write() {
@@ -307,11 +354,19 @@ static void write() {
         puts("no name provided");
         return;
     }
-    fs_node_t node = fs_find(current_node, current_token);
-    if(!node.valid) {
-        node = fs_touch(current_node, current_token);
+
+    fs_node_t node_parent = *current_node;
+    fs_node_t node;
+    SHELL_ERR err = path_find_last_node(current_token, &node_parent, &node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", node.name);
+        return;
+    }
+    if(err == ERR_SHELL_TARGET_NOT_FOUND) {
+        // try to create one
+        node = fs_touch(&node_parent, node.name);
         if(!node.valid) {
-            puts("cannot create file");
+            printf("cannot create file '%s', out of space\n", node.name);
             return;
         }
     }
@@ -346,6 +401,25 @@ static void write() {
     file_close(&f);
 }
 
+static void mv() {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
+        puts("no fs installed");
+        return;
+    }
+    char* source = strtok(NULL, " ");
+    if(source == NULL) {
+        puts("no source provided");
+        return;
+    }
+    char* target = strtok(NULL, " ");
+    if(target == NULL) {
+        puts("no target provided");
+        return;
+    }
+    puts("not implemented");
+}
+
 static void process_prompt() {
     current_token = strtok(input, " ");
 
@@ -365,6 +439,7 @@ static void process_prompt() {
     else if(strcmp(current_token, "rm")) rm();
     else if(strcmp(current_token, "touch")) touch();
     else if(strcmp(current_token, "write")) write();
+    else if(strcmp(current_token, "mv")) mv();
     else if(input_len == 0); // just skip
     else puts("unknow command");
     printf("[kernel@kshell %s ]$ ", node_stack[node_stack_offset].name);
