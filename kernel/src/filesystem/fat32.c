@@ -3,8 +3,6 @@
 
 #include "string.h"
 
-#include "stdio.h"
-
 // these processes are used very frequently
 // so i define some macros for them
 
@@ -197,7 +195,7 @@ uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count) {
 
         if(FAT_val == FAT_FREE_CLUSTER) {
             // we found a free cluster
-            if(start_cluster == FAT_FREE_CLUSTER)
+            if(start_cluster == 0)
                 start_cluster = current_cluster;
             else
                 set_FAT_entry(bootrec, fs, first_FAT_sector, prev_cluster, current_cluster);
@@ -249,9 +247,7 @@ FS_ERR fat32_free_cluster_chain(fs_t* fs, uint32_t start_cluster) {
     uint32_t current_cluster = start_cluster;
     while(current_cluster < FAT_EOC && current_cluster != FAT_BAD_CLUSTER) {
         uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
-        // set it to 0 (free)
-        printf("freeing cluster %d\n", current_cluster);
-        set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, 0);
+        set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, FAT_FREE_CLUSTER);
         current_cluster = FAT_val;
         fsinfo_free_cluster_count++;
     }
