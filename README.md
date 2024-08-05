@@ -18,19 +18,23 @@ it's a working-in-progress project and should not be used as references for osde
 # build
 chmod +x script/*.sh
 make all
-
+```
+```
 # run
 ./script/run.sh # or make run
-
+```
+```
 # make iso
 ./script/geniso.sh
-
+```
+```
 # editing the disk files
 ./script/mount-device.sh
 cd mnt/
 ## do some stuffs here
 ./script/umount-device.sh # you also want to run this if you ever encountered errors like disk image is in use or whatever
-
+```
+```
 # if you want to copy some files/dirs and dont want to run mount-device and then umount-device
 ./script/cpyfile.sh file/or/directory/in/somewhere ./mnt/some/DIRECTORY/in/the/disk
 ```
@@ -109,7 +113,7 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
 - [ ] set file timestamp
 ## known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
-- sometime keyboard is not working
+- sometime keyboard is not working (seem like it only appears in QEMU)
 - enter_usermode() crash after run `iret`
 ## learning resources
 note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
