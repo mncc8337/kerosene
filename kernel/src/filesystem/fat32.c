@@ -3,6 +3,8 @@
 
 #include "string.h"
 
+#include "stdio.h"
+
 // these processes are used very frequently
 // so i define some macros for them
 
@@ -193,9 +195,9 @@ uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count) {
     while(cluster_count > 0) {
         uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
 
-        if(FAT_val == 0) {
+        if(FAT_val == FAT_FREE_CLUSTER) {
             // we found a free cluster
-            if(start_cluster == 0)
+            if(start_cluster == FAT_FREE_CLUSTER)
                 start_cluster = current_cluster;
             else
                 set_FAT_entry(bootrec, fs, first_FAT_sector, prev_cluster, current_cluster);
@@ -211,7 +213,7 @@ uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count) {
     if(start_cluster == 0) return 0;
 
     // set end-of-cluster
-    set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, 0x0ffffff8);
+    set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, FAT_EOC);
 
     // update the fsinfo
     fsinfo.available_clusters_start = current_cluster;
@@ -245,15 +247,16 @@ FS_ERR fat32_free_cluster_chain(fs_t* fs, uint32_t start_cluster) {
         fsinfo_start_cluster = 2;
 
     uint32_t current_cluster = start_cluster;
-    while(current_cluster != 0x0ffffff8 && current_cluster != 0x0ffffff7) {
+    while(current_cluster < FAT_EOC && current_cluster != FAT_BAD_CLUSTER) {
         uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
         // set it to 0 (free)
+        printf("freeing cluster %d\n", current_cluster);
         set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, 0);
         current_cluster = FAT_val;
         fsinfo_free_cluster_count++;
     }
 
-    if(current_cluster == 0x0ffffff7) return ERR_FS_BAD_CLUSTER;
+    if(current_cluster == FAT_BAD_CLUSTER) return ERR_FS_BAD_CLUSTER;
 
     // update fsinfo
     // only update the start cluster if it is smaller
@@ -288,7 +291,7 @@ FS_ERR fat32_cut_cluster_chain(fs_t* fs, uint32_t start_cluster) {
     // free them
     FS_ERR err = fat32_free_cluster_chain(fs, FAT_val);
     if(err != ERR_FS_SUCCESS) return err;
-    set_FAT_entry(bootrec, fs, first_FAT_sector, start_cluster, 0x0ffffff8);
+    set_FAT_entry(bootrec, fs, first_FAT_sector, start_cluster, FAT_EOC);
     return ERR_FS_SUCCESS;
 }
 
@@ -299,7 +302,7 @@ uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster) {
 
     uint32_t current_cluster = start_cluster;
     uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
-    while(FAT_val != 0x0ffffff8 && FAT_val != 0x0ffffff7) {
+    while(FAT_val < FAT_EOC && FAT_val != FAT_BAD_CLUSTER) {
         current_cluster = FAT_val;
         FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
     }
@@ -331,7 +334,7 @@ uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster) {
         ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, data);
 
         current_cluster = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
-        if(current_cluster == 0x0ffffff8 || current_cluster == 0x0ffffff7)
+        if(current_cluster >= FAT_EOC || current_cluster == FAT_BAD_CLUSTER)
             break;
 
         copied_current_cluster = fat32_expand_cluster_chain(fs, copied_current_cluster, 1);
@@ -391,7 +394,7 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
                 // in linux the .. dir of a root's child directory is pointed to cluster 0
                 // we need to fix it because root directory is in cluster 2
                 // else we would destroy cluster 0 which contain filesystem infomation
-                node.start_cluster = 2;
+                node.start_cluster = bootrec->ebpb.rootdir_cluster;
             }
             node.centisecond = temp_dir->centisecond;
             node.creation_time = temp_dir->creation_time;
@@ -416,9 +419,9 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
 
         uint32_t FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
 
-        if(FAT_val >= 0x0ffffff8)
+        if(FAT_val >= FAT_EOC)
             break; // end of cluster
-        if(FAT_val == 0x0ffffff7)
+        if(FAT_val == FAT_BAD_CLUSTER)
             return ERR_FS_BAD_CLUSTER;
 
         current_cluster = FAT_val;
@@ -452,9 +455,9 @@ FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_
         // get next cluster
         uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
 
-        if(FAT_val >= 0x0ffffff8)
+        if(FAT_val >= FAT_EOC)
             return ERR_FS_EOF;
-        if(FAT_val == 0x0ffffff7)
+        if(FAT_val == FAT_BAD_CLUSTER)
             return ERR_FS_BAD_CLUSTER;
 
         current_cluster = FAT_val;
@@ -475,9 +478,9 @@ FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_
         // get next cluster
         uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
 
-        if(FAT_val >= 0x0ffffff8)
+        if(FAT_val >= FAT_EOC)
             return ERR_FS_EOF;
-        if(FAT_val == 0x0ffffff7)
+        if(FAT_val == FAT_BAD_CLUSTER)
             return ERR_FS_BAD_CLUSTER;
 
         current_cluster = FAT_val;
@@ -537,9 +540,9 @@ FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size
         // get next cluster
         uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
 
-        if(FAT_val >= 0x0ffffff8)
+        if(FAT_val >= FAT_EOC)
             break; // end of cluster
-        if(FAT_val == 0x0ffffff7)
+        if(FAT_val == FAT_BAD_CLUSTER)
             return ERR_FS_BAD_CLUSTER; // bad cluster
 
         current_cluster = FAT_val;
@@ -628,7 +631,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
 
         uint32_t FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
 
-        if(FAT_val >= 0x0ffffff8) { // end of cluster
+        if(FAT_val >= FAT_EOC) { // end of cluster
             // add a new cluster
             current_cluster = fat32_expand_cluster_chain(parent->fs, current_cluster, 1);
             // no more space
@@ -862,7 +865,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
         // to see if it is clear or not
         uint32_t FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
 
-        if(FAT_val >= 0x0ffffff8 || FAT_val == 0x0ffffff7) { // it should never happend
+        if(FAT_val >= FAT_EOC || FAT_val == FAT_BAD_CLUSTER) { // it should never happend
             clear_val = 0x0;
         }
         else {
@@ -916,7 +919,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
 
         if(clear_val == 0x0) {
             fat32_free_cluster_chain(parent->fs, current_cluster);
-            set_FAT_entry(bootrec, parent->fs, first_FAT_sector, last_cluster, 0x0ffffff8);
+            set_FAT_entry(bootrec, parent->fs, first_FAT_sector, last_cluster, FAT_EOC);
         }
     }
 
