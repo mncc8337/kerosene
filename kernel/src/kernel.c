@@ -109,6 +109,9 @@ void disk_init() {
 }
 
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
+    // disable interrupts at the start to set up things
+    asm volatile("cli");
+
     // greeting msg to let us know we are in the kernel
     tty_set_attr(LIGHT_CYAN);  puts("hello");
     tty_set_attr(LIGHT_GREEN); printf("this is ");
@@ -123,8 +126,6 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     if(mbd->flags & (1 << 9))
         print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name);
 
-
-    asm volatile("cli");
     gdt_init();
     print_debug(LT_OK, "GDT initialised\n");
     uint32_t esp = 0;
@@ -135,7 +136,6 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     print_debug(LT_OK, "IDT initialised\n");
     isr_init();
     print_debug(LT_OK, "ISR initialised\n");
-    asm volatile("sti");
 
     disk_init();
 
@@ -151,6 +151,9 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     kbd_init();
 
     timer_init_PIT();
+
+    // start interrupts again after setting up everything
+    asm volatile("sti");
 
     // make cursor slimmer
     tty_enable_cursor(13, 14);
