@@ -160,10 +160,8 @@ static size_t count_free_cluster(fat32_bootrecord_t* bootrec, fs_t* fs, uint32_t
     return free_count;
 }
 
-static void fix_empty_entry(fs_t* fs, uint32_t start_cluster, uint32_t end_cluster) {
-    // this is the faster version that use a stack for a quick way
-    // to get the previous cluster of any cluster in the chain
-
+FS_ERR fat32_cut_cluster_chain(fs_t* fs, uint32_t start_cluster);
+static void fix_empty_entries(fs_t* fs, uint32_t start_cluster, uint32_t end_cluster) {
     fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table1;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = get_first_data_sector(bootrec);
@@ -173,60 +171,63 @@ static void fix_empty_entry(fs_t* fs, uint32_t start_cluster, uint32_t end_clust
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t directory[cluster_size];
 
-    uint32_t cluster_stack[512]; // i dont think there are any directory that expand to more than 512 cluster
-    int stack_top = -1;
-    // fill in the stack
-    // TODO: only push clusters contain a lot of 0xe5 entries and end with 0x0 entry to save space
-    while(current_cluster != end_cluster) {
-        if(stack_top == 511) break; // give up
+    // the while block below will find a chain of 0xe5 entries that end with a 0x0 entry
+    // and also store the cluster that the chain start and how many clusters that the chain lied in
 
-        cluster_stack[++stack_top] = current_cluster;
-        current_cluster = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
-    }
-    cluster_stack[++stack_top] = current_cluster;
-
+    bool forming_chain = false;
+    uint32_t trash_start_cluster = 0;
+    int cluster_count = 0;
     while(true) {
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
-        bool found_cleared_entry = false;
-        bool job_done = false;
-        for(int index = cluster_size - sizeof(fat_directory_entry_t); index >= 0; index -= sizeof(fat_directory_entry_t)) {
+        for(int index = 0; (unsigned)index < cluster_size; index += sizeof(fat_directory_entry_t)) {
+            if(directory[index] != 0x0 && directory[index] != 0xe5) {
+                forming_chain = false;
+                continue;
+            }
+            if(directory[index] == 0xe5) {
+                if(!forming_chain) {
+                    forming_chain = true;
+                    trash_start_cluster = current_cluster;
+                    cluster_count = 1;
+                    continue;
+                }
+                cluster_count++;
+                continue;
+            }
             if(directory[index] == 0x0) {
-                if(!found_cleared_entry) continue;
-                else goto done_deleting; // this should never happend
+                if(!forming_chain) return; // no job to be done
+                // start
+                goto start_deleting;
             }
-            if(directory[index] != 0xe5) {
-                // toggle flag and end
-                // the flag also mean that this cluster is not empty
-                job_done = true;
-                break;
-            }
-
-            // now directory[index] is 0xe5
-            found_cleared_entry = true;
-            directory[index] = 0x0;
         }
 
-        if(job_done) {
-            // write changes
-            ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
-            goto done_deleting;
-        }
-
-        // if it reached here then the current_cluster is empty
-        // note that current_cluster is also the final cluster of the chain
-        // so we can free it by only set its FAT value to 0
-        set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, FAT_FREE_CLUSTER);
-
-        // if it is the head of the cluster chain then just exit
-        if(stack_top == 0) return; // return to skip setting its FAT val to EOC
-
-        current_cluster = cluster_stack[--stack_top];
+        if(current_cluster == end_cluster) return; // it should never reached here
+        current_cluster = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
     }
 
-    done_deleting:
-    set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, FAT_EOC);
+    start_deleting:
+
+    if(cluster_count > 1) {
+        // the clusters after trash_start_cluster only contain 0xe5 entries and 0x0 entries
+        // so we can trash them
+        fat32_cut_cluster_chain(fs, trash_start_cluster);
+
+        // also read back the "first" cluster
+        uint32_t first_sector = ((trash_start_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
+    }
+
+    for(int i = cluster_size - sizeof(fat_directory_entry_t); i >= 0; i -= sizeof(fat_directory_entry_t)) {
+        // now clear until we meet something that not 0x0 nor 0xe5
+        if(directory[i] != 0x0 && directory[i] != 0xe5) break;
+        directory[i] = 0x0;
+    }
+
+    // write changes
+    uint32_t first_sector = ((trash_start_cluster - 2) * sectors_per_cluster) + first_data_sector;
+    ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 }
 
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour) {
@@ -986,7 +987,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
     }
 
     if(clear_val == 0x0)
-        fix_empty_entry(parent->fs, parent->start_cluster, remove_node.parent_cluster);
+        fix_empty_entries(parent->fs, parent->start_cluster, remove_node.parent_cluster);
 
     return ERR_FS_SUCCESS;
 }
@@ -1056,15 +1057,15 @@ fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uin
 // initialize FAT 32
 // return the root node
 FS_ERR fat32_init(partition_entry_t part, int id) {
-    fs_t fs;
-    fs.partition = part;
-    fs.type = FS_FAT32;
+    fs_t* fs = fs_get(id);
+    fs->partition = part;
+    fs->type = FS_FAT32;
 
     // parsing info tables
-    get_bootrec(part, fs.info_table1);
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)(fs.info_table1);
-    get_fsinfo(part, bootrec, fs.info_table2);
-    fat32_fsinfo_t* fsinfo = (fat32_fsinfo_t*)(fs.info_table2);
+    get_bootrec(part, fs->info_table1);
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)(fs->info_table1);
+    get_fsinfo(part, bootrec, fs->info_table2);
+    fat32_fsinfo_t* fsinfo = (fat32_fsinfo_t*)(fs->info_table2);
 
     // check fsinfo
     if(fsinfo->lead_signature != 0x41615252
@@ -1079,19 +1080,17 @@ FS_ERR fat32_init(partition_entry_t part, int id) {
     }
     if(fsinfo->free_cluster_count == 0xffffffff) {
         uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
-        fsinfo->free_cluster_count = count_free_cluster(bootrec, &fs, first_FAT_sector);
+        fsinfo->free_cluster_count = count_free_cluster(bootrec, fs, first_FAT_sector);
         fsinfo_update = true;
     }
-    if(fsinfo_update) update_fsinfo(&fs);
+    if(fsinfo_update) update_fsinfo(fs);
 
-    fs.root_node.fs = fs_get(id);
-    fs.root_node.start_cluster = bootrec->ebpb.rootdir_cluster;
-    fs.root_node.parent_node = 0; // no parent
-    fs.root_node.isdir = true;
-    fs.root_node.hidden = false;
-    fs.root_node.valid = true;
-
-    fs_add(fs, id);
+    fs->root_node.fs = fs;
+    fs->root_node.start_cluster = bootrec->ebpb.rootdir_cluster;
+    fs->root_node.parent_node = 0; // no parent
+    fs->root_node.isdir = true;
+    fs->root_node.hidden = false;
+    fs->root_node.valid = true; // this is the way to know if a fs is valid
 
     return ERR_FS_SUCCESS;
 }

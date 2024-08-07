@@ -122,7 +122,6 @@ partition_entry_t mbr_get_partition_entry(unsigned int id);
 
 // fsmngr.c
 fs_type_t fs_detect(partition_entry_t part);
-void fs_add(fs_t fs, int id);
 fs_t* fs_get(int id);
 
 // file_op.c

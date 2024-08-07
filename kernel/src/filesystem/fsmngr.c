@@ -1,7 +1,9 @@
 #include "filesystem.h"
 #include "ata.h"
 
-static fs_t FS[26];
+// TODO: implement vfs to remove this
+
+static fs_t FS[26]; // this is hella big, pls use mem mngr to allocate it
 
 static bool is_field_fs_type(uint8_t* buff, int cnt) {
     for(int i = 0; i < cnt; i++) {
@@ -46,10 +48,6 @@ fs_type_t fs_detect(partition_entry_t part) {
     return FS_EMPTY;
 }
 
-void fs_add(fs_t fs, int id) {
-    FS[id] = fs;
-}
-
 fs_t* fs_get(int id) {
-    return &(FS[id]);
+    return FS + id;
 }
