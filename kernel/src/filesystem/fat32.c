@@ -121,10 +121,20 @@ static uint8_t gen_checksum(char* shortname) {
     return sum;
 }
 
-fat32_bootrecord_t fat32_get_bootrec(partition_entry_t part) {
-    fat32_bootrecord_t bootrec;
-    ata_pio_LBA28_access(true, part.LBA_start, 1, (uint8_t*)(&bootrec));
-    return bootrec;
+void fat32_get_bootrec(partition_entry_t part, uint8_t* bootrec) {
+    ata_pio_LBA28_access(true, part.LBA_start, 1, bootrec);
+}
+void fat32_update_bootrecord(fs_t* fs) {
+    ata_pio_LBA28_access(false, fs->partition.LBA_start, 1, fs->info_table1);
+}
+
+void fat32_get_fsinfo(partition_entry_t part, fat32_bootrecord_t* bootrec, uint8_t* fsinfo) {
+    ata_pio_LBA28_access(true, part.LBA_start + bootrec->ebpb.fsinfo_sector, 1, fsinfo);
+}
+void fat32_update_fsinfo(fs_t* fs) {
+    ata_pio_LBA28_access(false,
+                         fs->partition.LBA_start + ((fat32_bootrecord_t*)(fs->info_table1))->ebpb.fsinfo_sector,
+                         1, fs->info_table2);
 }
 
 uint32_t fat32_total_sectors(fat32_bootrecord_t* bootrec) {
@@ -166,26 +176,13 @@ void fat32_parse_date(uint16_t date, int* day, int* month, int* year) {
 // return start cluster address when success
 // return 0 when failed to read fsinfo / cannot find a free cluster / not enough free cluster
 uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count) {
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table1;
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
 
-    // read the FS info
-    fat32_fsinfo_t fsinfo;
-    ata_pio_LBA28_access(true, fs->partition.LBA_start + bootrec->ebpb.fsinfo_sector, 1, (uint8_t*)&fsinfo);
+    fat32_fsinfo_t* fsinfo = (fat32_fsinfo_t*)(fs->info_table2);
 
-    // invalid signature
-    if(fsinfo.lead_signature != 0x41615252
-            || fsinfo.mid_signature != 0x61417272
-            || fsinfo.trail_signature != 0xaa550000)
-        return 0;
-
-    uint32_t current_cluster = fsinfo.available_clusters_start;
-    if(current_cluster == 0xffffffff)
-        current_cluster = 2;
-
-    size_t free_cluster_count = fsinfo.free_cluster_count;
-    if(free_cluster_count == 0xffffffff)
-        free_cluster_count = count_free_cluster(bootrec, fs, first_FAT_sector);
+    uint32_t current_cluster = fsinfo->available_clusters_start;
+    size_t free_cluster_count = fsinfo->free_cluster_count;
 
     uint32_t start_cluster = 0;
     uint32_t prev_cluster = 0;
@@ -214,35 +211,22 @@ uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count) {
     set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, FAT_EOC);
 
     // update the fsinfo
-    fsinfo.available_clusters_start = current_cluster;
-    fsinfo.free_cluster_count = free_cluster_count;
-    ata_pio_LBA28_access(false, fs->partition.LBA_start + bootrec->ebpb.fsinfo_sector, 1, (uint8_t*)&fsinfo);
+    fsinfo->available_clusters_start = current_cluster;
+    fsinfo->free_cluster_count = free_cluster_count;
+    fat32_update_fsinfo(fs);
 
     return start_cluster;
 }
 
 // free a cluster chain
 FS_ERR fat32_free_cluster_chain(fs_t* fs, uint32_t start_cluster) {
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table1;
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
 
-    // read the FS info structure
-    fat32_fsinfo_t fsinfo;
-    ata_pio_LBA28_access(true, fs->partition.LBA_start + bootrec->ebpb.fsinfo_sector, 1, (uint8_t*)&fsinfo);
+    fat32_fsinfo_t* fsinfo = (fat32_fsinfo_t*)(fs->info_table2);
 
-    // invalid signature
-    if(fsinfo.lead_signature != 0x41615252
-            || fsinfo.mid_signature != 0x61417272
-            || fsinfo.trail_signature != 0xaa550000)
-        return ERR_FS_INVALID_FSINFO;
-
-    size_t fsinfo_free_cluster_count = fsinfo.free_cluster_count;
-    if(fsinfo_free_cluster_count == 0xffffffff)
-        fsinfo_free_cluster_count = count_free_cluster(bootrec, fs, first_FAT_sector);
-
-    uint32_t fsinfo_start_cluster = fsinfo.available_clusters_start;
-    if(fsinfo_start_cluster == 0xffffffff)
-        fsinfo_start_cluster = 2;
+    size_t fsinfo_free_cluster_count = fsinfo->free_cluster_count;
+    uint32_t fsinfo_start_cluster = fsinfo->available_clusters_start;
 
     uint32_t current_cluster = start_cluster;
     while(current_cluster < FAT_EOC && current_cluster != FAT_BAD_CLUSTER) {
@@ -256,9 +240,9 @@ FS_ERR fat32_free_cluster_chain(fs_t* fs, uint32_t start_cluster) {
 
     // update fsinfo
     // only update the start cluster if it is smaller
-    if(start_cluster < fsinfo_start_cluster) fsinfo.available_clusters_start = start_cluster;
-    fsinfo.free_cluster_count = fsinfo_free_cluster_count;
-    ata_pio_LBA28_access(false, fs->partition.LBA_start + bootrec->ebpb.fsinfo_sector, 1, (uint8_t*)&fsinfo);
+    if(start_cluster < fsinfo_start_cluster) fsinfo->available_clusters_start = start_cluster;
+    fsinfo->free_cluster_count = fsinfo_free_cluster_count;
+    fat32_update_fsinfo(fs);
 
     return ERR_FS_SUCCESS;
 }
@@ -267,7 +251,7 @@ FS_ERR fat32_free_cluster_chain(fs_t* fs, uint32_t start_cluster) {
 // return start of expanded cluster address when success
 // return 0 when cannot find free cluster
 uint32_t fat32_expand_cluster_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count) {
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table1;
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
     // create new chain
     uint32_t new_chain = fat32_allocate_clusters(fs, cluster_count);
@@ -278,12 +262,15 @@ uint32_t fat32_expand_cluster_chain(fs_t* fs, uint32_t end_cluster, size_t clust
     return new_chain;
 }
 
-// resize a cluster chain to only have 1 cluster
+// cut a cluster chain at start_cluster
 FS_ERR fat32_cut_cluster_chain(fs_t* fs, uint32_t start_cluster) {
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table1;
     // get next cluster
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
     uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, start_cluster);
+    if(FAT_val >= FAT_EOC) return ERR_FS_SUCCESS; // no more cluster to cut
+    if(FAT_val == FAT_BAD_CLUSTER) return ERR_FS_BAD_CLUSTER;
+
     // free them
     FS_ERR err = fat32_free_cluster_chain(fs, FAT_val);
     if(err != ERR_FS_SUCCESS) return err;
@@ -293,7 +280,7 @@ FS_ERR fat32_cut_cluster_chain(fs_t* fs, uint32_t start_cluster) {
 
 // get the last cluster in a cluster chain
 uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster) {
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table1;
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
 
     uint32_t current_cluster = start_cluster;
@@ -312,7 +299,7 @@ uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster) {
     uint32_t copied_start_cluster = fat32_allocate_clusters(fs, 1);
     if(copied_start_cluster == 0) return 0;
 
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table1;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
@@ -344,7 +331,7 @@ uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster) {
 FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
     if(!parent->isdir) return ERR_FS_NOT_DIR;
 
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table1;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
@@ -428,7 +415,7 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
 
 // read some clusters to buffer
 FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset) {
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table1;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
@@ -492,7 +479,7 @@ FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_
 
 // write infomation into cluster
 FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset) {
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table1;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
@@ -559,7 +546,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     fs_node_t node;
     node.valid = false;
 
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table1;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
@@ -810,7 +797,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
     if(strcmp(remove_node.name, ".") || strcmp(remove_node.name, ".."))
         return ERR_FS_FAILED;
 
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)parent->fs->info_table1;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
     uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
@@ -937,7 +924,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
 
 // update node entry infomation on disk
 FS_ERR fat32_update_entry(fs_node_t* node) {
-    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)node->fs->info_table;
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)node->fs->info_table1;
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = fat32_first_data_sector(bootrec);
 
@@ -999,23 +986,43 @@ fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uin
 
 // initialize FAT 32
 // return the root node
-fs_node_t fat32_init(partition_entry_t part, int id) {
+FS_ERR fat32_init(partition_entry_t part, int id) {
     fs_t fs;
     fs.partition = part;
     fs.type = FS_FAT32;
-    fat32_bootrecord_t bootrec = fat32_get_bootrec(part);
-    memcpy(fs.info_table, &bootrec, sizeof(fat32_bootrecord_t));
+
+    // parsing info tables
+    fat32_get_bootrec(part, fs.info_table1);
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)(fs.info_table1);
+    fat32_get_fsinfo(part, bootrec, fs.info_table2);
+    fat32_fsinfo_t* fsinfo = (fat32_fsinfo_t*)(fs.info_table2);
+
+    // check fsinfo
+    if(fsinfo->lead_signature != 0x41615252
+            || fsinfo->mid_signature != 0x61417272
+            || fsinfo->trail_signature != 0xaa550000)
+        return ERR_FS_INVALID_FSINFO;
+
+    bool fsinfo_update = false;
+    if(fsinfo->available_clusters_start == 0xffffffff) {
+        fsinfo->available_clusters_start = 2;
+        fsinfo_update = true;
+    }
+    if(fsinfo->free_cluster_count == 0xffffffff) {
+        uint32_t first_FAT_sector = fat32_first_FAT_sector(bootrec);
+        fsinfo->free_cluster_count = count_free_cluster(bootrec, &fs, first_FAT_sector);
+        fsinfo_update = true;
+    }
+    if(fsinfo_update) fat32_update_fsinfo(&fs);
+
+    fs.root_node.fs = fs_get(id);
+    fs.root_node.start_cluster = bootrec->ebpb.rootdir_cluster;
+    fs.root_node.parent_node = 0; // no parent
+    fs.root_node.isdir = true;
+    fs.root_node.hidden = false;
+    fs.root_node.valid = true;
 
     fs_add(fs, id);
 
-    fs_node_t rootnode;
-    rootnode.fs = fs_get(id);
-    rootnode.start_cluster = bootrec.ebpb.rootdir_cluster;
-    rootnode.parent_node = 0; // no parent
-    rootnode.isdir = true;
-    rootnode.hidden = false;
-    rootnode.valid = true;
-
-    fs.root_node = rootnode;
-    return rootnode;
+    return ERR_FS_SUCCESS;
 }

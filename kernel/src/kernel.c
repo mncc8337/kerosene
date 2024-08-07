@@ -17,7 +17,7 @@
 char freebuff[512];
 
 int FS_ID = 0;
-fs_node_t current_node;
+fs_t* fs;
 
 extern uint32_t startkernel;
 extern uint32_t endkernel;
@@ -83,12 +83,18 @@ void disk_init() {
         partition_entry_t part = mbr_get_partition_entry(i);
         if(part.sector_count == 0) continue;
 
+        FS_ERR err;
         switch(fs_detect(part)) {
             case FS_EMPTY:
                 break;
             case FS_FAT32:
-                current_node = fat32_init(part, FS_ID);
-                print_debug(LT_OK, "initialised FAT 32 filesystem in partition %d\n", i+1);
+                err = fat32_init(part, FS_ID);
+                if(err != ERR_FS_SUCCESS) {
+                    print_debug(LT_ER, "failed to initialize FAT32 filesystem in partition %d. error code %d\n", i+1, err);
+                    break;
+                }
+                print_debug(LT_OK, "initialised FAT32 filesystem in partition %d\n", i+1);
+                fs = fs_get(FS_ID);
                 break;
             case FS_EXT2:
                 print_debug(LT_WN, "EXT2 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
@@ -96,9 +102,9 @@ void disk_init() {
         }
     }
 
-    if(current_node.valid) {
-        current_node.name[0] = '/';
-        current_node.name[1] = '\0';
+    if(fs->root_node.valid) {
+        fs->root_node.name[0] = '/';
+        fs->root_node.name[1] = '\0';
     }
 }
 
@@ -151,7 +157,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    shell_set_root_node(current_node);
+    shell_set_root_node(fs->root_node);
     shell_start();
 
     // // i cannot get this to work :(

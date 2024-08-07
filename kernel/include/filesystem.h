@@ -99,9 +99,12 @@ struct _fs_t {
     fs_type_t type;
     partition_entry_t partition;
     struct _fs_node_t root_node;
-    // the filesystem info table
+    // the filesystem info table 1
     // FAT12/16/32: boot record
-    uint8_t info_table[512];
+    uint8_t info_table1[512];
+    // the filesystem info table 2
+    // FAT12/16/32: FS info structure
+    uint8_t info_table2[512];
 };
 
 typedef struct {
@@ -139,7 +142,10 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size);
 FS_ERR file_close(FILE* file);
 
 // fat32.c
-fat32_bootrecord_t fat32_get_bootrec(partition_entry_t part);
+void fat32_get_bootrec(partition_entry_t part, uint8_t* bootrec);
+void fat32_update_bootrecord(fs_t* fs);
+void fat32_get_fsinfo(partition_entry_t part, fat32_bootrecord_t* bootrec, uint8_t* fsinfo);
+void fat32_update_fsinfo(fs_t* fs);
 uint32_t fat32_total_sectors(fat32_bootrecord_t* bootrec);
 uint32_t fat32_FAT_size(fat32_bootrecord_t* bootrec);
 uint32_t fat32_first_data_sector(fat32_bootrecord_t* bootrec);
@@ -168,4 +174,4 @@ fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uin
 
 FS_ERR fat32_save_entry();
 
-fs_node_t fat32_init(partition_entry_t part, int id);
+FS_ERR fat32_init(partition_entry_t part, int id);
