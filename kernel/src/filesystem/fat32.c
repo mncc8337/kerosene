@@ -160,6 +160,75 @@ static size_t count_free_cluster(fat32_bootrecord_t* bootrec, fs_t* fs, uint32_t
     return free_count;
 }
 
+static void fix_empty_entry(fs_t* fs, uint32_t start_cluster, uint32_t end_cluster) {
+    // this is the faster version that use a stack for a quick way
+    // to get the previous cluster of any cluster in the chain
+
+    fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)fs->info_table1;
+    uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
+    uint32_t first_data_sector = get_first_data_sector(bootrec);
+    uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
+
+    uint32_t current_cluster = start_cluster;
+    uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
+    uint8_t directory[cluster_size];
+
+    uint32_t cluster_stack[512]; // i dont think there are any directory that expand to more than 512 cluster
+    int stack_top = -1;
+    // fill in the stack
+    // TODO: only push clusters contain a lot of 0xe5 entries and end with 0x0 entry to save space
+    while(current_cluster != end_cluster) {
+        if(stack_top == 511) break; // give up
+
+        cluster_stack[++stack_top] = current_cluster;
+        current_cluster = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
+    }
+    cluster_stack[++stack_top] = current_cluster;
+
+    while(true) {
+        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
+
+        bool found_cleared_entry = false;
+        bool job_done = false;
+        for(int index = cluster_size - sizeof(fat_directory_entry_t); index >= 0; index -= sizeof(fat_directory_entry_t)) {
+            if(directory[index] == 0x0) {
+                if(!found_cleared_entry) continue;
+                else goto done_deleting; // this should never happend
+            }
+            if(directory[index] != 0xe5) {
+                // toggle flag and end
+                // the flag also mean that this cluster is not empty
+                job_done = true;
+                break;
+            }
+
+            // now directory[index] is 0xe5
+            found_cleared_entry = true;
+            directory[index] = 0x0;
+        }
+
+        if(job_done) {
+            // write changes
+            ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
+            goto done_deleting;
+        }
+
+        // if it reached here then the current_cluster is empty
+        // note that current_cluster is also the final cluster of the chain
+        // so we can free it by only set its FAT value to 0
+        set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, FAT_FREE_CLUSTER);
+
+        // if it is the head of the cluster chain then just exit
+        if(stack_top == 0) return; // return to skip setting its FAT val to EOC
+
+        current_cluster = cluster_stack[--stack_top];
+    }
+
+    done_deleting:
+    set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, FAT_EOC);
+}
+
 void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour) {
     *hour = (time >> 11);
     *minute = (time >> 5) & 0b111111;
@@ -880,7 +949,8 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
 
     if(clear_val == 0xe5 || (clear_val == 0x0 && go_back == 0)) {
         // "delete" directory entries in the current cluster, just set the first byte of that entry to 0x0 or 0xe5
-        for(int i = 0; i < entry_cnt; i++) directory[start_index + i*32] = clear_val;
+        for(int i = 0; i < entry_cnt; i++)
+            directory[start_index + i*sizeof(fat_directory_entry_t)] = clear_val;
 
         // write
         int first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
@@ -888,7 +958,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
     }
     if(go_back > 0) {
         start_index = cluster_size - go_back;
-        entry_cnt = go_back / 32;
+        entry_cnt = go_back / sizeof(fat_directory_entry_t);
 
         // find previous cluster of current cluster
         uint32_t last_cluster = parent->start_cluster;
@@ -903,7 +973,8 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
         ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
         // "delete"
-        for(int i = 0; i < entry_cnt; i++) directory[start_index + i*32] = clear_val;
+        for(int i = 0; i < entry_cnt; i++)
+            directory[start_index + i*sizeof(fat_directory_entry_t)] = clear_val;
 
         // write
         ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
@@ -914,9 +985,8 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
         }
     }
 
-    // TODO: clear 0xe5 entry if their next entry is 0x0 (clear_val)
-
-    // the pain is over
+    if(clear_val == 0x0)
+        fix_empty_entry(parent->fs, parent->start_cluster, remove_node.parent_cluster);
 
     return ERR_FS_SUCCESS;
 }
