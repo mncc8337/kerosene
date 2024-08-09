@@ -33,10 +33,10 @@ void timer_wait(unsigned int ms) {
     asm volatile("sti");
 }
 
-void timer_init_PIT() {
+void timer_init() {
     if(initialised) return;
 
-    pit_timer_phase(TIMER_FREQUENCY);
+    pit_timer_frequency(TIMER_FREQUENCY);
     irq_install_handler(0, tick_handler);
     initialised = true;
 }

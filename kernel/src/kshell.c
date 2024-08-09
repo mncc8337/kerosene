@@ -1,5 +1,6 @@
 #include "kshell.h"
 #include "kbd.h"
+#include "rtc.h"
 #include "timer.h"
 #include "tty.h"
 #include "filesystem.h"
@@ -7,6 +8,8 @@
 #include "string.h"
 #include "stdio.h"
 #include "stdlib.h"
+
+#include "time.h"
 
 typedef enum {
     ERR_SHELL_NOT_FOUND,
@@ -127,6 +130,7 @@ static void help(char* arg) {
         else if(strcmp(arg, "cp")) puts("cp <source-path> <destination-path>");
         else if(strcmp(arg, "stat")) puts("stat <path>");
         else if(strcmp(arg, "pwd")) puts("pwd <no-args>");
+        else if(strcmp(arg, "datetime")) puts("datetime <no-args>");
     }
 }
 
@@ -579,6 +583,13 @@ static void pwd(char* args) {
     putchar('\n');
 }
 
+static void datetime(char* arg) {
+    (void)(arg);
+    time_t curr_time = rtc_get_current_time();
+
+    printf("seconds since epoch: %d\n", curr_time);
+}
+
 static void process_prompt() {
     char* cmd_name = strtok(input, " ");
     char* remain_arg = cmd_name + strlen(cmd_name) + 1;
@@ -604,6 +615,7 @@ static void process_prompt() {
     else if(strcmp(cmd_name, "cp")) cp(remain_arg);
     else if(strcmp(cmd_name, "stat")) stat(remain_arg);
     else if(strcmp(cmd_name, "pwd")) pwd(remain_arg);
+    else if(strcmp(cmd_name, "datetime")) datetime(remain_arg);
     else if(input_len == 0); // just skip
     else puts("unknow command");
     printf("[kernel@kshell %s ]$ ", node_stack[node_stack_offset].name);

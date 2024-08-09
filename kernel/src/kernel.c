@@ -1,10 +1,12 @@
 #include "multiboot.h"
+#include "pic.h"
 #include "system.h"
 #include "kpanic.h"
 #include "tty.h"
 #include "mem.h"
 #include "ata.h"
 #include "kbd.h"
+#include "rtc.h"
 #include "timer.h"
 #include "syscall.h"
 #include "filesystem.h"
@@ -115,8 +117,9 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // greeting msg to let us know we are in the kernel
     tty_set_attr(LIGHT_CYAN);  puts("hello");
     tty_set_attr(LIGHT_GREEN); printf("this is ");
-    tty_set_attr(LIGHT_RED);   puts("the kernel");
+    tty_set_attr(LIGHT_RED);   puts("sos kernel!");
     tty_set_attr(LIGHT_GREY);
+    printf("build datetime: %s, %s\n", __TIME__, __DATE__);
 
     if(magic != MULTIBOOT_BOOTLOADER_MAGIC) {
         print_debug(LT_CR, "invalid magic number. system halted\n");
@@ -150,7 +153,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     kbd_init();
 
-    timer_init_PIT();
+    timer_init();
 
     // start interrupts again after setting up everything
     asm volatile("sti");

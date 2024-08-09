@@ -10,6 +10,7 @@ BIN = bin/
 LIBC_SRC = libc/stdio/*.c \
 		   libc/stdlib/*.c \
 		   libc/string/*.c \
+		   libc/time/*.c \
 
 C_SRC = kernel/src/*.c \
 		kernel/src/system/*.c \
@@ -50,6 +51,8 @@ $(BIN)%.o: libc/stdio/%.c
 $(BIN)%.o: libc/stdlib/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)%.o: libc/string/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)%.o: libc/time/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)libk.a: $(LIBC_OBJ)
 	$(CROSS_COMPILER_LOC)$(TARGET)-ar rcs $@ $^

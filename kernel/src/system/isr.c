@@ -4,6 +4,8 @@
 #include "pic.h"
 #include "string.h"
 
+#include "stdio.h"
+
 static void* routines[IDT_MAX_DESCRIPTORS];
 // from isr.asm
 extern void* isr_table[IDT_MAX_DESCRIPTORS];
@@ -53,9 +55,7 @@ static void exception_handler(regs_t* r) {
 
 // default ISR. every interrupt will be "handled" by this function
 void isr_handler(regs_t* reg) {
-    void (*handler)(regs_t*);
-
-    handler = routines[reg->int_no];
+    void (*handler)(regs_t*) = routines[reg->int_no];
     if(handler) handler(reg);
 
     // if is an IRQ
@@ -90,6 +90,6 @@ void isr_init() {
     for(int vector = 32; vector < 48; vector++)
         idt_set_descriptor(vector, isr_table[vector], 0x8e);
 
-    memset(routines + 32, 0, 223);
+    memset(routines + 32, 0, 255 - 32);
 }
 

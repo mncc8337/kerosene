@@ -8,4 +8,5 @@ void install_tick_listener(void (*tlis)(unsigned int));
 void uninstall_tick_listener();
 
 void timer_wait(unsigned int waittick);
-void timer_init_PIT();
+
+void timer_init();
