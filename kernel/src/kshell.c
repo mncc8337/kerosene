@@ -1,6 +1,5 @@
 #include "kshell.h"
 #include "kbd.h"
-#include "rtc.h"
 #include "timer.h"
 #include "tty.h"
 #include "filesystem.h"
@@ -585,9 +584,10 @@ static void pwd(char* args) {
 
 static void datetime(char* arg) {
     (void)(arg);
-    time_t curr_time = rtc_get_current_time();
+    time_t curr_time = time(NULL);
 
     printf("seconds since epoch: %d\n", curr_time);
+    printf("second since start: %d\n", curr_time - timer_get_start_time());
 }
 
 static void process_prompt() {
