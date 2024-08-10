@@ -4,8 +4,6 @@
 #include "pic.h"
 #include "string.h"
 
-#include "stdio.h"
-
 static void* routines[IDT_MAX_DESCRIPTORS];
 // from isr.asm
 extern void* isr_table[IDT_MAX_DESCRIPTORS];

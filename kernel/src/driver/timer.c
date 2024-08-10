@@ -19,11 +19,11 @@ unsigned int timer_get_ticks() {
     return ticks;
 }
 
-int timer_get_start_time() {
+time_t timer_get_start_time() {
     return start_timestamp;
 }
 
-int timer_get_current_time() {
+time_t timer_get_current_time() {
     return start_timestamp + (ticks / TIMER_FREQUENCY);
 }
 

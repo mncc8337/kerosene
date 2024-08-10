@@ -1,8 +1,10 @@
 #pragma once
 
+#include "time.h"
+
 unsigned int timer_get_ticks();
-int timer_get_start_time();
-int timer_get_current_time();
+time_t timer_get_start_time();
+time_t timer_get_current_time();
 
 void install_tick_listener(void (*tlis)(unsigned int));
 void uninstall_tick_listener();

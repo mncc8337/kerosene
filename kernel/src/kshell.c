@@ -220,6 +220,7 @@ static void read(char* path) {
     while(file_read(&f, (uint8_t*)(&chr), 1) != ERR_FS_EOF) {
         putchar(chr);
     }
+    file_close(&f);
 }
 
 static void cd(char* path) {
@@ -547,14 +548,25 @@ static void stat(char* path) {
         return;
     }
 
-    printf("stat of '%s':\n", node.name);
-    printf("    filesystem: %s\n", (node.fs->type == 1 ? "FAT32" : (node.fs->type == 2 ? "ext2" : "unknown")));
-    printf("    parent: '%s'\n", node.parent_node->name);
-    printf("    type: %s\n", (node.isdir ? "directory" : "file"));
-    printf("    hidden: %s\n", (node.hidden ? "true" : "false"));
-    printf("    size: %d bytes\n", node.size);
-    // TODO: creation/last access/modified datetime
-    printf("    start cluster: 0x%x\n", node.start_cluster);
+    printf("filesystem: %s\n", (node.fs->type == 1 ? "FAT32" : (node.fs->type == 2 ? "ext2" : "unknown")));
+    printf("parent: '%s'\n", node.parent_node->name);
+    printf("start cluster: 0x%x\n", node.start_cluster);
+    printf("type: %s\n", (node.isdir ? "directory" : "file"));
+    printf("hidden: %s\n", (node.hidden ? "true" : "false"));
+    printf("size: %d bytes\n", node.size);
+
+    struct tm t_dump = gmtime(&(node.creation_timestamp));
+    printf("    creation timestamp: %d/%d/%d %d:%d:%d.%d\n",
+           t_dump.tm_mday, t_dump.tm_mon, t_dump.tm_year,
+           t_dump.tm_hour, t_dump.tm_min, t_dump.tm_sec, node.creation_milisecond);
+    t_dump = gmtime(&(node.accessed_timestamp));
+    printf("    last accessed timestamp: %d/%d/%d %d:%d:%d\n",
+           t_dump.tm_mday, t_dump.tm_mon, t_dump.tm_year,
+           t_dump.tm_hour, t_dump.tm_min, t_dump.tm_sec);
+    t_dump = gmtime(&(node.modified_timestamp));
+    printf("    last modified timestamp: %d/%d/%d %d:%d:%d\n",
+           t_dump.tm_mday, t_dump.tm_mon, t_dump.tm_year,
+           t_dump.tm_hour, t_dump.tm_min, t_dump.tm_sec);
 }
 
 static void pwd(char* args) {

@@ -4,6 +4,8 @@
 #include "stdbool.h"
 #include "stddef.h"
 
+#include "time.h"
+
 #include "fat_type.h"
 
 // including the null char
@@ -82,13 +84,11 @@ struct _fs_node_t {
     uint32_t start_cluster;
     bool isdir;
     bool hidden;
+    uint16_t creation_milisecond;
+    time_t creation_timestamp;
+    time_t modified_timestamp;
+    time_t accessed_timestamp;
     uint32_t size;
-    uint8_t centisecond;
-    uint16_t creation_time;
-    uint16_t creation_date;
-    uint16_t last_access_date;
-    uint16_t last_mod_time;
-    uint16_t last_mod_date;
     // filesystem infomation
     // may change when i add support for other filesystem
     uint32_t parent_cluster;
@@ -147,9 +147,6 @@ uint32_t fat32_expand_cluster_chain(fs_t* fs, uint32_t end_cluster, size_t clust
 FS_ERR fat32_cut_cluster_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster);
-
-void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour);
-void fat32_parse_date(uint16_t date, int* day, int* month, int* year);
 
 FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset);

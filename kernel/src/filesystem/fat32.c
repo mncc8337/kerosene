@@ -230,16 +230,28 @@ static void fix_empty_entries(fs_t* fs, uint32_t start_cluster, uint32_t end_clu
     ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 }
 
-void fat32_parse_time(uint16_t time, int* second, int* minute, int* hour) {
-    *hour = (time >> 11);
-    *minute = (time >> 5) & 0b111111;
-    *second = (time & 0b11111) * 2;
+static void parse_datetime(uint16_t date, uint16_t time, time_t* t) {
+    struct tm _t;
+
+    _t.tm_hour = (time >> 11);
+    _t.tm_min = (time >> 5) & 0b111111;
+    _t.tm_sec = (time & 0b11111) * 2;
+    _t.tm_mday = date & 0b11111;
+    _t.tm_mon = (date >> 5) & 0b1111;
+    _t.tm_year = (date >> 9) + 1980;
+
+    *t = mktime(&_t);
 }
-void fat32_parse_date(uint16_t date, int* day, int* month, int* year) {
-    *day = date & 0b11111;
-    *month = (date >> 5) & 0b1111;
-    *year = (date >> 9) + 1980;
+static void parse_timestamp(uint16_t* date, uint16_t* time, struct tm t) {
+    *time = t.tm_sec/2;
+    *time |= t.tm_min << 5;
+    *time |= t.tm_hour << 11;
+
+    *date = t.tm_mday;
+    *date |= t.tm_mon << 5;
+    *date |= (t.tm_year >= 1980 ? t.tm_year - 1980 : 0) << 9;
 }
+
 
 // find a free custer / clusters chain
 // return start cluster address when success
@@ -448,12 +460,10 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
                 // else we would destroy cluster 0 which contain filesystem infomation
                 node.start_cluster = bootrec->ebpb.rootdir_cluster;
             }
-            node.centisecond = temp_dir->centisecond;
-            node.creation_time = temp_dir->creation_time;
-            node.creation_date = temp_dir->creation_date;
-            node.last_access_date = temp_dir->last_access_date;
-            node.last_mod_time = temp_dir->last_mod_time;
-            node.last_mod_date = temp_dir->last_mod_date;
+            node.creation_milisecond = temp_dir->centisecond * 10;
+            parse_datetime(temp_dir->creation_date, temp_dir->creation_time, &(node.creation_timestamp));
+            parse_datetime(temp_dir->last_access_date, 0, &(node.accessed_timestamp));
+            parse_datetime(temp_dir->last_mod_date, temp_dir->last_mod_time, &(node.modified_timestamp));
             node.isdir = temp_dir->attr & FAT_ATTR_DIRECTORY;
             node.hidden = temp_dir->attr & FAT_ATTR_HIDDEN;
 
@@ -782,14 +792,10 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     node.isdir = attr & FAT_ATTR_DIRECTORY;
     node.hidden = attr & FAT_ATTR_HIDDEN;
     node.size = size;
-    // TODO: set correct time attr
-    // these are dummy value
-    node.centisecond = 102;
-    node.creation_time = 0b0010110011101111;
-    node.creation_date = 0b0101100110001101;
-    node.last_access_date = 0b0101100110001101;
-    node.last_mod_time = 0b0010110011101111;
-    node.last_mod_date = 0b0101100110001101;
+    node.creation_milisecond = (clock() % CLOCKS_PER_SEC) * 1000 / CLOCKS_PER_SEC;
+    node.creation_timestamp = time(NULL);
+    node.modified_timestamp = 0;
+    node.accessed_timestamp = 0;
 
     // add entries
     for(int i = lfn_entry_count; i >= 0; i--) {
@@ -822,13 +828,23 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
             fat_directory_entry_t* dir_entry = (fat_directory_entry_t*)(directory + start_index);
             memcpy(dir_entry->name, shortname, 11);
             dir_entry->attr = attr;
-            dir_entry->centisecond = node.centisecond;
-            dir_entry->creation_time = node.creation_time;
-            dir_entry->creation_date = node.creation_date;
-            dir_entry->last_access_date = node.last_access_date;
+            dir_entry->centisecond = node.creation_milisecond / 10;
+
+            uint16_t date_dump, time_dump;
+
+            parse_timestamp(&date_dump, &time_dump, gmtime(&(node.creation_timestamp)));
+            dir_entry->creation_time = time_dump;
+            dir_entry->creation_date = date_dump;
+
+            parse_timestamp(&date_dump, &time_dump, gmtime(&(node.accessed_timestamp)));
+            dir_entry->last_access_date = date_dump;
+
             dir_entry->first_cluster_number_high = start_cluster >> 16;
-            dir_entry->last_mod_time = node.last_mod_time;
-            dir_entry->last_mod_date = node.last_mod_date;
+
+            parse_timestamp(&date_dump, &time_dump, gmtime(&(node.modified_timestamp)));
+            dir_entry->last_mod_time = time_dump;
+            dir_entry->last_mod_date = date_dump;
+
             dir_entry->first_cluster_number_low = start_cluster & 0xffff;
             dir_entry->size = size;
 
@@ -1007,9 +1023,14 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
     fat_directory_entry_t* dir = (fat_directory_entry_t*)(directory+node->parent_cluster_index);
     // TODO: check if the entry is really exists
     
-    dir->last_access_date = node->last_access_date;
-    dir->last_mod_time = node->last_mod_time;
-    dir->last_mod_date = node->last_mod_date;
+    uint16_t date_dump, time_dump;
+
+    parse_timestamp(&date_dump, &time_dump, gmtime(&(node->accessed_timestamp)));
+    dir->last_access_date = date_dump;
+    parse_timestamp(&date_dump, &time_dump, gmtime(&(node->modified_timestamp)));
+    dir->last_mod_time = time_dump;
+    dir->last_mod_date = date_dump;
+
     dir->attr = node->isdir | node->hidden;
     dir->size = node->size;
     // name updating is very problematic

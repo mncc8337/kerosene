@@ -1,8 +1,6 @@
 #include "time.h"
 #include "stdbool.h"
 
-#include "stdio.h"
-
 #define SECS_PER_DAY 86400
 
 // 1/1/1970 was thursday

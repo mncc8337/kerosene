@@ -209,6 +209,9 @@ FILE file_open(fs_node_t* node, int mode) {
             break;
     }
 
+    if(file.valid)
+        node->accessed_timestamp = time(NULL);
+
     return file;
 }
 
@@ -234,6 +237,7 @@ FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
 
         file->position += size;
         file->node->size += size;
+        file->node->modified_timestamp = time(NULL);
         return ERR_FS_SUCCESS;
     }
 
@@ -262,11 +266,6 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
 }
 
 FS_ERR file_close(FILE* file) {
-    if(file->mode == FILE_READ) {
-        file->valid = false;
-        return ERR_FS_SUCCESS;
-    }
-
     if(file->node->fs->type == FS_FAT32) {
         fat32_update_entry(file->node);
         file->valid = false;
