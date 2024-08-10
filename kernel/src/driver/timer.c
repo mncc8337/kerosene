@@ -42,7 +42,8 @@ void timer_wait(unsigned int ms) {
 }
 
 void timer_init() {
-    start_timestamp = rtc_get_current_time();
+    struct tm t = rtc_get_current_time();
+    start_timestamp = mktime(&t);
 
     pit_timer_frequency(TIMER_FREQUENCY);
     irq_install_handler(0, tick_handler);

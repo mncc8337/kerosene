@@ -1,7 +1,5 @@
 #pragma once
 
-#define TIMER_FREQUENCY 1000
-
 unsigned int timer_get_ticks();
 int timer_get_start_time();
 int timer_get_current_time();

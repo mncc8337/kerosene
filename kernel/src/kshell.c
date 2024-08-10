@@ -1,6 +1,5 @@
 #include "kshell.h"
 #include "kbd.h"
-#include "timer.h"
 #include "tty.h"
 #include "filesystem.h"
 
@@ -44,11 +43,6 @@ static void kbd_listener(key_t k) {
     if(k.released) return;
     key_handled = false;
     current_key = k;
-}
-static void tick_listener(unsigned int ticks) {
-    (void)(ticks);
-
-    // put some sheduled tasks here
 }
 
 static int indent_level = 0;
@@ -113,7 +107,7 @@ static void help(char* arg) {
     else {
         if(arg[0] == '.') printf("go back %d dir\n", strlen(arg)-1);
         else if(strcmp(arg, "echo")) puts("echo <string>");
-        else if(strcmp(arg, "ticks")) puts("ticks <no-args>");
+        else if(strcmp(arg, "clocks")) puts("clocks <no-args>");
         else if(strcmp(arg, "ls")) puts(
                 "ls <args> <directory>\n"
                 "available arg:\n"
@@ -137,9 +131,9 @@ static void echo(char* args) {
     puts(args);
 }
 
-static void ticks(char* args) {
+static void clocks(char* args) {
     (void)(args);
-    printf("%d\n", timer_get_ticks());
+    printf("%d\n", clock());
 }
 
 static void ls(char* args) {
@@ -587,7 +581,6 @@ static void datetime(char* arg) {
     time_t curr_time = time(NULL);
 
     printf("seconds since epoch: %d\n", curr_time);
-    printf("seconds since start: %d\n", curr_time - timer_get_start_time());
 }
 
 static void process_prompt() {
@@ -603,7 +596,7 @@ static void process_prompt() {
         else node_stack_offset -= back_cnt;
     }
     else if(strcmp(cmd_name, "echo")) echo(remain_arg);
-    else if(strcmp(cmd_name, "ticks")) ticks(remain_arg);
+    else if(strcmp(cmd_name, "clocks")) clocks(remain_arg);
     else if(strcmp(cmd_name, "ls")) ls(remain_arg);
     else if(strcmp(cmd_name, "read")) read(remain_arg);
     else if(strcmp(cmd_name, "cd")) cd(remain_arg);
@@ -628,7 +621,6 @@ void shell_set_root_node(fs_node_t node) {
     node_stack_offset = 0;
 }
 void shell_start() {
-    install_tick_listener(tick_listener);
     install_key_listener(kbd_listener);
     puts("welcome to the shell");
     puts("type `help` t show all command. `help <command>` to see all available argument");

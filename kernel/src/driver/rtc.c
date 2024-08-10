@@ -1,6 +1,5 @@
 #include "rtc.h"
 #include "system.h"
-#include "time.h"
 
 static bool is_update_in_progress() {
     port_outb(PORT_RTC_SELECT_REG, RTC_REG_A);
@@ -47,7 +46,7 @@ void rtc_timer_start() {
 }
 */
 
-int rtc_get_current_time() {
+struct tm rtc_get_current_time() {
     struct tm curr_time;
 
     uint8_t last_second;
@@ -109,5 +108,5 @@ int rtc_get_current_time() {
     // ok until next century comes :)
     curr_time.tm_year += 2000;
 
-    return mktime(&curr_time);
+    return curr_time;
 }

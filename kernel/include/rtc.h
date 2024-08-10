@@ -1,5 +1,7 @@
 #pragma once
 
+#include "time.h"
+
 #define PORT_RTC_SELECT_REG 0x70
 #define PORT_RTC_DAT 0x71
 
@@ -17,4 +19,4 @@
 
 void rtc_timer_start();
 void rtc_timer_frequency(int freq);
-int rtc_get_current_time();
+struct tm rtc_get_current_time();
