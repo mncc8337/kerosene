@@ -47,7 +47,7 @@ void rtc_timer_start() {
 }
 */
 
-time_t rtc_get_current_time() {
+int rtc_get_current_time() {
     struct tm curr_time;
 
     uint8_t last_second;

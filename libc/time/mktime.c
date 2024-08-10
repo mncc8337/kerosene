@@ -31,17 +31,17 @@ time_t mktime(struct tm* tp) {
     // calculate total second from 1970 to tp->tm_year
     t = (tp->tm_year - 1970) * 365;
     // accounting leap year
-    t += (int)(tp->tm_year/4) - (int)(1970/4); // years that are divisable by 4
-    t -= (int)(tp->tm_year/100) - (int)(1970/100); // years that are divisable by 100
-    t += (int)(tp->tm_year/400) - (int)(1970/400); // years that are divisable by 400
+    t += (int)((tp->tm_year-1)/4) - (int)(1970/4);
+    t -= (int)((tp->tm_year-1)/100) - (int)(1970/100);
+    t += (int)((tp->tm_year-1)/400) - (int)(1970/400);
     t *= seconds_per_day;
 
     // calculate total second from january to the start of tp->tm_month
     for(int m = 1; m < (tp->tm_mon); m++)
         t += days_in_month(m, leap_year) * seconds_per_day;
 
-    // adding the remaining days
-    t += tp->tm_mday * seconds_per_day;
+    // adding the remaining days (excluding current day)
+    t += (tp->tm_mday - 1) * seconds_per_day;
 
     // the rest is easy
     t += tp->tm_sec;

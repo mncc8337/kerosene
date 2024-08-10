@@ -3,7 +3,6 @@
 #include "pit.h"
 #include "rtc.h"
 
-static bool initialised = false;
 static volatile unsigned int ticks = 0;
 static void (*tick_listener)(unsigned int) = 0;
 static uint32_t start_timestamp;
@@ -42,14 +41,9 @@ void timer_wait(unsigned int ms) {
     asm volatile("sti");
 }
 
-bool timer_is_initialised() {
-    return initialised;
-}
-
 void timer_init() {
     start_timestamp = rtc_get_current_time();
 
     pit_timer_frequency(TIMER_FREQUENCY);
     irq_install_handler(0, tick_handler);
-    initialised = true;
 }

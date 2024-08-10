@@ -3,7 +3,7 @@
 #include "stdint.h"
 
 // epochalypse is still 14 years away :)
-typedef uint32_t time_t;
+typedef int32_t time_t;
 
 struct tm {
     int tm_sec;

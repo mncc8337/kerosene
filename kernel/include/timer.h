@@ -1,7 +1,5 @@
 #pragma once
 
-#include "stdbool.h"
-
 #define TIMER_FREQUENCY 1000
 
 unsigned int timer_get_ticks();
@@ -13,5 +11,4 @@ void uninstall_tick_listener();
 
 void timer_wait(unsigned int waittick);
 
-bool timer_is_initialised();
 void timer_init();

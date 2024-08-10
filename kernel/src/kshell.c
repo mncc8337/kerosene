@@ -587,7 +587,7 @@ static void datetime(char* arg) {
     time_t curr_time = time(NULL);
 
     printf("seconds since epoch: %d\n", curr_time);
-    printf("second since start: %d\n", curr_time - timer_get_start_time());
+    printf("seconds since start: %d\n", curr_time - timer_get_start_time());
 }
 
 static void process_prompt() {
