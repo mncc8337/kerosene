@@ -579,7 +579,40 @@ static void pwd(char* args) {
 static void datetime(char* arg) {
     (void)(arg);
     time_t curr_time = time(NULL);
+    struct tm t = gmtime(&curr_time);
 
+    printf("%d:%d:%d, ", t.tm_hour, t.tm_min, t.tm_sec);
+    switch(t.tm_wday) {
+        case 1:
+        printf("mon ");
+        break;
+
+        case 2:
+        printf("tue ");
+        break;
+
+        case 3:
+        printf("wed ");
+        break;
+
+        case 4:
+        printf("thu ");
+        break;
+
+        case 5:
+        printf("fri ");
+        break;
+
+        case 6:
+        printf("sat ");
+        break;
+
+        case 0:
+        printf("sun ");
+        break;
+    }
+    printf("%d/%d/%d\n", t.tm_mday, t.tm_mon, t.tm_year);
+    printf("days since 1st january: %d\n", t.tm_yday);
     printf("seconds since epoch: %d\n", curr_time);
 }
 

@@ -2,6 +2,8 @@
 
 #include "stdbool.h"
 
+#define SECS_PER_DAY 86400
+
 static bool is_leap_year(int year) {
     if(year % 400 == 0) return true;
     if(year % 4 == 0) return !(year % 100 == 0);
@@ -26,22 +28,21 @@ time_t mktime(struct tm* tp) {
     time_t t;
 
     bool leap_year = is_leap_year(tp->tm_year);
-    const int seconds_per_day = 86400;
 
     // calculate total second from 1970 to tp->tm_year
     t = (tp->tm_year - 1970) * 365;
     // accounting leap year
-    t += (int)((tp->tm_year-1)/4) - (int)(1970/4);
+    t += (int)((tp->tm_year-1)/4)   - (int)(1970/4);
     t -= (int)((tp->tm_year-1)/100) - (int)(1970/100);
     t += (int)((tp->tm_year-1)/400) - (int)(1970/400);
-    t *= seconds_per_day;
+    t *= SECS_PER_DAY;
 
     // calculate total second from january to the start of tp->tm_month
     for(int m = 1; m < (tp->tm_mon); m++)
-        t += days_in_month(m, leap_year) * seconds_per_day;
+        t += days_in_month(m, leap_year) * SECS_PER_DAY;
 
     // adding the remaining days (excluding current day)
-    t += (tp->tm_mday - 1) * seconds_per_day;
+    t += (tp->tm_mday - 1) * SECS_PER_DAY;
 
     // the rest is easy
     t += tp->tm_sec;

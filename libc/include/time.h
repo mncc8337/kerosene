@@ -30,5 +30,6 @@ struct tm {
 time_t time(time_t* timer);
 time_t mktime(struct tm* tp);
 double difftime(time_t time1, time_t time0);
-
 clock_t clock();
+
+struct tm gmtime(const time_t* timer);
