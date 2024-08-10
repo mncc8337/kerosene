@@ -72,8 +72,7 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
 - [ ] ATA
     - [x] PIO mode
     - [ ] to be updated
-- [ ] CMOS
-    - [ ] get datetime
+- [x] CMOS: get datetime
 - [ ] APCI
 - [ ] mouse driver
 - [ ] GUI
@@ -110,8 +109,8 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
     - [ ] GNU GCC
     - [ ] to be updated
 ### misc
-- [ ] get current timestamp
-- [ ] set file timestamp
+- [x] get current timestamp
+- [x] set file timestamp
 ## known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
 - enter_usermode() crash after run `iret`
