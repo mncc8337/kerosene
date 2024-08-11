@@ -102,9 +102,10 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help .<n dot> echo ticks ls read cd mkdir rm touch write mv cp stat pwd");
+        puts("help .<n dot> echo ticks ls read cd mkdir rm touch write mv cp stat pwd datetime");
     }
     else {
+        arg = strtok(arg, " ");
         if(arg[0] == '.') printf("go back %d dir\n", strlen(arg)-1);
         else if(strcmp(arg, "echo")) puts("echo <string>");
         else if(strcmp(arg, "clocks")) puts("clocks <no-args>");
@@ -203,6 +204,8 @@ static void read(char* path) {
         return;
     }
 
+    path = strtok(path, " ");
+
     fs_node_t node_parent;
     fs_node_t node;
     SHELL_ERR err = path_find_last_node(path, &node_parent, &node);
@@ -233,6 +236,8 @@ static void cd(char* path) {
         puts("no path provided");
         return;
     }
+
+    path = strtok(path, " ");
 
     if(path[0] == '/') {
         // to rootdir
@@ -277,6 +282,8 @@ static void mkdir(char* path) {
         return;
     }
 
+    path = strtok(path, " ");
+
     fs_node_t _curr_node = *current_node;
 
     if(path[0] == '/') {
@@ -312,6 +319,8 @@ static void rm(char* path) {
         puts("no name provided");
         return;
     }
+
+    path = strtok(path, " ");
     
     fs_node_t node_parent;
     fs_node_t node;
@@ -340,6 +349,8 @@ static void touch(char* path) {
         puts("no name provided");
         return;
     }
+
+    path = strtok(path, " ");
 
     fs_node_t node_parent;
     fs_node_t node;
@@ -370,6 +381,8 @@ static void write(char* path) {
         puts("no name provided");
         return;
     }
+
+    path = strtok(path, " ");
 
     fs_node_t node_parent;
     fs_node_t node;
@@ -536,6 +549,8 @@ static void stat(char* path) {
         return;
     }
 
+    path = strtok(path, " ");
+
     fs_node_t node_parent;
     fs_node_t node;
     SHELL_ERR err = path_find_last_node(path, &node_parent, &node);
@@ -543,7 +558,7 @@ static void stat(char* path) {
         printf("no such directory '%s'\n", node.name);
         return;
     }
-    if(err == ERR_SHELL_TARGET_NOT_FOUND || node.isdir) {
+    if(err == ERR_SHELL_TARGET_NOT_FOUND) {
         printf("no such file '%s'\n", node.name);
         return;
     }
@@ -556,15 +571,15 @@ static void stat(char* path) {
     printf("size: %d bytes\n", node.size);
 
     struct tm t_dump = gmtime(&(node.creation_timestamp));
-    printf("    creation timestamp: %d/%d/%d %d:%d:%d.%d\n",
+    printf("creation timestamp: %d/%d/%d %d:%d:%d.%d\n",
            t_dump.tm_mday, t_dump.tm_mon, t_dump.tm_year,
            t_dump.tm_hour, t_dump.tm_min, t_dump.tm_sec, node.creation_milisecond);
     t_dump = gmtime(&(node.accessed_timestamp));
-    printf("    last accessed timestamp: %d/%d/%d %d:%d:%d\n",
+    printf("last accessed timestamp: %d/%d/%d %d:%d:%d\n",
            t_dump.tm_mday, t_dump.tm_mon, t_dump.tm_year,
            t_dump.tm_hour, t_dump.tm_min, t_dump.tm_sec);
     t_dump = gmtime(&(node.modified_timestamp));
-    printf("    last modified timestamp: %d/%d/%d %d:%d:%d\n",
+    printf("last modified timestamp: %d/%d/%d %d:%d:%d\n",
            t_dump.tm_mday, t_dump.tm_mon, t_dump.tm_year,
            t_dump.tm_hour, t_dump.tm_min, t_dump.tm_sec);
 }
