@@ -6,7 +6,6 @@
 #include "ata.h"
 #include "kbd.h"
 #include "timer.h"
-#include "pit.h"
 #include "syscall.h"
 #include "filesystem.h"
 

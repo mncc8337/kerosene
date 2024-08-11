@@ -21,13 +21,13 @@ typedef enum {
 } SHELL_ERR;
 
 static char input[MAX_INPUT];
-static unsigned int input_len = 0;
+static unsigned input_len = 0;
 
 static char last_input[MAX_INPUT];
 
 // a stack that contain the path of current dir
 static fs_node_t node_stack[NODE_STACK_MAX_LENGTH];
-static unsigned int node_stack_offset = 0;
+static unsigned node_stack_offset = 0;
 
 static fs_node_t* node_stack_top() {
     return node_stack + node_stack_offset;
@@ -106,13 +106,16 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
     return ERR_SHELL_SUCCESS;
 }
 
+static void process_prompt(char* prompts, unsigned prompts_len);
+
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help .<n dot> echo ticks ls read cd mkdir rm touch write mv cp stat pwd datetime beep");
+        puts("help . .<n dot> echo ticks ls read cd mkdir rm touch write mv cp stat pwd datetime beep");
     }
     else {
         arg = strtok(arg, " ");
-        if(arg[0] == '.') printf("go back %d dir\n", strlen(arg)-1);
+        if(strcmp(arg, ".")) puts(". <path>");
+        else if(arg[0] == '.') printf("go back %d dir\n", strlen(arg)-1);
         else if(strcmp(arg, "echo")) puts("echo <string>");
         else if(strcmp(arg, "clocks")) puts("clocks <no-args>");
         else if(strcmp(arg, "ls")) puts(
@@ -133,6 +136,54 @@ static void help(char* arg) {
         else if(strcmp(arg, "datetime")) puts("datetime <no-args>");
         else if(strcmp(arg, "beep")) puts("beep <frequency> <duration>");
     }
+}
+
+static void run_sh(char* args) {
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
+        puts("no fs installed");
+        return;
+    }
+
+    if(args == NULL) {
+        puts("no file input");
+        return;
+    }
+
+    args = strtok(args, " ");
+
+    fs_node_t node_parent;
+    fs_node_t node;
+    SHELL_ERR err = path_find_last_node(args, &node_parent, &node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", node.name);
+        return;
+    }
+    if(err == ERR_SHELL_TARGET_NOT_FOUND || node.isdir) {
+        printf("no such file '%s'\n", node.name);
+        return;
+    }
+
+    FILE f = file_open(&node, FILE_READ);
+    char chr;
+    input_len = 0;
+    input[0] = '\0';
+    while(file_read(&f, (uint8_t*)(&chr), 1) != ERR_FS_EOF) {
+        if(chr != '\n')
+            input[input_len++] = chr;
+        else {
+            input[input_len] = '\0';
+            process_prompt(input, input_len);
+            input_len = 0;
+            input[0] = '\0';
+        }
+    }
+    if(input_len > 0 && input[0] != '\0') {
+        input[input_len] = '\0';
+        process_prompt(input, input_len);
+    }
+
+    file_close(&f);
 }
 
 static void echo(char* args) {
@@ -412,9 +463,11 @@ static void write(char* path) {
     input_len = 0;
     puts("writing mode. press ESC to exit");
 
-    while(current_key.keycode != 0) { // 0 is esc keycode
+    while(current_key.keycode != KEYCODE_ESC) {
         while(key_handled) continue; // wait for new key
         key_handled = true;
+
+        if(current_key.mapped == '\0') continue;
 
         if(current_key.mapped == '\b') {
             if(input_len == 0) continue;
@@ -670,35 +723,44 @@ static void beep(char* arg) {
     pit_beep_stop();
 }
 
-static void process_prompt(char* prompt, int prompt_len) {
-    char* cmd_name = strtok(prompt, " ");
-    char* remain_arg = cmd_name + strlen(cmd_name) + 1;
-    while(remain_arg[0] == '\0' || remain_arg[0] == ' ') remain_arg++;
-    if(remain_arg - cmd_name >= prompt_len) remain_arg = NULL;
+static void process_prompt(char* prompts, unsigned prompts_len) {
+    char* prompt = strtok(prompts, ";\n");
+    unsigned tot_len = 0;
+    while(prompt != NULL && tot_len < prompts_len) {
+        unsigned prompt_len = strlen(prompt);
+        char* cmd_name = strtok(prompt, " ");
+        char* remain_arg = cmd_name + strlen(cmd_name) + 1;
+        while(remain_arg[0] == '\0' || remain_arg[0] == ' ') remain_arg++;
+        if(remain_arg - cmd_name >= (signed)prompt_len) remain_arg = NULL;
 
-    if(strcmp(cmd_name, "help")) help(remain_arg);
-    else if(cmd_name[0] == '.') { // special command to go to parent dir
-        unsigned int back_cnt = strlen(cmd_name) - 1;
-        if(back_cnt > node_stack_offset) node_stack_offset = 0;
-        else node_stack_offset -= back_cnt;
+        if(strcmp(cmd_name, "help")) help(remain_arg);
+        else if(strcmp(cmd_name, ".")) run_sh(remain_arg);
+        else if(cmd_name[0] == '.') { // special command to go to parent dir
+            unsigned int back_cnt = strlen(cmd_name) - 1;
+            if(back_cnt > node_stack_offset) node_stack_offset = 0;
+            else node_stack_offset -= back_cnt;
+        }
+        else if(strcmp(cmd_name, "echo")) echo(remain_arg);
+        else if(strcmp(cmd_name, "clocks")) clocks(remain_arg);
+        else if(strcmp(cmd_name, "ls")) ls(remain_arg);
+        else if(strcmp(cmd_name, "read")) read(remain_arg);
+        else if(strcmp(cmd_name, "cd")) cd(remain_arg);
+        else if(strcmp(cmd_name, "mkdir")) mkdir(remain_arg);
+        else if(strcmp(cmd_name, "rm")) rm(remain_arg);
+        else if(strcmp(cmd_name, "touch")) touch(remain_arg);
+        else if(strcmp(cmd_name, "write")) write(remain_arg);
+        else if(strcmp(cmd_name, "mv")) mv(remain_arg);
+        else if(strcmp(cmd_name, "cp")) cp(remain_arg);
+        else if(strcmp(cmd_name, "stat")) stat(remain_arg);
+        else if(strcmp(cmd_name, "pwd")) pwd(remain_arg);
+        else if(strcmp(cmd_name, "datetime")) datetime(remain_arg);
+        else if(strcmp(cmd_name, "beep")) beep(remain_arg);
+        else if(prompt_len == 0); // just skip
+        else printf("unknow command '%s'\n", prompt);
+
+        tot_len += prompt_len;
+        prompt = strtok(prompt+prompt_len+1, ";\n");
     }
-    else if(strcmp(cmd_name, "echo")) echo(remain_arg);
-    else if(strcmp(cmd_name, "clocks")) clocks(remain_arg);
-    else if(strcmp(cmd_name, "ls")) ls(remain_arg);
-    else if(strcmp(cmd_name, "read")) read(remain_arg);
-    else if(strcmp(cmd_name, "cd")) cd(remain_arg);
-    else if(strcmp(cmd_name, "mkdir")) mkdir(remain_arg);
-    else if(strcmp(cmd_name, "rm")) rm(remain_arg);
-    else if(strcmp(cmd_name, "touch")) touch(remain_arg);
-    else if(strcmp(cmd_name, "write")) write(remain_arg);
-    else if(strcmp(cmd_name, "mv")) mv(remain_arg);
-    else if(strcmp(cmd_name, "cp")) cp(remain_arg);
-    else if(strcmp(cmd_name, "stat")) stat(remain_arg);
-    else if(strcmp(cmd_name, "pwd")) pwd(remain_arg);
-    else if(strcmp(cmd_name, "datetime")) datetime(remain_arg);
-    else if(strcmp(cmd_name, "beep")) beep(remain_arg);
-    else if(prompt_len == 0); // just skip
-    else puts("unknow command");
 }
 
 static void print_prompt() {
@@ -728,8 +790,7 @@ void shell_start() {
         if(key_handled) continue; // wait for new key
         key_handled = true;
 
-        // up arrow
-        if(current_key.keycode == ((7 << 4) | 0)) {
+        if(current_key.keycode == KEYCODE_UP) {
             int currpos = tty_get_cursor();
             for(int i = 0; i <= (signed)input_len; i++) {
                 tty_set_cursor(currpos - i);
@@ -760,14 +821,7 @@ void shell_start() {
             input[input_len] = '\0';
             memcpy(last_input, input, input_len+1);
 
-            char* prompt = strtok(input, ";\n");
-            unsigned tot_len = 0;
-            while(prompt != NULL && tot_len < input_len) {
-                int len = strlen(prompt);
-                process_prompt(prompt, len);
-                prompt = strtok(prompt + len + 1, ";\n");
-                tot_len += len;
-            }
+            process_prompt(input, input_len);
             input[0] = '\0';
             input_len = 0;
             print_prompt();
