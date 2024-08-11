@@ -62,9 +62,9 @@ note that scripts in `script/` will need sudo privilege to setup loopback device
     + [x] get key scancode
     + [x] translate scancode to keycode
     + [ ] LED indicating
-- [ ] PIT
+- [x] PIT
     - [x] generate ticks
-    - [ ] PC speaker (beep beep boop boop)
+    - [x] PC speaker (beep beep boop boop)
 - [ ] memory manager
     - [x] physical memory manager
     - [x] virtual memory manager
