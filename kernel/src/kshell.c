@@ -1,13 +1,17 @@
 #include "kshell.h"
 #include "kbd.h"
+#include "timer.h"
 #include "tty.h"
 #include "filesystem.h"
+#include "pit.h"
 
 #include "string.h"
 #include "stdio.h"
 #include "stdlib.h"
 
 #include "time.h"
+
+#define MAX_INPUT 1024
 
 typedef enum {
     ERR_SHELL_NOT_FOUND,
@@ -16,8 +20,10 @@ typedef enum {
     ERR_SHELL_NOT_A_DIR
 } SHELL_ERR;
 
-static char input[512];
+static char input[MAX_INPUT];
 static unsigned int input_len = 0;
+
+static char last_input[MAX_INPUT];
 
 // a stack that contain the path of current dir
 static fs_node_t node_stack[NODE_STACK_MAX_LENGTH];
@@ -102,7 +108,7 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help .<n dot> echo ticks ls read cd mkdir rm touch write mv cp stat pwd datetime");
+        puts("help .<n dot> echo ticks ls read cd mkdir rm touch write mv cp stat pwd datetime beep");
     }
     else {
         arg = strtok(arg, " ");
@@ -125,6 +131,7 @@ static void help(char* arg) {
         else if(strcmp(arg, "stat")) puts("stat <path>");
         else if(strcmp(arg, "pwd")) puts("pwd <no-args>");
         else if(strcmp(arg, "datetime")) puts("datetime <no-args>");
+        else if(strcmp(arg, "beep")) puts("beep <frequency> <duration>");
     }
 }
 
@@ -419,7 +426,7 @@ static void write(char* path) {
 
         putchar(current_key.mapped);
         input[input_len++] = current_key.mapped;
-        if(current_key.mapped == '\n' || input_len >= 512) {
+        if(current_key.mapped == '\n' || input_len >= MAX_INPUT - 10) {
             file_write(&f, (uint8_t*)input, input_len);
             input_len = 0;
         }
@@ -643,11 +650,31 @@ static void datetime(char* arg) {
     printf("seconds since epoch: %d\n", curr_time);
 }
 
-static void process_prompt() {
-    char* cmd_name = strtok(input, " ");
+static void beep(char* arg) {
+    char* frq_str = strtok(arg, " ");
+    if(frq_str == NULL) {
+        puts("no frequency provided");
+        return;
+    }
+    int frq = atoi(frq_str);
+
+    char* dur_str = strtok(NULL, " ");
+    int dur;
+    if(dur_str == NULL) {
+        dur = 1000;
+    }
+    else dur = atoi(dur_str);
+
+    pit_beep(frq);
+    timer_wait(dur);
+    pit_beep_stop();
+}
+
+static void process_prompt(char* prompt, int prompt_len) {
+    char* cmd_name = strtok(prompt, " ");
     char* remain_arg = cmd_name + strlen(cmd_name) + 1;
     while(remain_arg[0] == '\0' || remain_arg[0] == ' ') remain_arg++;
-    if(remain_arg - cmd_name >= (signed)input_len) remain_arg = NULL;
+    if(remain_arg - cmd_name >= prompt_len) remain_arg = NULL;
 
     if(strcmp(cmd_name, "help")) help(remain_arg);
     else if(cmd_name[0] == '.') { // special command to go to parent dir
@@ -669,11 +696,22 @@ static void process_prompt() {
     else if(strcmp(cmd_name, "stat")) stat(remain_arg);
     else if(strcmp(cmd_name, "pwd")) pwd(remain_arg);
     else if(strcmp(cmd_name, "datetime")) datetime(remain_arg);
-    else if(input_len == 0); // just skip
+    else if(strcmp(cmd_name, "beep")) beep(remain_arg);
+    else if(prompt_len == 0); // just skip
     else puts("unknow command");
-    printf("[kernel@kshell %s ]$ ", node_stack[node_stack_offset].name);
-    input_len = 0;
-    input[0] = '\0';
+}
+
+static void print_prompt() {
+    if(tty_get_cursor() % MAX_COLS != 0)
+        putchar('\n');
+
+    putchar('[');
+    tty_set_attr(GREEN);
+    printf("kernel@kshell");
+    tty_set_attr(LIGHT_BLUE);
+    printf(" %s ", node_stack[node_stack_offset].name);
+    tty_set_attr(LIGHT_GREY);
+    printf("]$ ");
 }
 
 void shell_set_root_node(fs_node_t node) {
@@ -684,11 +722,24 @@ void shell_start() {
     install_key_listener(kbd_listener);
     puts("welcome to the shell");
     puts("type `help` t show all command. `help <command>` to see all available argument");
-    printf("[kernel@kshell %s ]$ ", node_stack[node_stack_offset].name);
+    print_prompt();
 
     while(true) {
         if(key_handled) continue; // wait for new key
         key_handled = true;
+
+        // up arrow
+        if(current_key.keycode == ((7 << 4) | 0)) {
+            int currpos = tty_get_cursor();
+            for(int i = 0; i <= (signed)input_len; i++) {
+                tty_set_cursor(currpos - i);
+                tty_print_char(' ', -1, 0, false);
+            }
+
+            input_len = strlen(last_input);
+            memcpy(input, last_input, input_len+1);
+            printf(last_input);
+        }
 
         // ignore non printable characters
         if(current_key.mapped == '\0') continue;
@@ -707,7 +758,19 @@ void shell_start() {
         }
         else {
             input[input_len] = '\0';
-            process_prompt();
+            memcpy(last_input, input, input_len+1);
+
+            char* prompt = strtok(input, ";\n");
+            unsigned tot_len = 0;
+            while(prompt != NULL && tot_len < input_len) {
+                int len = strlen(prompt);
+                process_prompt(prompt, len);
+                prompt = strtok(prompt + len + 1, ";\n");
+                tot_len += len;
+            }
+            input[0] = '\0';
+            input_len = 0;
+            print_prompt();
         }
     }
 }

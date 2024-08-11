@@ -13,3 +13,8 @@
 #define PIT_MODE_HW_TRIGGERED_STROBE      5
 
 void pit_timer_frequency(int hz);
+unsigned pit_get_count();
+void pit_set_count(unsigned count);
+
+void pit_beep(int freq);
+void pit_beep_stop();

@@ -4,6 +4,8 @@ QEMUFLAGS="-m 128M \
           -serial stdio \
           -no-shutdown \
           -no-reboot \
+          -audiodev pa,id=speaker \
+          -machine pcspk-audiodev=speaker \
           -accel tcg,thread=single \
           -usb"
 
