@@ -782,7 +782,7 @@ void shell_set_root_node(fs_node_t node) {
 }
 void shell_start() {
     install_key_listener(kbd_listener);
-    puts("welcome to the shell");
+    puts("welcome to keroshell");
     puts("type `help` t show all command. `help <command>` to see all available argument");
     print_prompt();
 

@@ -115,7 +115,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // greeting msg to let us know we are in the kernel
     tty_set_attr(LIGHT_CYAN);  puts("hello");
     tty_set_attr(LIGHT_GREEN); printf("this is ");
-    tty_set_attr(LIGHT_RED);   puts("sos kernel!");
+    tty_set_attr(LIGHT_RED);   puts("kernosene!");
     tty_set_attr(LIGHT_GREY);
     printf("build datetime: %s, %s\n", __TIME__, __DATE__);
 
