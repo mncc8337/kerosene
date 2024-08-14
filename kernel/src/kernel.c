@@ -14,6 +14,8 @@
 
 #include "kshell.h"
 
+#include "access/my_avt.h"
+
 char freebuff[512];
 
 int FS_ID = 0;
@@ -205,8 +207,18 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
             video_framebuffer_plot_pixel(x, y, color);
         }
 
-    shell_set_root_node(fs->root_node);
-    shell_start();
+    char* my_avt_data = my_avt_header_data;
+    for(int y = 0; y < (signed)my_avt_height; y++) {
+        for(int x = 0; x < (signed)my_avt_width; x++) {
+            int pixel[3];
+            HEADER_PIXEL(my_avt_data, pixel);
+            uint32_t color = (pixel[2] << 24) | (pixel[0] << 16) | (pixel[1] << 8);
+            video_framebuffer_plot_pixel(x, y, color);
+        }
+    }
+
+    // shell_set_root_node(fs->root_node);
+    // shell_start();
 
     // // i cannot get this to work :(
     // // enter_usermode();

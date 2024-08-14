@@ -31,7 +31,7 @@ OBJ = $(addprefix $(BIN), $(_OBJ))
 
 DEFINES = -DTIMER_FREQUENCY=1000 -D__is_libk
 
-C_INCLUDES = -I./kernel/include -I./libc/include
+C_INCLUDES = -I./kernel/src -I./kernel/include -I./libc/include
 
 # CFLAGS = $(DEFINES) -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles
 # LDFLAGS = -T linker.ld -m elf_i386 -nostdlib --nmagic

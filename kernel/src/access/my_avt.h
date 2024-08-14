@@ -1,7 +1,7 @@
-/*  GIMP header image file format (RGB): /home/mncc/PLAYGROUND/kerosene/kernel/include/avt.h  */
+/*  generated using GIMP  */
 
-static unsigned int width = 460;
-static unsigned int height = 438;
+static unsigned int my_avt_width = 460;
+static unsigned int my_avt_height = 438;
 
 /*  Call this macro repeatedly.  After each use, the pixel data can be extracted  */
 
@@ -11,7 +11,7 @@ pixel[1] = ((((data[1] - 33) & 0xF) << 4) | ((data[2] - 33) >> 2)); \
 pixel[2] = ((((data[2] - 33) & 0x3) << 6) | ((data[3] - 33))); \
 data += 4; \
 }
-static char *header_data =
+static char *my_avt_header_data =
 	"D6Y/D6Y/D6Y/D6Y/D6Y/D6Y/D6Y/D6Y/D6Y/D6Y/D6Y/D6Y/D6Y/CVM-CVM-BV9)"
 	"BV9)B61(B61(B61(B61(B61(B61(B61(B61(B61(B61(B61(B61(B61(@V!!@V!!"
 	"@V!!@V!!@V!!@V!!@V!!@V!!@V!!@V!!@V!!@V!!@V!!@V!!@V!!@V!!@V!!@V!!"
