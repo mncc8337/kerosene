@@ -112,11 +112,44 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // disable interrupts at the start to set up things
     asm volatile("cli");
 
+    uint64_t framebuffer_addr = 0;
+    int framebuffer_width = 0;
+    int framebuffer_height = 0;
+
+    if(mbd->flags & MULTIBOOT_INFO_FRAMEBUFFER_INFO) {
+        framebuffer_addr = mbd->framebuffer_addr;
+        framebuffer_width = mbd->framebuffer_width;
+        framebuffer_height = mbd->framebuffer_height;
+        video_set_vidmem_ptr(framebuffer_addr);
+        switch(mbd->framebuffer_type) {
+            // case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
+            //     break;
+            //
+            // case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED:
+            //     break;
+
+            case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
+                video_textmode_init();
+                break;
+
+            default:
+                video_framebuffer_init(mbd->framebuffer_pitch,
+                                       framebuffer_width,
+                                       framebuffer_height,
+                                       mbd->framebuffer_bpp);
+        }
+    }
+    else {
+        // textmode should be available
+        video_textmode_init();
+        video_set_vidmem_ptr(VIDEO_TEXTMODE_ADDRESS);
+    }
+
     // greeting msg to let us know we are in the kernel
-    video_set_attr(TTY_LIGHT_CYAN);  puts("hello");
-    video_set_attr(TTY_LIGHT_GREEN); printf("this is ");
-    video_set_attr(TTY_LIGHT_RED);   puts("kernosene!");
-    video_set_attr(TTY_LIGHT_GREY);
+    video_set_attr(VIDEO_LIGHT_CYAN);  puts("hello");
+    video_set_attr(VIDEO_LIGHT_GREEN); printf("this is ");
+    video_set_attr(VIDEO_LIGHT_RED);   puts("kernosene!");
+    video_set_attr(VIDEO_LIGHT_GREY);
     printf("build datetime: %s, %s\n", __TIME__, __DATE__);
 
     if(magic != MULTIBOOT_BOOTLOADER_MAGIC) {
@@ -124,7 +157,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         kpanic();
     }
 
-    if(mbd->flags & (1 << 9))
+    if(mbd->flags & MULTIBOOT_INFO_BOOT_LOADER_NAME)
         print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name);
 
     gdt_init();
@@ -140,11 +173,11 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     disk_init();
 
-    if(!(mbd->flags & (1 << 6))) {
-        print_debug(LT_CR, "no memory map given by bootloader. system halted\n");
-        kpanic();
-    }
-    mem_init(mbd->mmap_addr, mbd->mmap_length);
+    // if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) {
+    //     print_debug(LT_CR, "no memory map given by bootloader. system halted\n");
+    //     kpanic();
+    // }
+    // mem_init(mbd->mmap_addr, mbd->mmap_length);
 
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
@@ -160,6 +193,17 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     video_enable_cursor(13, 14);
 
     print_debug(LT_IF, "done initialising\n");
+
+    for(int x = 0; x < framebuffer_width; x++)
+        for(int y = 0; y < framebuffer_height; y++) {
+            uint32_t color = 0;
+            int x_norm = (uint8_t)(((float)x / framebuffer_width) * 255);
+            int y_norm = (uint8_t)(((float)y / framebuffer_height) * 255);
+            color |= x_norm << 24;
+            color |= y_norm << 16;
+            color |= x_norm << 8;
+            video_framebuffer_plot_pixel(x, y, color);
+        }
 
     shell_set_root_node(fs->root_node);
     shell_start();

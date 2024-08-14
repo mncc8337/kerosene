@@ -99,12 +99,14 @@ struct _fs_t {
     fs_type_t type;
     partition_entry_t partition;
     struct _fs_node_t root_node;
-    // the filesystem info table 1
-    // FAT12/16/32: boot record
-    uint8_t info_table1[512];
-    // the filesystem info table 2
-    // FAT12/16/32: FS info structure
-    uint8_t info_table2[512];
+
+    // type-depend field
+    union {
+        struct {
+            fat32_bootrecord_t bootrec;
+            fat32_fsinfo_t fsinfo;
+        } fat32_info;
+    };
 };
 
 typedef struct {

@@ -63,9 +63,9 @@ static bool list_dir(fs_node_t node) {
         printf("|   ");
     printf("|---");
 
-    if(node.isdir) video_set_attr(TTY_LIGHT_BLUE);
+    if(node.isdir) video_set_attr(VIDEO_LIGHT_BLUE);
     puts(node.name);
-    if(node.isdir) video_set_attr(TTY_LIGHT_GREY);
+    if(node.isdir) video_set_attr(VIDEO_LIGHT_GREY);
 
     if(node.isdir && !strcmp(node.name, ".") && !strcmp(node.name, ".."))
         fs_list_dir(&node, list_dir);
@@ -764,15 +764,15 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
 }
 
 static void print_prompt() {
-    if(video_get_cursor() % TTY_MAX_COLS != 0)
+    if(video_get_cursor() % VIDEO_MAX_COLS != 0)
         putchar('\n');
 
     putchar('[');
-    video_set_attr(TTY_GREEN);
+    video_set_attr(VIDEO_GREEN);
     printf("kernel@kshell");
-    video_set_attr(TTY_LIGHT_BLUE);
+    video_set_attr(VIDEO_LIGHT_BLUE);
     printf(" %s ", node_stack[node_stack_offset].name);
-    video_set_attr(TTY_LIGHT_GREY);
+    video_set_attr(VIDEO_LIGHT_GREY);
     printf("]$ ");
 }
 

@@ -219,7 +219,7 @@ FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
     if(file->mode == FILE_READ) return ERR_FS_FAILED;
 
     if(file->node->fs->type == FS_FAT32) {
-        fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)(file->node->fs->info_table1);
+        fat32_bootrecord_t* bootrec = &(file->node->fs->fat32_info.bootrec);
         int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
 
         if(file->position == 0 && file->node->size > (unsigned)cluster_size) {
@@ -250,7 +250,7 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
     if(file->position == file->node->size) return ERR_FS_EOF;
 
     if(file->node->fs->type == FS_FAT32) {
-        fat32_bootrecord_t* bootrec = (fat32_bootrecord_t*)(file->node->fs->info_table1);
+        fat32_bootrecord_t* bootrec = &(file->node->fs->fat32_info.bootrec);
         int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
 
         FS_ERR err = fat32_read_file(file->node->fs, &(file->current_cluster), buffer, size, file->position % cluster_size);

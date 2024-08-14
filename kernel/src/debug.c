@@ -6,27 +6,27 @@ static void print_log_tag(int lt) {
     putchar('[');
     switch(lt) {
         case LT_IF:
-            video_set_attr(TTY_WHITE);
+            video_set_attr(VIDEO_WHITE);
             printf("IF");
             break;
         case LT_OK:
-            video_set_attr(TTY_LIGHT_GREEN);
+            video_set_attr(VIDEO_LIGHT_GREEN);
             printf("OK");
             break;
         case LT_WN:
-            video_set_attr(TTY_LIGHT_BROWN);
+            video_set_attr(VIDEO_LIGHT_BROWN);
             printf("WN");
             break;
         case LT_ER:
-            video_set_attr(TTY_LIGHT_RED);
+            video_set_attr(VIDEO_LIGHT_RED);
             printf("ER");
             break;
         case LT_CR:
-            video_set_attr(TTY_RED);
+            video_set_attr(VIDEO_RED);
             printf("CR");
             break;
     }
-    video_set_attr(TTY_LIGHT_GREY);
+    video_set_attr(VIDEO_LIGHT_GREY);
     printf("] ");
 }
 

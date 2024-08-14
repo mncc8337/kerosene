@@ -45,9 +45,9 @@ static char* exception_message[] = {
 
 // default exception handler
 static void exception_handler(regs_t* r) {
-    video_print_string("Exception: ", -1, TTY_WHITE, true);
-    video_print_string(exception_message[r->int_no], -1, TTY_LIGHT_RED, true);
-    video_print_string(".\nSystem Halted!", -1, TTY_WHITE, true);
+    video_print_string("Exception: ", -1, VIDEO_WHITE, true);
+    video_print_string(exception_message[r->int_no], -1, VIDEO_LIGHT_RED, true);
+    video_print_string(".\nSystem Halted!", -1, VIDEO_WHITE, true);
     kpanic();
 }
 

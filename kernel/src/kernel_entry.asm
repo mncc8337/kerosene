@@ -19,11 +19,7 @@ align 4
     dd 0 ; load end addr
     dd 0 ; bss end addr
     dd 0 ; entry addr
-%ifdef __VIDEO_TEXT_MODE
-    dd 1 ; textmode
-%else
-    dd 0 ; linear frame buffer mode
-%endif
+    dd 0 ; 0 for linear graphics mode, 1 for text mode
     dd 0 ; video width
     dd 0 ; video height
     dd 0  ; video depth
