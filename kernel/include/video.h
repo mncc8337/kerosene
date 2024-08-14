@@ -8,9 +8,6 @@
 
 #define VIDEO_TEXTMODE_ADDRESS 0xb8000
 
-#define VIDEO_MAX_ROWS 25
-#define VIDEO_MAX_COLS 80
-
 #define VIDEO_BLACK         0x0
 #define VIDEO_BLUE          0x1
 #define VIDEO_GREEN         0x2
@@ -29,7 +26,6 @@
 #define VIDEO_WHITE         0xf
 
 #define VIDEO_ATTR(bg, fg) (bg) * 16 + (fg)
-#define VIDEO_OFFSET(r, c) (r) * VIDEO_MAX_COLS + (c)
 
 void video_set_attr(uint8_t attr);
 void video_set_vidmem_ptr(uint32_t ptr);
@@ -66,5 +62,5 @@ extern void (*video_scroll_screen)(unsigned ammount);
 extern void (*video_print_char)(char chr, int offset, char attr, bool move);
 extern void (*video_print_string)(char* string, int offset, char attr, bool move);
 
-void video_textmode_init();
+void video_textmode_init(uint8_t cols, uint8_t rows);
 void video_framebuffer_init(uint32_t pitch, uint32_t width, uint32_t height, uint8_t bpp);

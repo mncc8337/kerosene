@@ -114,15 +114,15 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // disable interrupts at the start to set up things
     asm volatile("cli");
 
-    uint64_t framebuffer_addr = 0;
-    int framebuffer_width = 0;
-    int framebuffer_height = 0;
+    uint64_t video_addr = 0;
+    int video_width = 0;
+    int video_height = 0;
 
     if(mbd->flags & MULTIBOOT_INFO_FRAMEBUFFER_INFO) {
-        framebuffer_addr = mbd->framebuffer_addr;
-        framebuffer_width = mbd->framebuffer_width;
-        framebuffer_height = mbd->framebuffer_height;
-        video_set_vidmem_ptr(framebuffer_addr);
+        video_addr = mbd->framebuffer_addr;
+        video_width = mbd->framebuffer_width;
+        video_height = mbd->framebuffer_height;
+        video_set_vidmem_ptr(video_addr);
         switch(mbd->framebuffer_type) {
             // case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
             //     break;
@@ -131,19 +131,20 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
             //     break;
 
             case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
-                video_textmode_init();
+                video_textmode_init(video_width, video_height);
                 break;
 
             default:
                 video_framebuffer_init(mbd->framebuffer_pitch,
-                                       framebuffer_width,
-                                       framebuffer_height,
+                                       video_width,
+                                       video_height,
                                        mbd->framebuffer_bpp);
         }
     }
     else {
-        // textmode should be available
-        video_textmode_init();
+        // textmode video memory at VIDEO_TEXTMODE_ADDRESS should be available
+        // with or without GRUB
+        video_textmode_init(80, 25);
         video_set_vidmem_ptr(VIDEO_TEXTMODE_ADDRESS);
     }
 
@@ -175,10 +176,11 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     disk_init();
 
-    // if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) {
-    //     print_debug(LT_CR, "no memory map given by bootloader. system halted\n");
-    //     kpanic();
-    // }
+    if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) {
+        print_debug(LT_CR, "no memory map given by bootloader. system halted\n");
+        kpanic();
+    }
+    // disabled until i implemented the heap
     // mem_init(mbd->mmap_addr, mbd->mmap_length);
 
     syscall_init();
@@ -196,11 +198,11 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    for(int x = 0; x < framebuffer_width; x++)
-        for(int y = 0; y < framebuffer_height; y++) {
+    for(int x = 0; x < video_width; x++)
+        for(int y = 0; y < video_height; y++) {
             uint32_t color = 0;
-            int x_norm = (uint8_t)(((float)x / framebuffer_width) * 255);
-            int y_norm = (uint8_t)(((float)y / framebuffer_height) * 255);
+            int x_norm = (uint8_t)(((float)x / video_width) * 255);
+            int y_norm = (uint8_t)(((float)y / video_height) * 255);
             color |= x_norm << 24;
             color |= y_norm << 16;
             color |= x_norm << 8;
@@ -217,8 +219,8 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         }
     }
 
-    // shell_set_root_node(fs->root_node);
-    // shell_start();
+    shell_set_root_node(fs->root_node);
+    shell_start();
 
     // // i cannot get this to work :(
     // // enter_usermode();

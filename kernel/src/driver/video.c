@@ -17,6 +17,9 @@ void video_set_vidmem_ptr(uint32_t ptr) {
 
 // text mode
 
+static uint8_t text_rows;
+static uint8_t text_cols;
+
 void video_textmode_enable_cursor(uint8_t cursor_scanline_start, uint8_t cursor_scanline_end) {
 	port_outb(PORT_SCREEN_CTRL, 0x0a);
 	port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xc0) | cursor_scanline_start);
@@ -53,13 +56,13 @@ void video_textmode_cls(char attr) {
 void video_textmode_scroll_screen(unsigned ammount) {
     int end = video_textmode_get_cursor();
 
-    int start = end - VIDEO_MAX_COLS * ammount;
+    int start = end - text_cols * ammount;
     // already on top
-    if(end < VIDEO_MAX_COLS) start = 0;
+    if(end < text_cols) start = 0;
 
     for(int i = 0; i < start; i++) {
-        vid_mem[i * 2] = vid_mem[i * 2 + VIDEO_MAX_COLS * 2 * ammount];
-        vid_mem[i * 2 + 1] = vid_mem[i * 2 + VIDEO_MAX_COLS * 2 * ammount + 1];
+        vid_mem[i * 2] = vid_mem[i * 2 + text_cols * 2 * ammount];
+        vid_mem[i * 2 + 1] = vid_mem[i * 2 + text_cols * 2 * ammount + 1];
     }
     for(int i = start; i <= end; i++) {
         vid_mem[i * 2] = ' ';
@@ -71,7 +74,7 @@ void video_textmode_scroll_screen(unsigned ammount) {
 
 static int _print_char(char chr, int offset, char attr) {
     if(chr == '\n') {
-        offset += VIDEO_MAX_COLS - (offset % VIDEO_MAX_COLS);
+        offset += text_cols - (offset % text_cols);
     }
     else if(chr == '\b') {
         offset--;
@@ -81,7 +84,7 @@ static int _print_char(char chr, int offset, char attr) {
         // handle tabs like spaces
         // change later
         return _print_char(' ', offset, attr);
-        // offset += - offset % VIDEO_MAX_COLS % 8 + 8;
+        // offset += - offset % text_cols % 8 + 8;
     }
     else if(chr >= 0x20 && chr <= 0x7e) {
         vid_mem[offset * 2] = chr;
@@ -98,7 +101,7 @@ void video_textmode_print_char(char chr, int offset, char attr, bool move) {
 
     if(move) {
         video_textmode_set_cursor(offset);
-        if(offset > VIDEO_MAX_ROWS * VIDEO_MAX_COLS - 1) video_textmode_scroll_screen(1);
+        if(offset > text_rows * text_cols - 1) video_textmode_scroll_screen(1);
     }
 }
 void video_textmode_print_string(char* string, int offset, char attr, bool move) {
@@ -113,8 +116,8 @@ void video_textmode_print_string(char* string, int offset, char attr, bool move)
 
     if(move) {
         video_textmode_set_cursor(offset);
-        if(offset > VIDEO_MAX_ROWS * VIDEO_MAX_COLS - 1)
-            video_textmode_scroll_screen((offset + (VIDEO_MAX_COLS - offset % VIDEO_MAX_COLS))/VIDEO_MAX_COLS - VIDEO_MAX_ROWS);
+        if(offset > text_rows * text_cols - 1)
+            video_textmode_scroll_screen((offset + (text_cols - offset % text_cols))/text_cols - text_rows);
     }
 }
 
@@ -192,7 +195,7 @@ void (*video_scroll_screen)(unsigned ammount);
 void (*video_print_char)(char chr, int offset, char attr, bool move);
 void (*video_print_string)(char* string, int offset, char attr, bool move);
 
-void video_textmode_init() {
+void video_textmode_init(uint8_t cols, uint8_t rows) {
     video_enable_cursor  = video_textmode_enable_cursor;
     video_disable_cursor = video_textmode_disable_cursor;
     video_get_cursor     = video_textmode_get_cursor;
@@ -201,6 +204,9 @@ void video_textmode_init() {
     video_print_char     = video_textmode_print_char;
     video_print_string   = video_textmode_print_string;
     video_scroll_screen  = video_textmode_scroll_screen;
+
+    text_cols = cols;
+    text_rows = rows;
 }
 void video_framebuffer_init(uint32_t pitch, uint32_t width, uint32_t height, uint8_t bpp) {
     video_enable_cursor  = video_framebuffer_enable_cursor;
