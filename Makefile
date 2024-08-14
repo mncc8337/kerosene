@@ -29,7 +29,8 @@ _OBJ += $(addsuffix .o, $(notdir $(wildcard $(ASM_SRC))))
 LIBC_OBJ = $(addprefix $(BIN), $(_LIBC_OBJ))
 OBJ = $(addprefix $(BIN), $(_OBJ))
 
-DEFINES = -DTIMER_FREQUENCY=1000 -D__is_libk
+# include -D__VIDEO_TEXT_MODE to use text mode
+DEFINES = -DTIMER_FREQUENCY=1000 -D__is_libk -D__VIDEO_TEXT_MODE
 
 C_INCLUDES = -I./kernel/include -I./libc/include
 

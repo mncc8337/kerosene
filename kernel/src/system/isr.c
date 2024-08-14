@@ -1,6 +1,6 @@
 #include "system.h"
 #include "kpanic.h"
-#include "tty.h"
+#include "video.h"
 #include "pic.h"
 #include "string.h"
 
@@ -45,9 +45,9 @@ static char* exception_message[] = {
 
 // default exception handler
 static void exception_handler(regs_t* r) {
-    tty_print_string("Exception: ", -1, WHITE, true);
-    tty_print_string(exception_message[r->int_no], -1, LIGHT_RED, true);
-    tty_print_string(".\nSystem Halted!", -1, WHITE, true);
+    video_print_string("Exception: ", -1, TTY_WHITE, true);
+    video_print_string(exception_message[r->int_no], -1, TTY_LIGHT_RED, true);
+    video_print_string(".\nSystem Halted!", -1, TTY_WHITE, true);
     kpanic();
 }
 

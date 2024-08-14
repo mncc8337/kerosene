@@ -1,7 +1,7 @@
 #include "multiboot.h"
 #include "system.h"
 #include "kpanic.h"
-#include "tty.h"
+#include "video.h"
 #include "mem.h"
 #include "ata.h"
 #include "kbd.h"
@@ -113,10 +113,10 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     asm volatile("cli");
 
     // greeting msg to let us know we are in the kernel
-    tty_set_attr(LIGHT_CYAN);  puts("hello");
-    tty_set_attr(LIGHT_GREEN); printf("this is ");
-    tty_set_attr(LIGHT_RED);   puts("kernosene!");
-    tty_set_attr(LIGHT_GREY);
+    video_set_attr(TTY_LIGHT_CYAN);  puts("hello");
+    video_set_attr(TTY_LIGHT_GREEN); printf("this is ");
+    video_set_attr(TTY_LIGHT_RED);   puts("kernosene!");
+    video_set_attr(TTY_LIGHT_GREY);
     printf("build datetime: %s, %s\n", __TIME__, __DATE__);
 
     if(magic != MULTIBOOT_BOOTLOADER_MAGIC) {
@@ -157,7 +157,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     asm volatile("sti");
 
     // make cursor slimmer
-    tty_enable_cursor(13, 14);
+    video_enable_cursor(13, 14);
 
     print_debug(LT_IF, "done initialising\n");
 

@@ -1,7 +1,7 @@
 #include "kshell.h"
 #include "kbd.h"
 #include "timer.h"
-#include "tty.h"
+#include "video.h"
 #include "filesystem.h"
 #include "pit.h"
 
@@ -63,9 +63,9 @@ static bool list_dir(fs_node_t node) {
         printf("|   ");
     printf("|---");
 
-    if(node.isdir) tty_set_attr(LIGHT_BLUE);
+    if(node.isdir) video_set_attr(TTY_LIGHT_BLUE);
     puts(node.name);
-    if(node.isdir) tty_set_attr(LIGHT_GREY);
+    if(node.isdir) video_set_attr(TTY_LIGHT_GREY);
 
     if(node.isdir && !strcmp(node.name, ".") && !strcmp(node.name, ".."))
         fs_list_dir(&node, list_dir);
@@ -471,8 +471,8 @@ static void write(char* path) {
 
         if(current_key.mapped == '\b') {
             if(input_len == 0) continue;
-            tty_set_cursor(tty_get_cursor() - 1); // move back
-            tty_print_char(' ', -1, 0, false); // delete printed char
+            video_set_cursor(video_get_cursor() - 1); // move back
+            video_print_char(' ', -1, 0, false); // delete printed char
             input_len--;
             continue;
         }
@@ -764,15 +764,15 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
 }
 
 static void print_prompt() {
-    if(tty_get_cursor() % MAX_COLS != 0)
+    if(video_get_cursor() % TTY_MAX_COLS != 0)
         putchar('\n');
 
     putchar('[');
-    tty_set_attr(GREEN);
+    video_set_attr(TTY_GREEN);
     printf("kernel@kshell");
-    tty_set_attr(LIGHT_BLUE);
+    video_set_attr(TTY_LIGHT_BLUE);
     printf(" %s ", node_stack[node_stack_offset].name);
-    tty_set_attr(LIGHT_GREY);
+    video_set_attr(TTY_LIGHT_GREY);
     printf("]$ ");
 }
 
@@ -791,10 +791,10 @@ void shell_start() {
         key_handled = true;
 
         if(current_key.keycode == KEYCODE_UP) {
-            int currpos = tty_get_cursor();
+            int currpos = video_get_cursor();
             for(int i = 0; i <= (signed)input_len; i++) {
-                tty_set_cursor(currpos - i);
-                tty_print_char(' ', -1, 0, false);
+                video_set_cursor(currpos - i);
+                video_print_char(' ', -1, 0, false);
             }
 
             input_len = strlen(last_input);
@@ -807,8 +807,8 @@ void shell_start() {
 
         if(current_key.mapped == '\b') {
             if(input_len == 0) continue;
-            tty_set_cursor(tty_get_cursor() - 1); // move back
-            tty_print_char(' ', -1, 0, false); // delete printed char
+            video_set_cursor(video_get_cursor() - 1); // move back
+            video_print_char(' ', -1, 0, false); // delete printed char
             input_len--;
             continue;
         }

@@ -1,32 +1,32 @@
 #include "debug.h"
-#include "tty.h"
+#include "video.h"
 #include "stdio.h"
 
 static void print_log_tag(int lt) {
     putchar('[');
     switch(lt) {
         case LT_IF:
-            tty_set_attr(WHITE);
+            video_set_attr(TTY_WHITE);
             printf("IF");
             break;
         case LT_OK:
-            tty_set_attr(LIGHT_GREEN);
+            video_set_attr(TTY_LIGHT_GREEN);
             printf("OK");
             break;
         case LT_WN:
-            tty_set_attr(LIGHT_BROWN);
+            video_set_attr(TTY_LIGHT_BROWN);
             printf("WN");
             break;
         case LT_ER:
-            tty_set_attr(LIGHT_RED);
+            video_set_attr(TTY_LIGHT_RED);
             printf("ER");
             break;
         case LT_CR:
-            tty_set_attr(RED);
+            video_set_attr(TTY_RED);
             printf("CR");
             break;
     }
-    tty_set_attr(LIGHT_GREY);
+    video_set_attr(TTY_LIGHT_GREY);
     printf("] ");
 }
 
