@@ -192,31 +192,17 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // start interrupts again after setting up everything
     asm volatile("sti");
 
-    // make cursor slimmer
-    video_enable_cursor(13, 14);
-
     print_debug(LT_IF, "done initialising\n");
 
-    // for(int x = 0; x < video_width; x++)
-    //     for(int y = 0; y < video_height; y++) {
-    //         uint32_t color = 0;
-    //         int x_norm = (uint8_t)(((float)x / video_width) * 255);
-    //         int y_norm = (uint8_t)(((float)y / video_height) * 255);
-    //         color |= x_norm << 24;
-    //         color |= y_norm << 16;
-    //         color |= x_norm << 8;
-    //         video_framebuffer_plot_pixel(x, y, color);
-    //     }
-    //
-    // char* my_avt_data = my_avt_header_data;
-    // for(int y = 0; y < (signed)my_avt_height; y++) {
-    //     for(int x = 0; x < (signed)my_avt_width; x++) {
-    //         int pixel[3];
-    //         HEADER_PIXEL(my_avt_data, pixel);
-    //         uint32_t color = (pixel[2] << 24) | (pixel[0] << 16) | (pixel[1] << 8);
-    //         video_framebuffer_plot_pixel(x, y, color);
-    //     }
-    // }
+    char* my_avt_data = my_avt_header_data;
+    for(int y = 0; y < (signed)my_avt_height; y++) {
+        for(int x = 0; x < (signed)my_avt_width; x++) {
+            int pixel[3];
+            HEADER_PIXEL(my_avt_data, pixel);
+            uint32_t color = (pixel[2] << 24) | (pixel[0] << 16) | (pixel[1] << 8);
+            video_framebuffer_plot_pixel(x, y, color);
+        }
+    }
 
     shell_set_root_node(fs->root_node);
     shell_start();

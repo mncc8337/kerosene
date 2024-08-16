@@ -5,8 +5,6 @@
 
 // actually define the pointers else we would get undefined reference error
 int  (*video_rgb)(int r, int g, int b);
-void (*video_enable_cursor)(int cursor_scanline_start, int cursor_scanline_end);
-void (*video_disable_cursor)();
 int  (*video_get_cursor)();
 void (*video_set_cursor)(int offset);
 void (*video_cls)(int color);
@@ -47,17 +45,17 @@ int video_textmode_rgb(int r, int g, int b) {
     return 0x7;
 }
 
-void video_textmode_enable_cursor(int cursor_scanline_start, int cursor_scanline_end) {
-    port_outb(PORT_SCREEN_CTRL, 0x0a);
-    port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xc0) | cursor_scanline_start);
-
-    port_outb(PORT_SCREEN_CTRL, 0x0b);
-    port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xe0) | cursor_scanline_end);
-}
-void video_textmode_disable_cursor() {
-    port_outb(PORT_SCREEN_CTRL, 0x0a);
-    port_outb(PORT_SCREEN_DATA, 0x20);
-}
+// void video_textmode_enable_cursor(int cursor_scanline_start, int cursor_scanline_end) {
+//     port_outb(PORT_SCREEN_CTRL, 0x0a);
+//     port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xc0) | cursor_scanline_start);
+//
+//     port_outb(PORT_SCREEN_CTRL, 0x0b);
+//     port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xe0) | cursor_scanline_end);
+// }
+// void video_textmode_disable_cursor() {
+//     port_outb(PORT_SCREEN_CTRL, 0x0a);
+//     port_outb(PORT_SCREEN_DATA, 0x20);
+// }
 int video_textmode_get_cursor() {
     int offset = 0;
     port_outb(PORT_SCREEN_CTRL, 0x0f);
@@ -100,6 +98,8 @@ void video_textmode_scroll_screen(unsigned ammount) {
 }
 
 void video_textmode_print_char(char chr, int offset, int fg, int bg, bool move) {
+    if(chr == 0) return;
+
     if(offset < 0) offset = video_textmode_get_cursor();
     if(fg < 0) fg = current_fg;
     if(bg < 0) bg = current_bg;
@@ -114,10 +114,10 @@ void video_textmode_print_char(char chr, int offset, int fg, int bg, bool move) 
     else if(chr == '\t') {
         // handle tabs like spaces
         // change later
-        return video_textmode_print_char(' ', offset, fg, bg, move);
+        video_textmode_print_char(' ', offset, fg, bg, move);
         // offset += - offset % text_cols % 8 + 8;
     }
-    else if(chr != 0) {
+    else {
         vid_mem[offset * 2] = chr;
         vid_mem[offset * 2 + 1] = ((bg & 0xf) << 4) | (fg & 0xf);
         offset++;
@@ -138,9 +138,6 @@ static uint32_t framebuffer_width;
 static uint32_t framebuffer_height;
 static uint8_t framebuffer_bpp;
 
-static bool cursor_enable = true;
-static uint8_t scanline_start = 0;
-static uint8_t scanline_end = 15;
 static int cursor_posx = 0;
 static int cursor_posy = 0;
 
@@ -180,15 +177,6 @@ void video_framebuffer_plot_pixel(int x, int y, int color) {
     }
 }
 
-void video_framebuffer_enable_cursor(int start, int end) {
-    scanline_start = start;
-    scanline_end = end;
-    cursor_enable = true;
-}
-void video_framebuffer_disable_cursor() {
-    cursor_enable = false;
-}
-
 int video_framebuffer_get_cursor() {
     return cursor_posy * text_cols + cursor_posx;
 }
@@ -220,14 +208,16 @@ void video_framebuffer_scroll_screen(unsigned ammount) {
 }
 
 void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool move) {
+    if(chr == 0) return;
+
     int _cursor_posx = cursor_posx;
     int _cursor_posy = cursor_posy;
     if(fg < 0) fg = current_fg;
     if(bg < 0) bg = current_bg;
 
     if(offset >= 0) {
-        _cursor_posy = offset / text_rows;
-        _cursor_posx = offset % text_rows;
+        _cursor_posy = offset / text_cols;
+        _cursor_posx = offset % text_cols;
     }
 
     if(chr == '\n') {
@@ -241,8 +231,17 @@ void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool mov
             _cursor_posy -= 1;
             if(_cursor_posy < 0) _cursor_posy = 0;
         }
+        video_framebuffer_print_char(' ',
+                                     _cursor_posy * text_cols + _cursor_posx,
+                                     0x0, 0x0, true);
     }
-    else if(chr >= 0x20 && chr <= 0x7e) {
+    else if(chr == '\t') {
+        video_framebuffer_print_char(' ',
+                                     _cursor_posy * text_cols + _cursor_posx,
+                                     0x0, 0x0, true);
+        _cursor_posx++;
+    }
+    else {
         char* glyph = psf_get_glyph(chr);
 
         int cnt = 0;
@@ -283,8 +282,6 @@ void video_textmode_init(uint8_t cols, uint8_t rows) {
     current_bg = video_textmode_rgb(0, 0, 0);
 
     video_rgb            = video_textmode_rgb;
-    video_enable_cursor  = video_textmode_enable_cursor;
-    video_disable_cursor = video_textmode_disable_cursor;
     video_get_cursor     = video_textmode_get_cursor;
     video_set_cursor     = video_textmode_set_cursor;
     video_cls            = video_textmode_cls;
@@ -300,8 +297,6 @@ void video_framebuffer_init(uint32_t pitch, uint32_t width, uint32_t height, uin
     current_bg = video_framebuffer_rgb(0, 0, 0);
 
     video_rgb            = video_framebuffer_rgb;
-    video_enable_cursor  = video_framebuffer_enable_cursor;
-    video_disable_cursor = video_framebuffer_disable_cursor;
     video_get_cursor     = video_framebuffer_get_cursor;
     video_set_cursor     = video_framebuffer_set_cursor;
     video_cls            = video_framebuffer_cls;

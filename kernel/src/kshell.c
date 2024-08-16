@@ -469,10 +469,10 @@ static void write(char* path) {
 
         if(current_key.mapped == '\0') continue;
 
+
         if(current_key.mapped == '\b') {
             if(input_len == 0) continue;
-            video_set_cursor(video_get_cursor() - 1); // move back
-            video_print_char(' ', -1, -1, -1, false); // delete printed char
+            putchar(current_key.mapped);
             input_len--;
             continue;
         }
@@ -809,8 +809,7 @@ void shell_start() {
 
         if(current_key.mapped == '\b') {
             if(input_len == 0) continue;
-            video_set_cursor(video_get_cursor() - 1); // move back
-            video_print_char(' ', -1, -1, -1, false); // delete printed char
+            putchar(current_key.mapped);
             input_len--;
             continue;
         }
