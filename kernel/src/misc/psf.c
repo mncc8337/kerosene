@@ -1,18 +1,11 @@
 #include "misc/psf.h"
-#include "string.h"
 
-#include "stddef.h"
-
+// default font
 #include "access/font.h"
 
-PSF_font_t* font;
+PSF_font_t* font = (PSF_font_t*)font_h_data;
 
-void psf_init(char* font_data) {
-    if(font_data == NULL) {
-        // load default font
-        font_data = font_h_data;
-    }
-
+void psf_load(char* font_data) {
     font = (PSF_font_t*)font_data;
 }
 

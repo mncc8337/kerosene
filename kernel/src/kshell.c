@@ -764,8 +764,9 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
 }
 
 static void print_prompt() {
-    // TODO: dont hardcode 80
-    if(video_get_cursor() % 80 != 0)
+    int w, h;
+    video_size(&w, &h);
+    if(video_get_cursor() % w != 0)
         putchar('\n');
 
     putchar('[');

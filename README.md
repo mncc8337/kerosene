@@ -78,7 +78,7 @@ Note that scripts in `script/` will need sudo privilege to setup loopback device
 - [ ] mouse driver
 - [ ] GUI
     - [x] plot pixel
-    - [ ] render fonts
+    - [x] render psf fonts
 - [ ] sound
 - [ ] video
 - [ ] im not gonna touch networking

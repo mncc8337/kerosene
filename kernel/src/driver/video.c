@@ -1,7 +1,7 @@
 #include "video.h"
 #include "system.h"
 
-#include "stdio.h"
+#include "string.h"
 
 // actually define the pointers else we would get undefined reference error
 int  (*video_rgb)(int r, int g, int b);
@@ -42,7 +42,9 @@ void video_size(int* w, int* h) {
 
 // TODO: implement textmode rgb
 int video_textmode_rgb(int r, int g, int b) {
-    return 0xf;
+    if(r == 0 && g == 0 && b == 0)
+        return 0x0;
+    return 0x7;
 }
 
 void video_textmode_enable_cursor(int cursor_scanline_start, int cursor_scanline_end) {
@@ -70,9 +72,9 @@ void video_textmode_set_cursor(int offset) {
     port_outb(PORT_SCREEN_CTRL, 15);
     port_outb(PORT_SCREEN_DATA, (uint8_t)(offset));
 }
-void video_textmode_cls(int attr) {
-    for(int i = 0; i < 80 * 25; i++) {
-        vid_mem[i * 2 + 1] = attr;
+void video_textmode_cls(int bg) {
+    for(int i = 0; i < text_rows * text_cols; i++) {
+        vid_mem[i * 2 + 1] = (bg & 0xf) << 4;
         vid_mem[i * 2]     = ' ';
     }
     video_textmode_set_cursor(0);
@@ -91,13 +93,17 @@ void video_textmode_scroll_screen(unsigned ammount) {
     }
     for(int i = start; i <= end; i++) {
         vid_mem[i * 2] = ' ';
-        vid_mem[i * 2 + 1] = 0x0f;
+        vid_mem[i * 2 + 1] = 0xf;
     }
 
     video_textmode_set_cursor(start);
 }
 
-static int _textmode_print_char(char chr, int offset, char attr) {
+void video_textmode_print_char(char chr, int offset, int fg, int bg, bool move) {
+    if(offset < 0) offset = video_textmode_get_cursor();
+    if(fg < 0) fg = current_fg;
+    if(bg < 0) bg = current_bg;
+
     if(chr == '\n') {
         offset += text_cols - (offset % text_cols);
     }
@@ -108,22 +114,14 @@ static int _textmode_print_char(char chr, int offset, char attr) {
     else if(chr == '\t') {
         // handle tabs like spaces
         // change later
-        return _textmode_print_char(' ', offset, attr);
+        return video_textmode_print_char(' ', offset, fg, bg, move);
         // offset += - offset % text_cols % 8 + 8;
     }
-    else if(chr >= 0x20 && chr <= 0x7e) {
+    else if(chr != 0) {
         vid_mem[offset * 2] = chr;
-        vid_mem[offset * 2 + 1] = attr;
+        vid_mem[offset * 2 + 1] = ((bg & 0xf) << 4) | (fg & 0xf);
         offset++;
     }
-    return offset;
-}
-void video_textmode_print_char(char chr, int offset, int fg, int bg, bool move) {
-    if(offset < 0) offset = video_textmode_get_cursor();
-    if(fg > -1) current_fg = fg;
-    if(bg > -1) current_bg = bg;
-
-    offset = _textmode_print_char(chr, offset, (bg << 4) | fg);
 
     if(move) {
         video_textmode_set_cursor(offset);
@@ -199,13 +197,27 @@ void video_framebuffer_set_cursor(int offset) {
     cursor_posx = offset % text_cols;
 }
 
-void video_framebuffer_cls(int color) {
+void video_framebuffer_cls(int bg) {
     for(unsigned y = 0; y < framebuffer_height; y++)
         for(unsigned x = 0; x < framebuffer_width; x++)
-            video_framebuffer_plot_pixel(x, y, color);
+            video_framebuffer_plot_pixel(x, y, bg);
 }
 
-void video_framebuffer_scroll_screen(unsigned int ammount) {}
+void video_framebuffer_scroll_screen(unsigned ammount) {
+    if(cursor_posy == 0) return;
+
+    cursor_posy -= ammount;
+    if(cursor_posy < 0) {
+        ammount += cursor_posy;
+        cursor_posy = 0;
+    }
+
+    memcpy((char*)vid_mem,
+           (char*)vid_mem + ammount * font_height * framebuffer_pitch,
+           cursor_posy * font_height * framebuffer_pitch);
+    memset((char*)vid_mem + cursor_posy * font_height * framebuffer_pitch,
+           0, ammount * font_height * framebuffer_pitch);
+}
 
 void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool move) {
     int _cursor_posx = cursor_posx;
@@ -251,17 +263,17 @@ void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool mov
             }
         }
         _cursor_posx++;
-        if(_cursor_posx % text_cols == 0) {
-            _cursor_posx = 0;
-            _cursor_posy++;
-            if(_cursor_posy == text_rows)
-                video_framebuffer_scroll_screen(1);
-        }
     }
 
+    if(_cursor_posx == text_cols) {
+        _cursor_posx = 0;
+        _cursor_posy++;
+    }
     if(move) {
         cursor_posx = _cursor_posx;
         cursor_posy = _cursor_posy;
+        if(cursor_posy == text_rows)
+            video_framebuffer_scroll_screen(1);
     }
 }
 
@@ -301,11 +313,7 @@ void video_framebuffer_init(uint32_t pitch, uint32_t width, uint32_t height, uin
     framebuffer_height = height;
     framebuffer_bpp = bpp;
 
-    psf_init(0);
-
     psf_get_font_geometry(&font_width, &font_height, &font_bpg);
     text_cols = framebuffer_width / font_width;
     text_rows = framebuffer_height / font_height;
-
-    printf("using font %dx%d\n", font_width, font_height);
 }

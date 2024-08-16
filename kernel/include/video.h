@@ -44,7 +44,7 @@ void video_framebuffer_enable_cursor(int start, int end);
 void video_framebuffer_disable_cursor();
 int  video_framebuffer_get_cursor();
 void video_framebuffer_set_cursor(int offset);
-void video_framebuffer_cls(int bge);
+void video_framebuffer_cls(int bg);
 void video_framebuffer_scroll_screen(unsigned ammount);
 void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool move);
 
@@ -56,7 +56,7 @@ extern void (*video_enable_cursor)(int cursor_scanline_start, int cursor_scanlin
 extern void (*video_disable_cursor)();
 extern int  (*video_get_cursor)();
 extern void (*video_set_cursor)(int offset);
-extern void (*video_cls)(int color);
+extern void (*video_cls)(int bg);
 extern void (*video_scroll_screen)(unsigned ammount);
 extern void (*video_print_char)(char chr, int offset, int fg, int bg, bool move);
 
