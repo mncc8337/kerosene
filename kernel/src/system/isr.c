@@ -1,8 +1,9 @@
 #include "system.h"
 #include "kpanic.h"
-#include "video.h"
 #include "pic.h"
+#include "stdio.h"
 #include "string.h"
+#include "video.h"
 
 static void* routines[IDT_MAX_DESCRIPTORS];
 // from isr.asm
@@ -45,9 +46,12 @@ static char* exception_message[] = {
 
 // default exception handler
 static void exception_handler(regs_t* r) {
-    video_print_string("Exception: ", -1, VIDEO_WHITE, true);
-    video_print_string(exception_message[r->int_no], -1, VIDEO_LIGHT_RED, true);
-    video_print_string(".\nSystem Halted!", -1, VIDEO_WHITE, true);
+    video_set_attr(VIDEO_WHITE, VIDEO_BLACK);
+    printf("\nException: ");
+    video_set_attr(VIDEO_LIGHT_RED, VIDEO_BLACK);
+    puts(exception_message[r->int_no]);
+    video_set_attr(VIDEO_WHITE, VIDEO_BLACK);
+    puts("System halted!");
     kpanic();
 }
 

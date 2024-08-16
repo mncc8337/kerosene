@@ -63,9 +63,9 @@ static bool list_dir(fs_node_t node) {
         printf("|   ");
     printf("|---");
 
-    if(node.isdir) video_set_attr(VIDEO_LIGHT_BLUE);
+    if(node.isdir) video_set_attr(VIDEO_LIGHT_BLUE, VIDEO_BLACK);
     puts(node.name);
-    if(node.isdir) video_set_attr(VIDEO_LIGHT_GREY);
+    if(node.isdir) video_set_attr(VIDEO_LIGHT_GREY, VIDEO_BLACK);
 
     if(node.isdir && !strcmp(node.name, ".") && !strcmp(node.name, ".."))
         fs_list_dir(&node, list_dir);
@@ -472,7 +472,7 @@ static void write(char* path) {
         if(current_key.mapped == '\b') {
             if(input_len == 0) continue;
             video_set_cursor(video_get_cursor() - 1); // move back
-            video_print_char(' ', -1, 0, false); // delete printed char
+            video_print_char(' ', -1, -1, -1, false); // delete printed char
             input_len--;
             continue;
         }
@@ -769,11 +769,11 @@ static void print_prompt() {
         putchar('\n');
 
     putchar('[');
-    video_set_attr(VIDEO_GREEN);
+    video_set_attr(VIDEO_GREEN, VIDEO_BLACK);
     printf("kernel@kshell");
-    video_set_attr(VIDEO_LIGHT_BLUE);
+    video_set_attr(VIDEO_LIGHT_BLUE, VIDEO_BLACK);
     printf(" %s ", node_stack[node_stack_offset].name);
-    video_set_attr(VIDEO_LIGHT_GREY);
+    video_set_attr(VIDEO_LIGHT_GREY, VIDEO_BLACK);
     printf("]$ ");
 }
 
@@ -795,7 +795,7 @@ void shell_start() {
             int currpos = video_get_cursor();
             for(int i = 0; i <= (signed)input_len; i++) {
                 video_set_cursor(currpos - i);
-                video_print_char(' ', -1, 0, false);
+                video_print_char(' ', -1, -1, -1, false);
             }
 
             input_len = strlen(last_input);
@@ -809,7 +809,7 @@ void shell_start() {
         if(current_key.mapped == '\b') {
             if(input_len == 0) continue;
             video_set_cursor(video_get_cursor() - 1); // move back
-            video_print_char(' ', -1, 0, false); // delete printed char
+            video_print_char(' ', -1, -1, -1, false); // delete printed char
             input_len--;
             continue;
         }

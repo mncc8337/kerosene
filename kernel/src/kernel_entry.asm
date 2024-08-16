@@ -20,9 +20,9 @@ align 4
     dd 0 ; bss end addr
     dd 0 ; entry addr
     dd 0 ; 0 for linear graphics mode, 1 for text mode
-    dd 0 ; video width
-    dd 0 ; video height
-    dd 0  ; video depth
+    dd 800 ; video width
+    dd 600 ; video height
+    dd 32  ; video depth
 
 section .bss
 align 16

@@ -6,7 +6,7 @@
 
 int putchar(int ic) {
 #if defined(__is_libk)
-    video_print_char((char)ic, -1, 0, true);
+    video_print_char((char)ic, -1, -1, -1, true);
 #else
     // TODO: implement stdio and the write system call
 #endif

@@ -13,6 +13,7 @@ LIBC_SRC = libc/stdio/*.c \
 		   libc/time/*.c \
 
 C_SRC = kernel/src/*.c \
+		kernel/src/misc/*.c \
 		kernel/src/system/*.c \
 		kernel/src/driver/*.c \
 		kernel/src/driver/ata/*.c \
@@ -64,6 +65,8 @@ $(BIN)kernel_entry.o: kernel/src/kernel_entry.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
 $(BIN)%.o: kernel/src/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)%.o: kernel/src/misc/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)%.o: kernel/src/system/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<

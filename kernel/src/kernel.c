@@ -124,21 +124,20 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         video_height = mbd->framebuffer_height;
         video_set_vidmem_ptr(video_addr);
         switch(mbd->framebuffer_type) {
-            // case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
-            //     break;
-            //
-            // case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED:
-            //     break;
-
-            case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
-                video_textmode_init(video_width, video_height);
+            case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED:
+                // very rare, not likely to happend
+                // so let's just not support it hehe
                 break;
-
-            default:
+            case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
+                // TODO: do sth with framebuffer color_info
                 video_framebuffer_init(mbd->framebuffer_pitch,
                                        video_width,
                                        video_height,
                                        mbd->framebuffer_bpp);
+                break;
+            case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
+                video_textmode_init(video_width, video_height);
+                break;
         }
     }
     else {
@@ -149,10 +148,10 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     }
 
     // greeting msg to let us know we are in the kernel
-    video_set_attr(VIDEO_LIGHT_CYAN);  puts("hello");
-    video_set_attr(VIDEO_LIGHT_GREEN); printf("this is ");
-    video_set_attr(VIDEO_LIGHT_RED);   puts("kernosene!");
-    video_set_attr(VIDEO_LIGHT_GREY);
+    video_set_attr(VIDEO_LIGHT_CYAN, VIDEO_BLACK); puts("hello");
+    video_set_attr(VIDEO_LIGHT_GREEN, VIDEO_BLACK); printf("this is ");
+    video_set_attr(VIDEO_LIGHT_RED, VIDEO_BLACK);   puts("kernosene!");
+    video_set_attr(VIDEO_LIGHT_GREY, VIDEO_BLACK);
     printf("build datetime: %s, %s\n", __TIME__, __DATE__);
 
     if(magic != MULTIBOOT_BOOTLOADER_MAGIC) {
@@ -198,26 +197,26 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    for(int x = 0; x < video_width; x++)
-        for(int y = 0; y < video_height; y++) {
-            uint32_t color = 0;
-            int x_norm = (uint8_t)(((float)x / video_width) * 255);
-            int y_norm = (uint8_t)(((float)y / video_height) * 255);
-            color |= x_norm << 24;
-            color |= y_norm << 16;
-            color |= x_norm << 8;
-            video_framebuffer_plot_pixel(x, y, color);
-        }
-
-    char* my_avt_data = my_avt_header_data;
-    for(int y = 0; y < (signed)my_avt_height; y++) {
-        for(int x = 0; x < (signed)my_avt_width; x++) {
-            int pixel[3];
-            HEADER_PIXEL(my_avt_data, pixel);
-            uint32_t color = (pixel[2] << 24) | (pixel[0] << 16) | (pixel[1] << 8);
-            video_framebuffer_plot_pixel(x, y, color);
-        }
-    }
+    // for(int x = 0; x < video_width; x++)
+    //     for(int y = 0; y < video_height; y++) {
+    //         uint32_t color = 0;
+    //         int x_norm = (uint8_t)(((float)x / video_width) * 255);
+    //         int y_norm = (uint8_t)(((float)y / video_height) * 255);
+    //         color |= x_norm << 24;
+    //         color |= y_norm << 16;
+    //         color |= x_norm << 8;
+    //         video_framebuffer_plot_pixel(x, y, color);
+    //     }
+    //
+    // char* my_avt_data = my_avt_header_data;
+    // for(int y = 0; y < (signed)my_avt_height; y++) {
+    //     for(int x = 0; x < (signed)my_avt_width; x++) {
+    //         int pixel[3];
+    //         HEADER_PIXEL(my_avt_data, pixel);
+    //         uint32_t color = (pixel[2] << 24) | (pixel[0] << 16) | (pixel[1] << 8);
+    //         video_framebuffer_plot_pixel(x, y, color);
+    //     }
+    // }
 
     shell_set_root_node(fs->root_node);
     shell_start();
