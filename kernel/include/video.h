@@ -36,8 +36,9 @@ void video_textmode_cls(int bg);
 void video_textmode_scroll_screen(unsigned ammount);
 void video_textmode_print_char(char chr, int offset, int fg, int bg, bool move);
 
-int video_framebuffer_rgb(int r, int g, int b);
+int  video_framebuffer_rgb(int r, int g, int b);
 void video_framebuffer_plot_pixel(int x, int y, int color);
+int  video_framebuffer_get_pixel(int x, int y);
 int  video_framebuffer_get_cursor();
 void video_framebuffer_set_cursor(int offset);
 void video_framebuffer_cls(int bg);

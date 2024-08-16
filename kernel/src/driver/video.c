@@ -145,7 +145,13 @@ static int font_width;
 static int font_height;
 static int font_bpg;
 
+// the pixels behind the cursor
+static int cursor_buffer[200];
+static int cursor_buffer_posx = 0;
+static int cursor_buffer_posy = 0;
+
 int video_framebuffer_rgb(int r, int g, int b) {
+    // TODO: support other bpp mode
     return (r << 16) | (g << 8) | b;
 }
 
@@ -163,18 +169,58 @@ void video_framebuffer_plot_pixel(int x, int y, int color) {
         *pixel = color;
     }
     else {
-        // NOTE: not tested!
-        int col_offset = x * framebuffer_bpp;
-        uint8_t* pixel = vid_mem + y * framebuffer_pitch + col_offset / 8;
-        uint8_t offset = col_offset % 8;
+        // who the hell use this is not deserved a pixel
+    }
+}
 
-        for(int i = framebuffer_bpp; i > 0; i -= 8) {
-            *pixel |= (uint8_t)(color << offset);
-            offset = (offset + 8) % 8;
-            color >>= 8;
-            pixel++;
+int video_framebuffer_get_pixel(int x, int y) {
+    if(framebuffer_bpp == 8) {
+        uint8_t* pixel = vid_mem + y * framebuffer_pitch + x;
+        return *pixel;
+    }
+    else if(framebuffer_bpp == 16) {
+        uint16_t* pixel = (uint16_t*)(vid_mem + y * framebuffer_pitch) + x;
+        return *pixel;
+    }
+    else if(framebuffer_bpp == 32) {
+        uint32_t* pixel = (uint32_t*)(vid_mem + y * framebuffer_pitch) + x;
+         return *pixel;
+    }
+    else {
+        // who the hell use this is not deserved a pixel
+        return 0x0;
+    }
+}
+
+// should be called after changing either cursor_posx or cursor_posy
+static void _framebuffer_draw_cursor(bool load_buffer) {
+    for(int y = 0; y < font_height; y++) {
+        for(int x = 0; x < font_width; x++) {
+            if(load_buffer)
+                video_framebuffer_plot_pixel(
+                    x + cursor_buffer_posx * font_width,
+                    y + cursor_buffer_posy * font_height,
+                    cursor_buffer[y * font_width + x]
+                );
+
+            // load new location to buffer
+            cursor_buffer[y * font_width + x] = video_framebuffer_get_pixel(
+                x + cursor_posx * font_width,
+                y + cursor_posy * font_height
+            );
+
+            // now draw the cursor
+            video_framebuffer_plot_pixel(
+                x + cursor_posx * font_width,
+                y + cursor_posy * font_height,
+                video_framebuffer_rgb(180, 170, 170)
+            );
         }
     }
+
+    // load new location
+    cursor_buffer_posx = cursor_posx;
+    cursor_buffer_posy = cursor_posy;
 }
 
 int video_framebuffer_get_cursor() {
@@ -195,16 +241,22 @@ void video_framebuffer_scroll_screen(unsigned ammount) {
     if(cursor_posy == 0) return;
 
     cursor_posy -= ammount;
+    cursor_buffer_posy -= ammount;
     if(cursor_posy < 0) {
         ammount += cursor_posy;
         cursor_posy = 0;
+        cursor_buffer_posy = 0;
     }
 
-    memcpy((char*)vid_mem,
-           (char*)vid_mem + ammount * font_height * framebuffer_pitch,
-           cursor_posy * font_height * framebuffer_pitch);
-    memset((char*)vid_mem + cursor_posy * font_height * framebuffer_pitch,
-           0, ammount * font_height * framebuffer_pitch);
+    memcpy(
+        (char*)vid_mem,
+        (char*)vid_mem + ammount * font_height * framebuffer_pitch,
+        cursor_posy * font_height * framebuffer_pitch
+    );
+    memset(
+        (char*)vid_mem + cursor_posy * font_height * framebuffer_pitch,
+        0, ammount * font_height * framebuffer_pitch
+    );
 }
 
 void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool move) {
@@ -220,45 +272,56 @@ void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool mov
         _cursor_posx = offset % text_cols;
     }
 
+    bool load_cursor_buffer = false;
     if(chr == '\n') {
+        load_cursor_buffer = true;
         _cursor_posx = 0;
         _cursor_posy++;
     }
     else if(chr == '\b') {
+        load_cursor_buffer = true;
         _cursor_posx -= 1;
         if(_cursor_posx < 0) {
             _cursor_posx = text_cols - 1;
             _cursor_posy -= 1;
             if(_cursor_posy < 0) _cursor_posy = 0;
         }
-        video_framebuffer_print_char(' ',
-                                     _cursor_posy * text_cols + _cursor_posx,
-                                     0x0, 0x0, true);
+        // manually delete the char
+        for(int y = 0; y < font_height; y++)
+            for(int x = 0; x < font_width; x++)
+                video_framebuffer_plot_pixel(
+                    x + _cursor_posx * font_width,
+                    y + _cursor_posy * font_height,
+                    0x0
+                );
     }
     else if(chr == '\t') {
-        video_framebuffer_print_char(' ',
-                                     _cursor_posy * text_cols + _cursor_posx,
-                                     0x0, 0x0, true);
+        video_framebuffer_print_char(
+            ' ', _cursor_posy * text_cols + _cursor_posx,
+            0x0, 0x0, true
+        );
         _cursor_posx++;
     }
     else {
         char* glyph = psf_get_glyph(chr);
 
-        int cnt = 0;
+        int col = 0;
         int line = 0;
         for(int i = 0; i < font_bpg; i++) {
-            int remain_width = font_width - cnt;
+            int remain_width = font_width - col;
             if(remain_width > 8) remain_width = 8;
             for(int j = 0; j < remain_width; j++) {
-                video_framebuffer_plot_pixel(_cursor_posx * font_width + j + cnt,
-                                             _cursor_posy * font_height + line,
-                                             ((*(glyph+i) >> (7-j)) & 1) ? fg : bg);
+                video_framebuffer_plot_pixel(
+                    _cursor_posx * font_width + j + col,
+                    _cursor_posy * font_height + line,
+                    ((*(glyph+i) >> (7-j)) & 1) ? fg : bg
+                );
             }
 
-            cnt += remain_width;
-            if(cnt >= font_width) {
+            col += remain_width;
+            if(col >= font_width) {
                 line++;
-                cnt = 0;
+                col = 0;
             }
         }
         _cursor_posx++;
@@ -274,6 +337,8 @@ void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool mov
         if(cursor_posy == text_rows)
             video_framebuffer_scroll_screen(1);
     }
+
+    _framebuffer_draw_cursor(load_cursor_buffer);
 }
 
 void video_textmode_init(uint8_t cols, uint8_t rows) {
