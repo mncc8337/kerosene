@@ -41,7 +41,7 @@ void video_textmode_disable_cursor() {
 
 // TODO: implement textmode rgb
 int video_textmode_rgb(int r, int g, int b) {
-    if(r == 0 && g == 0 && b == 0)
+    if(!r && !g && !b)
         return 0x0;
     return 0x7;
 }

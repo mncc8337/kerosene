@@ -92,9 +92,9 @@ void pmmngr_deinit_region(uint32_t base, size_t size) {
 }
 
 void* pmmngr_alloc_block() {
-    if(total_block - used_block == 0) return 0;
+    if(total_block - used_block == 0) return NULL;
     int frame = find_first_free_block();
-    if(frame == -1) return 0;
+    if(frame == -1) return NULL;
 
     set_bit(frame);
 
@@ -104,9 +104,9 @@ void* pmmngr_alloc_block() {
     return (void*)base;
 }
 void* pmmngr_alloc_multi_block(size_t cnt) {
-    if(used_block + cnt > total_block) return 0;
+    if(used_block + cnt > total_block) return NULL;
     int frame = find_first_free(cnt);
-    if(frame == -1) return 0;
+    if(frame == -1) return NULL;
 
     for(uint32_t i = 0; i < cnt; i++)
         set_bit(frame + i);

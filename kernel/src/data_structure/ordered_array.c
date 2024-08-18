@@ -1,6 +1,6 @@
 #include "data_structure/ordered_array.h"
 
-// TODO: better odered array implementation using binary tree
+// TODO: better ordered array implementation using binary tree
 
 static bool _less_than(void* a, void* b) {
     return (a < b ? true : false);

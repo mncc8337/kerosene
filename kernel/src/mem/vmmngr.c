@@ -85,8 +85,6 @@ MEM_ERR vmmngr_map_page(uint32_t phys, uint64_t virt) {
 MEM_ERR vmmngr_init() {
     ptable* table1 = (ptable*)pmmngr_alloc_block();
     if(!table1) return ERR_MEM_FAILED;
-    ptable* table2 = (ptable*)pmmngr_alloc_block();
-    if(!table2) return ERR_MEM_FAILED;
 
     for(int i = 0, frame = 0; i < 1024; i++, frame += 4096) {
         uint32_t page = 0;
@@ -95,14 +93,7 @@ MEM_ERR vmmngr_init() {
         table1->entry[PAGE_TABLE_INDEX(frame)] = page;
     }
 
-    for(int i = 0, frame = 0x100000, virt = 0xc0000000; i < 1024; i++, frame += 4096, virt += 4096) {
-        uint32_t page = 0;
-        pte_add_attrib(&page, PTE_PRESENT);
-        pte_set_frame(&page, frame);
-        table2->entry[PAGE_TABLE_INDEX(virt)] = page;
-    }
-
-    pdir* page_directory = (pdir*)pmmngr_alloc_multi_block(3);
+    pdir* page_directory = (pdir*)pmmngr_alloc_block();
     if(!page_directory) return ERR_MEM_FAILED;
 
     for(int i = 0; i < 1024; i++)
@@ -112,11 +103,6 @@ MEM_ERR vmmngr_init() {
     pde_add_attrib(entry1, PDE_PRESENT);
     pde_add_attrib(entry1, PDE_WRITABLE);
     pde_set_frame(entry1, (uint32_t)table1);
-
-    uint32_t* entry2 = vmmngr_pdirectory_lookup_entry(page_directory, 0xc0000000);
-    pde_add_attrib(entry2, PDE_PRESENT);
-    pde_add_attrib(entry2, PDE_WRITABLE);
-    pde_set_frame(entry2, (uint32_t)table2);
 
     current_pdbr = (uint32_t)(&page_directory->entry);
     vmmngr_switch_pdirectory(page_directory);

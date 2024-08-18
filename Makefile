@@ -14,6 +14,7 @@ LIBC_SRC = libc/stdio/*.c \
 
 C_SRC = kernel/src/*.c \
 		kernel/src/misc/*.c \
+		kernel/src/data_structure/*.c \
 		kernel/src/system/*.c \
 		kernel/src/driver/*.c \
 		kernel/src/driver/video/*.c \
@@ -31,7 +32,12 @@ _OBJ += $(addsuffix .o, $(notdir $(wildcard $(ASM_SRC))))
 LIBC_OBJ = $(addprefix $(BIN), $(_LIBC_OBJ))
 OBJ = $(addprefix $(BIN), $(_OBJ))
 
-DEFINES = -DTIMER_FREQUENCY=1000 -D__is_libk
+DEFINES = -DTIMER_FREQUENCY=1000 \
+		  -DMMNGR_HEAP_START=0xc0000000 \
+		  -DMMNGR_HEAP_INITAL_SIZE=0x100000 \
+		  -DMMNGR_HEAP_MIN_SIZE=0x70000 \
+		  -DMMNGR_HEAP_INDEX_SIZE=0x20000 \
+		  -D__is_libk \
 
 C_INCLUDES = -I./kernel/src -I./kernel/include -I./libc/include
 
@@ -68,6 +74,8 @@ $(BIN)kernel_entry.o: kernel/src/kernel_entry.asm
 $(BIN)%.o: kernel/src/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)%.o: kernel/src/misc/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)%.o: kernel/src/data_structure/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)%.o: kernel/src/system/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<

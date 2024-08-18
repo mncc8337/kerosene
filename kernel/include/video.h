@@ -25,6 +25,7 @@
 #define VIDEO_LIGHT_BROWN   video_rgb(0, 0, 0) // 0xe
 #define VIDEO_WHITE         video_rgb(255, 255, 255) // 0xf
 
+// vga.c
 void video_textmode_set_ptr(int ptr);
 void video_textmode_set_attr(int fg, int bg);
 void video_textmode_get_size(int* w, int* h);
@@ -38,6 +39,7 @@ void video_textmode_cls(int bg);
 void video_textmode_scroll_screen(unsigned ammount);
 void video_textmode_print_char(char chr, int offset, int fg, int bg, bool move);
 
+// vesa.c
 void video_framebuffer_set_ptr(int ptr);
 void video_framebuffer_set_attr(int fg, int bg);
 void video_framebuffer_get_size(int* w, int* h);
@@ -65,7 +67,7 @@ extern void (*video_cls)(int bg);
 extern void (*video_scroll_screen)(unsigned ammount);
 extern void (*video_print_char)(char chr, int offset, int fg, int bg, bool move);
 
+// video_init.c
 void video_textmode_init(uint8_t cols, uint8_t rows);
 void video_framebuffer_init(uint32_t pitch, uint32_t width, uint32_t height, uint8_t bpp);
-
 bool video_using_framebuffer();

@@ -44,6 +44,34 @@ static char* exception_message[] = {
     "Reserved"
 };
 
+static void page_fault_handler(regs_t* r) {
+    // the faulting address is stored in the CR2 register
+    uint32_t faulting_address;
+    asm volatile("mov %%cr2, %0" : "=r" (faulting_address));
+
+    bool present = !(r->err_code & 0x1);   // page not present
+    bool rw = r->err_code & 0x2;           // write operation
+    bool us = r->err_code & 0x4;           // processor was in user-mode
+    bool reserved = r->err_code & 0x8;     // overwritten CPU-reserved bits of page entry
+    bool id = r->err_code & 0x10;          // caused by an instruction fetch
+
+    // output an error message
+    printf("page fault at 0x%x\n", faulting_address);
+    printf("flags: ");
+    if(present) printf("present ");
+    if(rw) printf("read-only ");
+    if(us) printf("user-mode ");
+    if(reserved) printf("reserved ");
+    if(id) printf("instruction fetch ");
+    putchar('\n');
+}
+
+static void* exception_handlers[32] = {
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    page_fault_handler,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+};
+
 // default exception handler
 static void exception_handler(regs_t* r) {
     video_set_attr(VIDEO_WHITE, VIDEO_BLACK);
@@ -51,6 +79,11 @@ static void exception_handler(regs_t* r) {
     video_set_attr(VIDEO_LIGHT_RED, VIDEO_BLACK);
     puts(exception_message[r->int_no]);
     video_set_attr(VIDEO_WHITE, VIDEO_BLACK);
+    printf("Error code: 0b%b\n", r->err_code);
+
+    void (*handler)(regs_t*) = exception_handlers[r->int_no];
+    if(!handler) handler(r);
+
     puts("System halted!");
     kpanic();
 }

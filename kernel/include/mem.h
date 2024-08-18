@@ -1,14 +1,18 @@
 #pragma once
 
-#include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
+#include "stdint.h"
+#include "stddef.h"
+#include "stdbool.h"
 
 typedef enum {
     ERR_MEM_FAILED,
     ERR_MEM_SUCCESS,
     ERR_MEM_INVALID_DIR,
 } MEM_ERR;
+
+#ifndef NULL
+#define NULL
+#endif
 
 #define MMNGR_BLOCK_SIZE 4096
 #define MMNGR_PAGE_SIZE 4096
@@ -90,3 +94,7 @@ MEM_ERR vmmngr_alloc_page(uint32_t* e);
 void vmmngr_free_page(uint32_t* e);
 MEM_ERR vmmngr_map_page(uint32_t phys, uint64_t virt);
 MEM_ERR vmmngr_init();
+
+// heap.c
+void* kmalloc(int byte);
+void kfree(void* ptr);
