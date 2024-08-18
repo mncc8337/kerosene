@@ -1,3 +1,3 @@
 #pragma once
 
-#define __sos_libc
+#define __kerosene_libc

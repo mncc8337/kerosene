@@ -6,7 +6,7 @@ if [ -z "$(losetup -a | grep "/dev/loop1")" ]; then
 fi
 sudo mount --onlyonce /dev/loop1 ./mnt
 
-grub-mkrescue -o sos.iso --modules="normal part_msdos fat multiboot" ./mnt
+grub-mkrescue -o kerosene.iso --modules="normal part_msdos fat multiboot" ./mnt
 
 sudo umount ./mnt
 sudo losetup -d /dev/loop1
