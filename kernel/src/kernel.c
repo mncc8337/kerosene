@@ -16,10 +16,15 @@
 
 #include "access/my_avt.h"
 
-char freebuff[512];
+static char freebuff[512];
 
 int FS_ID = 0;
 fs_t* fs;
+
+int video_addr = 0;
+int video_width = 0;
+int video_height = 0;
+int video_pitch = 0;
 
 extern uint32_t startkernel;
 extern uint32_t endkernel;
@@ -64,6 +69,20 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
         print_debug(LT_CR, "error while enabling paging. system halted. error code %x", merr);
         kpanic();
     }
+    
+    // map video address
+    int virt_video_addr = 0xc0000000;
+    if(video_using_framebuffer()) {
+        for(int i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
+            vmmngr_map_page(video_addr + i, virt_video_addr + i);
+        video_framebuffer_set_ptr(virt_video_addr);
+    }
+    else {
+        vmmngr_map_page(video_addr, virt_video_addr);
+        video_textmode_set_ptr(virt_video_addr);
+    }
+    video_addr = virt_video_addr;
+
     print_debug(LT_OK, "paging enabled\n");
 }
 void disk_init() {
@@ -114,14 +133,11 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     // disable interrupts at the start to set up things
     asm volatile("cli");
 
-    uint64_t video_addr = 0;
-    int video_width = 0;
-    int video_height = 0;
-
     if(mbd->flags & MULTIBOOT_INFO_FRAMEBUFFER_INFO) {
         video_addr = mbd->framebuffer_addr;
         video_width = mbd->framebuffer_width;
         video_height = mbd->framebuffer_height;
+        video_pitch = mbd->framebuffer_pitch;
         switch(mbd->framebuffer_type) {
             case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED:
                 // very rare, not likely to happend
@@ -130,7 +146,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
             case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
                 // TODO: do sth with framebuffer color_info
                 video_framebuffer_set_ptr(video_addr);
-                video_framebuffer_init(mbd->framebuffer_pitch,
+                video_framebuffer_init(video_pitch,
                                        video_width,
                                        video_height,
                                        mbd->framebuffer_bpp);
@@ -146,6 +162,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         // with or without GRUB
         video_textmode_init(80, 25);
         video_textmode_set_ptr(VIDEO_TEXTMODE_ADDRESS);
+        video_addr = VIDEO_TEXTMODE_ADDRESS;
     }
 
     // greeting msg to let us know we are in the kernel
@@ -180,8 +197,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         print_debug(LT_CR, "no memory map given by bootloader. system halted\n");
         kpanic();
     }
-    // disabled until i implemented the heap
-    // mem_init(mbd->mmap_addr, mbd->mmap_length);
+    mem_init(mbd->mmap_addr, mbd->mmap_length);
 
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
@@ -195,13 +211,15 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    char* my_avt_data = my_avt_header_data;
-    for(int y = 0; y < (signed)my_avt_height; y++) {
-        for(int x = 0; x < (signed)my_avt_width; x++) {
-            int pixel[3];
-            HEADER_PIXEL(my_avt_data, pixel);
-            uint32_t color = (pixel[2] << 24) | (pixel[0] << 16) | (pixel[1] << 8);
-            video_framebuffer_plot_pixel(x, y, color);
+    if(video_using_framebuffer()) {
+        char* my_avt_data = my_avt_header_data;
+        for(int y = 0; y < (signed)my_avt_height; y++) {
+            for(int x = 0; x < (signed)my_avt_width; x++) {
+                int pixel[3];
+                HEADER_PIXEL(my_avt_data, pixel);
+                uint32_t color = (pixel[2] << 24) | (pixel[0] << 16) | (pixel[1] << 8);
+                video_framebuffer_plot_pixel(x, y, color);
+            }
         }
     }
 
