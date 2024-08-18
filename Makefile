@@ -2,7 +2,8 @@ TARGET = i686-elf
 CROSS_COMPILER_LOC = ./cross/bin/
 
 CC = $(CROSS_COMPILER_LOC)$(TARGET)-gcc
-# LD = $(CROSS_COMPILER_LOC)$(TARGET)-ld
+LD = $(CROSS_COMPILER_LOC)$(TARGET)-ld
+AR = $(CROSS_COMPILER_LOC)$(TARGET)-ar
 ASM = nasm
 
 BIN = bin/
@@ -41,11 +42,22 @@ DEFINES = -DTIMER_FREQUENCY=1000 \
 
 C_INCLUDES = -I./kernel/src -I./kernel/include -I./libc/include
 
-# CFLAGS = $(DEFINES) -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles
-# LDFLAGS = -T linker.ld -m elf_i386 -nostdlib --nmagic
 CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -std=gnu99 -g -MMD -MP
 LDFLAGS = -T linker.ld -nostdlib -lgcc
 NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
+
+ifdef NO_CROSS_COMPILER
+	CC = gcc
+	LD = ld
+	AR = ar
+
+	CFLAGS = $(DEFINES) -Wall -Wextra \
+			 -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles \
+			 -fno-stack-protector \
+			 -g -MMD -MP
+	LDFLAGS = -T linker.ld -nostdlib -m32 -fno-pie -lgcc
+endif
+
 
 .PHONY: all libc libk kernel disk copyfs run run-debug clean clean-all
 
@@ -63,7 +75,7 @@ $(BIN)%.o: libc/string/%.c
 $(BIN)%.o: libc/time/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)libk.a: $(LIBC_OBJ)
-	$(CROSS_COMPILER_LOC)$(TARGET)-ar rcs $@ $^
+	$(AR) rcs $@ $^
 	@echo done building libk
 $(BIN)libc.a: $(LIBC_OBJ)
 	@echo libc is not ready for build, yet
@@ -96,7 +108,6 @@ $(BIN)%.asm.o: kernel/src/mem/%.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
 $(BIN)kernel.bin: $(BIN)kernel_entry.o $(OBJ) $(BIN)libk.a
-	@echo $(OBJ)
 	# use GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lk
 

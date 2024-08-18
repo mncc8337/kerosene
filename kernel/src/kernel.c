@@ -25,6 +25,7 @@ int video_addr = 0;
 int video_width = 0;
 int video_height = 0;
 int video_pitch = 0;
+int video_bpp = 0;
 
 extern uint32_t startkernel;
 extern uint32_t endkernel;
@@ -71,16 +72,11 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
     }
     
     // map video address
-    int virt_video_addr = 0xc0000000;
-    if(video_using_framebuffer()) {
-        for(int i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
-            vmmngr_map_page(video_addr + i, virt_video_addr + i);
-        video_framebuffer_set_ptr(virt_video_addr);
-    }
-    else {
-        vmmngr_map_page(video_addr, virt_video_addr);
-        video_textmode_set_ptr(virt_video_addr);
-    }
+    int virt_video_addr = 0xc0000000; // temporary address
+    for(int i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
+        vmmngr_map_page(video_addr + i, virt_video_addr + i);
+    if(video_using_framebuffer()) video_framebuffer_set_ptr(virt_video_addr);
+    else video_textmode_set_ptr(virt_video_addr);
     video_addr = virt_video_addr;
 
     print_debug(LT_OK, "paging enabled\n");
@@ -138,6 +134,8 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         video_width = mbd->framebuffer_width;
         video_height = mbd->framebuffer_height;
         video_pitch = mbd->framebuffer_pitch;
+        video_bpp = mbd->framebuffer_bpp;
+
         switch(mbd->framebuffer_type) {
             case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED:
                 // very rare, not likely to happend
@@ -149,7 +147,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
                 video_framebuffer_init(video_pitch,
                                        video_width,
                                        video_height,
-                                       mbd->framebuffer_bpp);
+                                       video_bpp);
                 break;
             case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
                 video_textmode_set_ptr(video_addr);
@@ -163,6 +161,10 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         video_textmode_init(80, 25);
         video_textmode_set_ptr(VIDEO_TEXTMODE_ADDRESS);
         video_addr = VIDEO_TEXTMODE_ADDRESS;
+        video_width = 80;
+        video_height = 25;
+        video_pitch = 160;
+        video_bpp = 16;
     }
 
     // greeting msg to let us know we are in the kernel

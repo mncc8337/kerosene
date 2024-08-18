@@ -8,7 +8,7 @@ It's a working-in-progress project and should not be used as references for osde
 - FAT32 filesystem support (finally a serious feature hehe)
 ## Build and run
 ### Prerequisite
-- A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a normal x86_64 elf GCC will compile it just fine (by adding some flags, see the commented CFLAGS lines in Makefile, note that they are not up-to-dated with the uncommented flags), the osdev wiki said we should use a cross compiler to avoid any unexpected errors
+- A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors. if you are lazy to install one, use `make all NO_CROSS_COMPILER=1` to compile using linux GCC (please do not report any errors if you use this option)
 - nasm
 - grub (and xorriso to gen iso image)
 - qemu
@@ -38,9 +38,10 @@ cd mnt/
 ./script/cpyfile.sh file/or/directory/in/somewhere ./mnt/some/DIRECTORY/in/the/disk
 ```
 Note that scripts in `script/` will need sudo privilege to setup loopback device for the hard disk image.
-> [!WARNING]  
-> YOU SHOULD NOT RUN THE OS ON REAL HARDWARE.  
-> If you wish to do it any way, run `sudo dd if=disk.img of=/dev/sdX && sync` (MAKE SURE /dev/sdX IS AN USB DEVICE) or any program to burn the disk image into an usb device, restart the pc and choose the usb in the boot menu.
+### Running on real hardware
+You can either make an iso `./script/geniso.sh` and burn it to an usb or use `sudo dd if=disk.img of=/dev/sdX && sync` to burn the disk to an usb to run the OS. Note that ISO 9660 FS and usb driver are not implemented so the OS will perform filesystem commands on whatever partitions with FAT32 fs it found so just dont perform fs command and you will be fine.
+> [!NOTE]
+> I am not responsible for any damage caused to your machine by the OS. Try this with your own risk!
 ## Progress
 ### Baby first step
 - [x] basic bootloader
@@ -70,17 +71,15 @@ Note that scripts in `script/` will need sudo privilege to setup loopback device
     - [ ] the heap
 - [ ] ATA
     - [x] PIO mode
-    - [ ] to be updated
 - [x] CMOS: get datetime
 - [ ] APCI
 - [ ] APIC
 - [ ] HPET
-- [ ] mouse driver
-- [ ] GUI
+- [ ] PS2 mouse driver
+- [ ] video
     - [x] plot pixel
     - [x] render psf fonts
 - [ ] sound
-- [ ] video
 - [ ] im not gonna touch networking
 ### Filesystem
 - [x] MBR support
@@ -100,8 +99,8 @@ Note that scripts in `script/` will need sudo privilege to setup loopback device
 ### Userland
 - [x] TSS setup
 - [x] simple kshell
-- [ ] multithreading
 - [ ] process manager
+- [ ] multithreading
 - [ ] load and run ELF file
 - [ ] multi-processing
 - [ ] port some programs
