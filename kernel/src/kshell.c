@@ -671,32 +671,26 @@ static void datetime(char* arg) {
     printf("%d:%d:%d, ", t.tm_hour, t.tm_min, t.tm_sec);
     switch(t.tm_wday) {
         case 1:
-        printf("mon ");
-        break;
-
+            printf("mon ");
+            break;
         case 2:
-        printf("tue ");
-        break;
-
+            printf("tue ");
+            break;
         case 3:
-        printf("wed ");
-        break;
-
+            printf("wed ");
+            break;
         case 4:
-        printf("thu ");
-        break;
-
+            printf("thu ");
+            break;
         case 5:
-        printf("fri ");
-        break;
-
+            printf("fri ");
+            break;
         case 6:
-        printf("sat ");
-        break;
-
+            printf("sat ");
+            break;
         case 0:
-        printf("sun ");
-        break;
+            printf("sun ");
+            break;
     }
     printf("%d/%d/%d\n", t.tm_mday, t.tm_mon, t.tm_year);
     printf("days since 1st january: %d\n", t.tm_yday);
@@ -765,7 +759,8 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
 
 static void print_prompt() {
     int w, h;
-    video_size(&w, &h);
+    if(video_using_framebuffer()) video_framebuffer_get_rowcol(&w, &h);
+    else video_get_size(&w, &h);
     if(video_get_cursor() % w != 0)
         putchar('\n');
 

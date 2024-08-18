@@ -16,6 +16,7 @@ C_SRC = kernel/src/*.c \
 		kernel/src/misc/*.c \
 		kernel/src/system/*.c \
 		kernel/src/driver/*.c \
+		kernel/src/driver/video/*.c \
 		kernel/src/driver/ata/*.c \
 		kernel/src/filesystem/*.c \
 		kernel/src/mem/*.c \
@@ -71,6 +72,8 @@ $(BIN)%.o: kernel/src/misc/%.c
 $(BIN)%.o: kernel/src/system/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)%.o: kernel/src/driver/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)%.o: kernel/src/driver/video/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)%.o: kernel/src/driver/ata/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<

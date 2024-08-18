@@ -122,7 +122,6 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         video_addr = mbd->framebuffer_addr;
         video_width = mbd->framebuffer_width;
         video_height = mbd->framebuffer_height;
-        video_set_vidmem_ptr(video_addr);
         switch(mbd->framebuffer_type) {
             case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED:
                 // very rare, not likely to happend
@@ -130,12 +129,14 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
                 break;
             case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
                 // TODO: do sth with framebuffer color_info
+                video_framebuffer_set_ptr(video_addr);
                 video_framebuffer_init(mbd->framebuffer_pitch,
                                        video_width,
                                        video_height,
                                        mbd->framebuffer_bpp);
                 break;
             case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
+                video_textmode_set_ptr(video_addr);
                 video_textmode_init(video_width, video_height);
                 break;
         }
@@ -144,7 +145,7 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         // textmode video memory at VIDEO_TEXTMODE_ADDRESS should be available
         // with or without GRUB
         video_textmode_init(80, 25);
-        video_set_vidmem_ptr(VIDEO_TEXTMODE_ADDRESS);
+        video_textmode_set_ptr(VIDEO_TEXTMODE_ADDRESS);
     }
 
     // greeting msg to let us know we are in the kernel
