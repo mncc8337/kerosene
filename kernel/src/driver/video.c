@@ -45,17 +45,17 @@ int video_textmode_rgb(int r, int g, int b) {
     return 0x7;
 }
 
-// void video_textmode_enable_cursor(int cursor_scanline_start, int cursor_scanline_end) {
-//     port_outb(PORT_SCREEN_CTRL, 0x0a);
-//     port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xc0) | cursor_scanline_start);
-//
-//     port_outb(PORT_SCREEN_CTRL, 0x0b);
-//     port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xe0) | cursor_scanline_end);
-// }
-// void video_textmode_disable_cursor() {
-//     port_outb(PORT_SCREEN_CTRL, 0x0a);
-//     port_outb(PORT_SCREEN_DATA, 0x20);
-// }
+void video_textmode_enable_cursor(int cursor_scanline_start, int cursor_scanline_end) {
+    port_outb(PORT_SCREEN_CTRL, 0x0a);
+    port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xc0) | cursor_scanline_start);
+
+    port_outb(PORT_SCREEN_CTRL, 0x0b);
+    port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xe0) | cursor_scanline_end);
+}
+void video_textmode_disable_cursor() {
+    port_outb(PORT_SCREEN_CTRL, 0x0a);
+    port_outb(PORT_SCREEN_DATA, 0x20);
+}
 int video_textmode_get_cursor() {
     int offset = 0;
     port_outb(PORT_SCREEN_CTRL, 0x0f);

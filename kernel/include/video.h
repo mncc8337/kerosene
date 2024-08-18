@@ -30,6 +30,8 @@ void video_set_vidmem_ptr(uint32_t ptr);
 void video_size(int* w, int* h);
 
 int  video_textmode_rgb(int r, int g, int b);
+void video_textmode_enable_cursor(int cursor_scanline_start, int cursor_scanline_end);
+void video_textmode_disable_cursor();
 int  video_textmode_get_cursor();
 void video_textmode_set_cursor(int offset);
 void video_textmode_cls(int bg);
