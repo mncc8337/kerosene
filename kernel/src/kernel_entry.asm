@@ -25,13 +25,13 @@ align 4
     dd 32  ; video depth
 
 section .bss
-align 16
+; kernel stack
 kernel_stack_bottom:
-resb 16384 ; 16 KiB for kernel stack
+resb 16384 ; 16 KiB
 kernel_stack_top:
 
 section .text
-global _start: function (_start.end - _start)
+global _start
 _start:
 	mov esp, kernel_stack_top
     push eax ; magic value

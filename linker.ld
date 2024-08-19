@@ -2,7 +2,7 @@ ENTRY(_start)
 
 SECTIONS {
     . = 2M;
-    startkernel = .;
+    kernel_start = .;
 
     .text BLOCK(4K) : ALIGN(4K) {
         *(.multiboot)
@@ -22,5 +22,5 @@ SECTIONS {
         *(.bss)
     }
 
-    endkernel = .;
+    kernel_end = .;
 }

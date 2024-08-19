@@ -7,7 +7,7 @@
 #include "stdbool.h"
 
 typedef enum {
-    ERR_MEM_FAILED,
+    ERR_MEM_OOM,
     ERR_MEM_SUCCESS,
     ERR_MEM_INVALID_DIR,
 } MEM_ERR;

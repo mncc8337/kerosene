@@ -8,13 +8,11 @@ static pdir* current_directory = 0;
 static uint32_t current_pdbr = 0;
 
 pte_t* vmmngr_ptable_lookup_entry(ptable* p, virtual_addr_t addr) {
-    if(p) return &(p->entry[PAGE_TABLE_INDEX(addr)]);
-    return (pte_t*)ERR_MEM_FAILED;
+    return &(p->entry[PAGE_TABLE_INDEX(addr)]);
 }
 
 pde_t* vmmngr_pdirectory_lookup_entry(pdir* p, virtual_addr_t addr) {
-    if(p) return &(p->entry[PAGE_DIRECTORY_INDEX(addr)]);
-    return (pde_t*)ERR_MEM_FAILED;
+    return &(p->entry[PAGE_DIRECTORY_INDEX(addr)]);
 }
 
 MEM_ERR vmmngr_switch_pdirectory(pdir* dir) {
@@ -35,7 +33,7 @@ void vmmngr_flush_tlb_entry(virtual_addr_t addr) {
 
 MEM_ERR vmmngr_alloc_page(pte_t* e) {
     void* p = pmmngr_alloc_block();
-    if(!p) return ERR_MEM_FAILED;
+    if(!p) return ERR_MEM_OOM;
 
     pte_set_frame(e, (physical_addr_t)p);
     pte_add_attrib(e, PTE_PRESENT);
@@ -59,7 +57,7 @@ MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt) {
     if((*e & PTE_PRESENT) != PTE_PRESENT) {
         // if page table not present then allocate it
         ptable* table = (ptable*)pmmngr_alloc_block();
-        if(!table) return ERR_MEM_FAILED;
+        if(!table) return ERR_MEM_OOM;
 
         // clear page table
         memset(table, 0, sizeof(ptable));
@@ -84,7 +82,7 @@ MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt) {
 
 MEM_ERR vmmngr_init() {
     ptable* table1 = (ptable*)pmmngr_alloc_block();
-    if(!table1) return ERR_MEM_FAILED;
+    if(!table1) return ERR_MEM_OOM;
 
     for(int i = 0, frame = 0; i < 1024; i++, frame += 4096) {
         pte_t page = 0;
@@ -94,7 +92,7 @@ MEM_ERR vmmngr_init() {
     }
 
     pdir* page_directory = (pdir*)pmmngr_alloc_block();
-    if(!page_directory) return ERR_MEM_FAILED;
+    if(!page_directory) return ERR_MEM_OOM;
 
     for(int i = 0; i < 1024; i++)
         page_directory->entry[i] = 0x0;

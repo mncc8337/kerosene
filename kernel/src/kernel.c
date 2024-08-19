@@ -16,7 +16,13 @@
 
 #include "access/my_avt.h"
 
-static char freebuff[512];
+extern uint32_t kernel_start;
+extern uint32_t kernel_end;
+
+// page-aligned kernel size
+uint32_t kernel_size;
+
+char freebuff[512];
 
 int FS_ID = 0;
 fs_t* fs;
@@ -27,8 +33,6 @@ int video_height = 0;
 int video_pitch = 0;
 int video_bpp = 0;
 
-extern uint32_t startkernel;
-extern uint32_t endkernel;
 void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
     // get memsize
     size_t memsize = 0;
@@ -41,7 +45,7 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
 
         memsize += mmmt->len;
     }
-    pmmngr_init(endkernel+1, memsize);
+    pmmngr_init(kernel_end+1, memsize);
 
     // init regions
     for(unsigned int i = 0; i < mmap_length; i += sizeof(multiboot_memory_map_t)) {
@@ -58,8 +62,9 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
     }
 
     // deinit regions
-    pmmngr_deinit_region(startkernel, endkernel - startkernel + 1); // kernel
-    pmmngr_deinit_region(endkernel+1, pmmngr_get_size()/MMNGR_BLOCK_SIZE); // pmmngr
+    pmmngr_deinit_region(kernel_start, kernel_size); // kernel
+    pmmngr_deinit_region(kernel_end + 1, pmmngr_get_size()/MMNGR_BLOCK_SIZE); // pmmngr
+    pmmngr_deinit_region(video_addr, video_height * video_pitch); // video
 
     pmmngr_update_usage(); // always run this after init and deinit regions
     print_debug(LT_OK, "initialised pmmngr with %d MiB\n", pmmngr_get_free_size()/1024/1024);
@@ -71,8 +76,8 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
         kpanic();
     }
     
-    // map video address
-    int virt_video_addr = 0xc0000000; // temporary address
+    // map video address before printing anything
+    virtual_addr_t virt_video_addr = 0xc0000000 + kernel_size;
     for(int i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
         vmmngr_map_page(video_addr + i, virt_video_addr + i);
     if(video_using_framebuffer()) video_framebuffer_set_ptr(virt_video_addr);
@@ -126,9 +131,17 @@ void disk_init() {
 }
 
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
+    // calculate kernel_size
+    kernel_size = kernel_end - kernel_start;
+    if(kernel_size % MMNGR_PAGE_SIZE > 0) {
+        kernel_size += MMNGR_PAGE_SIZE - (kernel_size % MMNGR_PAGE_SIZE);
+        kernel_end = kernel_start + kernel_size - 1;
+    }
+
     // disable interrupts at the start to set up things
     asm volatile("cli");
 
+    // init video
     if(mbd->flags & MULTIBOOT_INFO_FRAMEBUFFER_INFO) {
         video_addr = mbd->framebuffer_addr;
         video_width = mbd->framebuffer_width;
@@ -193,13 +206,13 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     isr_init();
     print_debug(LT_OK, "ISR initialised\n");
 
-    disk_init();
-
     if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) {
         print_debug(LT_CR, "no memory map given by bootloader. system halted\n");
         kpanic();
     }
     mem_init(mbd->mmap_addr, mbd->mmap_length);
+
+    disk_init();
 
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
@@ -213,17 +226,17 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    if(video_using_framebuffer()) {
-        char* my_avt_data = my_avt_header_data;
-        for(int y = 0; y < (signed)my_avt_height; y++) {
-            for(int x = 0; x < (signed)my_avt_width; x++) {
-                int pixel[3];
-                HEADER_PIXEL(my_avt_data, pixel);
-                uint32_t color = (pixel[2] << 24) | (pixel[0] << 16) | (pixel[1] << 8);
-                video_framebuffer_plot_pixel(x, y, color);
-            }
-        }
-    }
+    // if(video_using_framebuffer()) {
+    //     char* my_avt_data = my_avt_header_data;
+    //     for(int y = 0; y < (signed)my_avt_height; y++) {
+    //         for(int x = 0; x < (signed)my_avt_width; x++) {
+    //             int pixel[3];
+    //             HEADER_PIXEL(my_avt_data, pixel);
+    //             uint32_t color = (pixel[2] << 24) | (pixel[0] << 16) | (pixel[1] << 8);
+    //             video_framebuffer_plot_pixel(x, y, color);
+    //         }
+    //     }
+    // }
 
     shell_set_root_node(fs->root_node);
     shell_start();
