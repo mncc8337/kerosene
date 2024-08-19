@@ -110,7 +110,7 @@ static void process_prompt(char* prompts, unsigned prompts_len);
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help . .<n dot> echo ticks ls read cd mkdir rm touch write mv cp stat pwd datetime beep");
+        puts("help . .<n dot> echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep");
     }
     else {
         arg = strtok(arg, " ");

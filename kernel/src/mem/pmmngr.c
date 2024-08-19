@@ -1,8 +1,8 @@
 #include "mem.h"
 
-static uint32_t* mem_addr;
-static uint32_t used_block;
-static uint32_t total_block;
+static physical_addr_t* mem_addr;
+static size_t used_block;
+static size_t total_block;
 
 static void set_bit(uint32_t bit) {
     mem_addr[bit/32] |= (1 << (bit % 32));
@@ -15,7 +15,7 @@ static void unset_bit(uint32_t bit) {
 // }
 
 static int find_first_free_block() {
-    for(unsigned int i = 0; i < total_block/32; i++) {
+    for(unsigned i = 0; i < total_block/32; i++) {
         if(mem_addr[i] == 0xffffffff) continue;
         for(int j = 0; j < 32;j++) {
             int bit = 1 << j;
@@ -51,7 +51,7 @@ static int find_first_free(size_t frame_cnt) {
 // must be run after done initializing regions
 void pmmngr_update_usage() {
     used_block = 0;
-    for(unsigned int i = 0; i < total_block/32; i++) {
+    for(unsigned i = 0; i < total_block/32; i++) {
         if(mem_addr[i] == 0xffffffff) {
             used_block += 32;
             continue;
@@ -73,7 +73,7 @@ size_t pmmngr_get_free_size() {
     return (total_block - used_block) * MMNGR_BLOCK_SIZE;
 }
 
-void pmmngr_init_region(uint32_t base, size_t size) {
+void pmmngr_init_region(physical_addr_t base, size_t size) {
     int start = base / MMNGR_BLOCK_SIZE;
     int block = size / MMNGR_BLOCK_SIZE;
 
@@ -83,7 +83,7 @@ void pmmngr_init_region(uint32_t base, size_t size) {
     set_bit(0); 
 }
 
-void pmmngr_deinit_region(uint32_t base, size_t size) {
+void pmmngr_deinit_region(physical_addr_t base, size_t size) {
     int start = base / MMNGR_BLOCK_SIZE;
     int block = size / MMNGR_BLOCK_SIZE;
 
@@ -98,7 +98,7 @@ void* pmmngr_alloc_block() {
 
     set_bit(frame);
 
-    uint32_t base = frame * MMNGR_BLOCK_SIZE;
+    physical_addr_t base = frame * MMNGR_BLOCK_SIZE;
     used_block++;
 
     return (void*)base;
@@ -111,13 +111,13 @@ void* pmmngr_alloc_multi_block(size_t cnt) {
     for(uint32_t i = 0; i < cnt; i++)
         set_bit(frame + i);
 
-    uint32_t addr = frame * MMNGR_BLOCK_SIZE;
+    physical_addr_t addr = frame * MMNGR_BLOCK_SIZE;
     used_block += cnt;
 
     return (void*)addr;
 }
 void pmmngr_free_block(void* base) {
-    uint32_t addr = (uint32_t)base;
+    physical_addr_t addr = (physical_addr_t)base;
     int frame = addr / MMNGR_BLOCK_SIZE;
 
     if(frame == 0) return;
@@ -126,7 +126,7 @@ void pmmngr_free_block(void* base) {
     used_block--;
 }
 void pmmngr_free_multi_block(void* base, size_t cnt) {
-    uint32_t addr = (uint32_t)base;
+    physical_addr_t addr = (physical_addr_t)base;
     int frame = addr / MMNGR_BLOCK_SIZE;
 
     if(frame == 0) return;
@@ -136,12 +136,12 @@ void pmmngr_free_multi_block(void* base, size_t cnt) {
     used_block -= cnt;
 }
 
-void pmmngr_init(uint32_t base, size_t size) {
-    mem_addr = (uint32_t*)base;
+void pmmngr_init(physical_addr_t base, size_t size) {
+    mem_addr = (physical_addr_t*)base;
     total_block = size / MMNGR_BLOCK_SIZE;
 
     // assume that all memory are in use
     used_block = total_block;
-    for(unsigned int i = 0; i < total_block / 32; i++)
+    for(unsigned i = 0; i < total_block / 32; i++)
         mem_addr[i] = 0xffffffff;
 }
