@@ -1,23 +1,23 @@
-ENTRY(_start)
+ENTRY(kernel_entry)
 
 SECTIONS {
-    . = 2M;
+    . = 0xc0000000 + 2M;
     kernel_start = .;
 
-    .text BLOCK(4K) : ALIGN(4K) {
+    .text ALIGN(4K) : AT(ADDR(.text)-0xc0000000) {
         *(.multiboot)
         *(.text)
     }
 
-    .rodata BLOCK(4K) : ALIGN(4K) {
+    .rodata ALIGN(4K) : AT(ADDR(.rodata)-0xc0000000) {
         *(.rodata)
     }
 
-    .data BLOCK(4K) : ALIGN(4K) {
+    .data ALIGN(4K) : AT(ADDR(.data)-0xc0000000) {
         *(.data)
     }
 
-    .bss BLOCK(4K) : ALIGN(4K) {
+    .bss ALIGN(4K) : AT(ADDR(.bss)-0xc0000000) {
         *(COMMON)
         *(.bss)
     }

@@ -57,7 +57,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [x] handle interrupts send by PIC
 - [x] load kernel with ELF binary instead of flat binary
 - [x] support multiboot
-- [ ] higher half kernel
+- [x] higher half kernel
 ### Hardware drivers
 - [ ] keyboard driver
     + [x] get key scancode
@@ -72,7 +72,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     - [ ] the heap
 - [ ] ATA
     - [x] PIO mode
-- [x] CMOS: get datetime
+- [x] CMOS and RTC: get datetime
 - [ ] APCI
 - [ ] APIC
 - [ ] HPET
@@ -80,6 +80,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [ ] video
     - [x] plot pixel
     - [x] render psf fonts
+- [ ] USB
 - [ ] sound
 - [ ] im not gonna touch networking
 ### Filesystem

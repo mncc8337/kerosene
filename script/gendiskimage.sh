@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # load backup if available
-if [ -f disk-backup.img ]; then
+if [ -f "disk-backup.img" ]; then
     cp disk-backup.img disk.img
     echo "backup loaded"
     exit

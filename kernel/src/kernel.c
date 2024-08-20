@@ -131,6 +131,9 @@ void disk_init() {
 }
 
 void kmain(multiboot_info_t* mbd, unsigned int magic) {
+    // hang until i set up higher half kernel properly
+    asm("cli; hlt");
+
     // calculate kernel_size
     kernel_size = kernel_end - kernel_start;
     if(kernel_size % MMNGR_PAGE_SIZE > 0) {

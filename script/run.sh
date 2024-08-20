@@ -10,7 +10,7 @@ QEMUFLAGS="-m 128M \
 
 if [ "$1" == "debug" ]; then
     qemu-system-i386 -hda disk.img $QEMUFLAGS -s -S &
-    gdb bin/kernel.bin \
+    gdb bin/kerosene.bin \
         -ex 'target remote localhost:1234' \
         -ex 'layout src' \
         -ex 'layout reg' \
