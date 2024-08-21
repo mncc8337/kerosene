@@ -712,6 +712,7 @@ static void beep(char* arg) {
     }
     else dur = atoi(dur_str);
 
+    pit_beep_start();
     pit_beep(frq);
     timer_wait(dur);
     pit_beep_stop();

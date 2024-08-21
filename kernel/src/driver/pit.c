@@ -34,6 +34,17 @@ void pit_set_count(unsigned count) {
 	return;
 }
 
+void pit_beep_start() {
+    uint8_t tmp = port_inb(PORT_PC_SPEAKER);
+    if(tmp != (tmp | 3))
+        port_outb(PORT_PC_SPEAKER, tmp | 3);
+}
+
+void pit_beep_stop() {
+    uint8_t tmp = port_inb(PORT_PC_SPEAKER) & 0xfc;
+    port_outb(PORT_PC_SPEAKER, tmp);
+}
+
 void pit_beep(int freq) {
     uint16_t div;
 
@@ -41,15 +52,4 @@ void pit_beep(int freq) {
     port_outb(PORT_PIT_COM, 0xb6);
     port_outb(PORT_PIT_CH2, (uint8_t)(div));
     port_outb(PORT_PIT_CH2, (uint8_t)(div >> 8));
-
-    // 0x61 is a special port on keyboard controller
-    // to control PC speaker (why is it on keyboard controller ???)
-    uint8_t tmp = port_inb(0x61);
-    if(tmp != (tmp | 3))
-        port_outb(0x61, tmp | 3);
-}
-
-void pit_beep_stop() {
-    uint8_t tmp = port_inb(0x61) & 0xfc;
-    port_outb(0x61, tmp);
 }
