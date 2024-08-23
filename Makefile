@@ -24,7 +24,6 @@ C_SRC = kernel/src/*.c \
 		kernel/src/mem/*.c \
 
 ASM_SRC = kernel/src/system/*.asm \
-		  kernel/src/mem/*.asm \
 
 _LIBC_OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
 _OBJ  = $(addsuffix .o, $(basename $(notdir $(wildcard $(C_SRC)))))
@@ -103,8 +102,6 @@ $(BIN)%.o: kernel/src/mem/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
 $(BIN)%.asm.o: kernel/src/system/%.asm
-	$(ASM) $(NASMFLAGS) -o $@ $<
-$(BIN)%.asm.o: kernel/src/mem/%.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
 $(BIN)kerosene.bin: $(BIN)kernel_entry.o $(OBJ) $(BIN)libk.a

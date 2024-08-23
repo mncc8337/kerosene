@@ -102,7 +102,7 @@ void video_init(multiboot_info_t* mbd) {
 
     // map video ptr
     for(unsigned i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
-        vmmngr_map_page(video_addr + i, VMBASE_VIDEO + i);
+        vmmngr_map_page(video_addr + i, VMBASE_VIDEO + i, PTE_WRITABLE);
     video_addr = VMBASE_VIDEO;
     if(using_framebuffer) {
         video_framebuffer_set_ptr(video_addr);
