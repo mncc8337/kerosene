@@ -10,7 +10,7 @@ isr_stub_%1:
 %macro isr_no_err_stub 1
 isr_stub_%1:
     cli
-    push 0
+    push byte 0
     push %1
     jmp isr_common_stub
 %endmacro
@@ -96,7 +96,6 @@ isr_common_stub:
     pop ds
     popa
     add esp, 8
-    sti
     iret
 
 global isr_table

@@ -1,26 +1,25 @@
 #include "system.h"
 
 uint8_t port_inb(uint16_t port) {
-    // a handy C wrapper function that reads a byte from the specified port
-    // "=a" (result): put AL register in variable RESULT when finished
-    // "d" (port): load EDX with port
     uint8_t result;
-    asm volatile("in %%dx, %%al" : "=a" (result) : "d" (port));
+    asm volatile("inb %w1, %b0" : "=a" (result) : "Nd" (port));
     return result;
 }
+
 void port_outb(uint16_t port, uint8_t data) {
-    // "a" ( data ): load EAX with data
-    // "d" ( port ): load EDX with port
-    asm volatile("out %%al, %%dx" : : "a" (data), "d" (port));
+    asm volatile("outb %b0, %w1" : : "a" (data), "Nd" (port));
 }
+
 uint16_t port_inw(uint16_t port) {
-    unsigned short result;
-    asm volatile("in %%dx, %%ax" : "=a" (result) : "d" (port));
+    uint16_t result;
+    asm volatile("inw %w1, %w0" : "=a" (result) : "Nd" (port));
     return result;
 }
+
 void port_outw(uint16_t port, uint16_t data) {
-    asm volatile("out %%ax, %%dx" : : "a" (data), "d" (port));
+    asm volatile("outw %w0, %w1" : : "a" (data), "Nd" (port));
 }
+
 void io_wait() {
     port_outb(0x80, 0);
 }

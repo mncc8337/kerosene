@@ -1,12 +1,14 @@
 #include "multiboot.h"
+
 #include "system.h"
+#include "syscall.h"
 #include "kpanic.h"
-#include "video.h"
 #include "mem.h"
+
+#include "video.h"
 #include "ata.h"
 #include "kbd.h"
 #include "timer.h"
-#include "syscall.h"
 #include "filesystem.h"
 
 #include "stdio.h"

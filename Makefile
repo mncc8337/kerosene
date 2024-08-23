@@ -41,7 +41,7 @@ DEFINES = -DVMBASE_KERNEL=0xc0000000 \
 
 C_INCLUDES = -I./kernel/src -I./kernel/include -I./libc/include
 
-CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -std=gnu99 -g -MMD -MP
+CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -g -MMD -MP
 LDFLAGS = -T linker.ld -nostdlib -lgcc
 NASMFLAGS = $(DEFINES) -f elf32 -F dwarf
 

@@ -3,20 +3,21 @@
 #include "pit.h"
 #include "rtc.h"
 
-static volatile unsigned int ticks = 0;
-static void (*tick_listener)(unsigned int) = 0;
-static uint32_t start_timestamp;
+static volatile unsigned ticks = 0;
+static time_t start_timestamp;
+static volatile time_t seconds_since_start = 0;
+static void (*tick_listener)(unsigned) = 0;
 
 static void tick_handler(regs_t* r) {
     (void)(r); // avoid unused arg
 
     ticks++;
-
     if(tick_listener) tick_listener(ticks);
-}
 
-unsigned int timer_get_ticks() {
-    return ticks;
+    if(ticks > 0 && ticks % TIMER_FREQUENCY == 0) {
+        seconds_since_start++;
+        ticks = 0;
+    }
 }
 
 time_t timer_get_start_time() {
@@ -24,21 +25,32 @@ time_t timer_get_start_time() {
 }
 
 time_t timer_get_current_time() {
-    return start_timestamp + (ticks / TIMER_FREQUENCY);
+    return start_timestamp + seconds_since_start;
 }
 
-void install_tick_listener(void (*tlis)(unsigned int)) {
+time_t timer_get_seconds_since_start() {
+    return seconds_since_start;
+}
+
+unsigned timer_get_current_ticks() {
+    return ticks;
+}
+
+void install_tick_listener(void (*tlis)(unsigned)) {
     tick_listener = tlis;
 }
 void uninstall_tick_listener() {
     tick_listener = 0;
 }
 
-void timer_wait(unsigned int ms) {
-    unsigned long eticks = ticks + ms * TIMER_FREQUENCY / 1000;
-    while(ticks < eticks)
-        asm volatile("sti; hlt; cli");
-    asm volatile("sti");
+void timer_wait(unsigned ms) {
+    unsigned eticks = ticks + ms * TIMER_FREQUENCY / 1000;
+    unsigned eseconds = eticks / TIMER_FREQUENCY;
+    eticks -= eseconds * TIMER_FREQUENCY;
+    eseconds += seconds_since_start;
+
+    while(eseconds > (unsigned)seconds_since_start || eticks > ticks)
+        asm volatile("hlt");
 }
 
 void timer_init() {

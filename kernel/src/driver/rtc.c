@@ -12,10 +12,13 @@ static uint8_t read_reg(uint8_t reg) {
 }
 
 // NOTE:
-// the 2 functions below are not working!
-// idk why the IRQ 8 only fired once
-// TODO: fix RTC timer only fired once
-/*
+// when using RTC IRQ
+// please include these lines to the handler
+//     port_outb(PORT_RTC_SELECT_REG, RTC_REG_C);
+//     port_inb(PORT_RTC_DAT);
+// this is because the register C need to be read
+// in order that another IRQ 8 can be fired
+
 void rtc_timer_frequency(int freq) {
     int pow = 0;
     // freq must be power of 2
@@ -33,18 +36,11 @@ void rtc_timer_frequency(int freq) {
 }
 
 void rtc_timer_start() {
-    // NOTE:
-    // since the RTC use IRQ 8 (slave)
-    // so while other IRQ from 0 to 7 (especially IRQ 0 (PIT) since it is requested a lot)
-    // are being handled, others IRQ are discard
-    // so this is very unreliable to be used as a timer
-
     port_outb(PORT_RTC_SELECT_REG, RTC_REG_B | RTC_DISABLE_NMI);
     uint8_t prev = port_inb(PORT_RTC_DAT);
     port_outb(PORT_RTC_SELECT_REG, RTC_REG_B | RTC_DISABLE_NMI);
     port_outb(PORT_RTC_DAT, prev | 0x40);
 }
-*/
 
 struct tm rtc_get_current_time() {
     struct tm curr_time;

@@ -14,6 +14,7 @@
 #define RTC_REG_YEAR    0x09
 #define RTC_REG_A       0xa
 #define RTC_REG_B       0xb
+#define RTC_REG_C       0xc
 
 #define RTC_DISABLE_NMI 0x80
 
