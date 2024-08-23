@@ -68,6 +68,14 @@ extern void (*video_scroll_screen)(unsigned ammount);
 extern void (*video_print_char)(char chr, int offset, int fg, int bg, bool move);
 
 // video_init.c
+void video_preinit_set_attr(int fg, int bg);
+void video_preinit_get_size(int* w, int* h);
+int  video_preinit_rgb(int r, int g, int b);
+int  video_preinit_get_cursor();
+void video_preinit_set_cursor(int offset);
+void video_preinit_cls(int color);
+void video_preinit_scroll_screen(unsigned ammount);
+void video_preinit_print_char(char chr, int offset, int fg, int bg, bool move);
 void video_textmode_init(uint8_t cols, uint8_t rows);
 void video_framebuffer_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bpp);
 bool video_using_framebuffer();

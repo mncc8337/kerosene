@@ -5,8 +5,8 @@
 
 static uint8_t* framebuffer;
 
-static int current_fg;
-static int current_bg;
+static int current_fg = 0x969696;
+static int current_bg = 0x000000;
 
 static int text_rows;
 static int text_cols;

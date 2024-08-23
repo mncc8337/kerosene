@@ -3,7 +3,7 @@
 
 static uint8_t* vid_mem;
 
-static uint8_t current_attr;
+static uint8_t current_attr = 0x7;
 
 static int text_rows;
 static int text_cols;

@@ -42,6 +42,7 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
         memsize += mmmt->len;
     }
     pmmngr_init(memsize);
+    print_debug(LT_OK, "pmmngr initialised, detected %d MiB of memory\n", memsize/1024/1024);
 
     // init regions
     for(unsigned int i = 0; i < mmap_length; i += sizeof(multiboot_memory_map_t)) {
@@ -66,6 +67,58 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
     MEM_ERR err = vmmngr_init();
     if(err != ERR_MEM_SUCCESS) kpanic();
 }
+
+void video_init(multiboot_info_t* mbd) {
+    bool using_framebuffer = false;
+    if(mbd->flags & MULTIBOOT_INFO_FRAMEBUFFER_INFO) {
+        video_addr = mbd->framebuffer_addr;
+        video_width = mbd->framebuffer_width;
+        video_height = mbd->framebuffer_height;
+        video_pitch = mbd->framebuffer_pitch;
+        video_bpp = mbd->framebuffer_bpp;
+       
+        switch(mbd->framebuffer_type) {
+            case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED:
+                using_framebuffer = false;
+                // very rare, not likely to happend
+                // so let's just not support it hehe
+                break;
+            case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
+                using_framebuffer = true;
+                // TODO: do sth with framebuffer color_info
+                break;
+            case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
+                using_framebuffer = false;
+                break;
+        }
+    }
+    else {
+        video_addr = VIDEO_TEXTMODE_ADDRESS;
+        video_width = 80;
+        video_height = 25;
+        video_pitch = 160;
+        video_bpp = 16;
+    }
+
+    // map video ptr
+    for(unsigned i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
+        vmmngr_map_page(video_addr + i, VMBASE_VIDEO + i);
+    video_addr = VMBASE_VIDEO;
+    if(using_framebuffer) {
+        video_framebuffer_set_ptr(video_addr);
+        video_framebuffer_init(
+            video_width, video_height,
+            video_pitch, video_bpp
+        );
+        print_debug(LT_OK, "VESA video initialised\n");
+    }
+    else {
+        video_textmode_set_ptr(video_addr);
+        video_textmode_init(video_width, video_height);
+        print_debug(LT_OK, "VGA video initialised\n");
+    }
+}
+
 void disk_init() {
     if(!ata_pio_init((uint16_t*)freebuff)) {
         print_debug(LT_WN, "failed to initialise ATA PIO mode\n");
@@ -113,10 +166,17 @@ void disk_init() {
 extern void* kernel_start;
 extern void* kernel_end;
 void kmain(multiboot_info_t* mbd) {
-    // since we have mapped 0x0 to 0xc0000000
+    // greeting msg to let us know we are in the kernel
+    // note that this will print into preinit video buffer
+    // and will not drawn to screen until video is initialised
+    puts("hello");
+    printf("this is "); puts("kernosene!");
+    printf("build datetime: %s, %s\n", __TIME__, __DATE__);
+
+    // since we have mapped 4MiB from 0x0 to 0xc0000000
     // any physical address under 4MiB can be converted to virtual address
     // by adding 0xc0000000 to it
-    // i think that grub will not give any address that are larger than 4 MiB
+    // i think that GRUB will not give any address that are larger than 4 MiB
     // except the framebuffer
     mbd = (void*)mbd + VMBASE_KERNEL;
 
@@ -128,56 +188,7 @@ void kmain(multiboot_info_t* mbd) {
     if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) kpanic();
     mem_init((void*)mbd->mmap_addr + VMBASE_KERNEL, mbd->mmap_length);
 
-    // init video
-    if(mbd->flags & MULTIBOOT_INFO_FRAMEBUFFER_INFO) {
-        video_addr = mbd->framebuffer_addr;
-        video_width = mbd->framebuffer_width;
-        video_height = mbd->framebuffer_height;
-        video_pitch = mbd->framebuffer_pitch;
-        video_bpp = mbd->framebuffer_bpp;
-
-        switch(mbd->framebuffer_type) {
-            case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED:
-                // very rare, not likely to happend
-                // so let's just not support it hehe
-                break;
-            case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
-                // TODO: do sth with framebuffer color_info
-                video_framebuffer_init(
-                    video_width, video_height,
-                    video_pitch, video_bpp
-                );
-                break;
-            case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
-                video_textmode_init(video_width, video_height);
-                break;
-        }
-    }
-    else {
-        // textmode video memory at VIDEO_TEXTMODE_ADDRESS should be available
-        // with or without GRUB
-        video_textmode_init(80, 25);
-        video_addr = VIDEO_TEXTMODE_ADDRESS;
-        video_width = 80;
-        video_height = 25;
-        video_pitch = 160;
-        video_bpp = 16;
-    }
-
-    // map video ptr
-    for(unsigned i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
-        vmmngr_map_page(video_addr + i, VMBASE_VIDEO + i);
-    video_addr = VMBASE_VIDEO;
-
-    if(video_using_framebuffer()) video_framebuffer_set_ptr(video_addr);
-    else video_textmode_set_ptr(video_addr);
-
-    // greeting msg to let us know we are in the kernel
-    video_set_attr(VIDEO_LIGHT_CYAN, VIDEO_BLACK); puts("hello");
-    video_set_attr(VIDEO_LIGHT_GREEN, VIDEO_BLACK); printf("this is ");
-    video_set_attr(VIDEO_LIGHT_RED, VIDEO_BLACK);   puts("kernosene!");
-    video_set_attr(VIDEO_LIGHT_GREY, VIDEO_BLACK);
-    printf("build datetime: %s, %s\n", __TIME__, __DATE__);
+    video_init(mbd);
 
     if(mbd->flags & MULTIBOOT_INFO_BOOT_LOADER_NAME)
         print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + VMBASE_KERNEL);
