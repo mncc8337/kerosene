@@ -27,7 +27,7 @@ void video_textmode_init(uint8_t cols, uint8_t rows) {
 
     video_textmode_set_size(cols, rows);
 }
-void video_framebuffer_init(uint32_t pitch, uint32_t width, uint32_t height, uint8_t bpp) {
+void video_framebuffer_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bpp) {
     linear_graphics_mode = true;
 
     video_set_attr       = video_framebuffer_set_attr;

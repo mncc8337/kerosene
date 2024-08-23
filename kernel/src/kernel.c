@@ -16,10 +16,6 @@
 
 #include "access/my_avt.h"
 
-extern uint32_t kernel_start;
-extern uint32_t kernel_end;
-
-// page-aligned kernel size
 uint32_t kernel_size;
 
 char freebuff[512];
@@ -27,13 +23,13 @@ char freebuff[512];
 int FS_ID = 0;
 fs_t* fs;
 
-int video_addr = 0;
-int video_width = 0;
-int video_height = 0;
-int video_pitch = 0;
-int video_bpp = 0;
+virtual_addr_t video_addr = 0;
+unsigned video_width = 0;
+unsigned video_height = 0;
+unsigned video_pitch = 0;
+unsigned video_bpp = 0;
 
-void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
+void mem_init(void* mmap_addr, uint32_t mmap_length) {
     // get memsize
     size_t memsize = 0;
     for(unsigned int i = 0; i < mmap_length; i += sizeof(multiboot_memory_map_t)) {
@@ -45,7 +41,7 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
 
         memsize += mmmt->len;
     }
-    pmmngr_init(kernel_end+1, memsize);
+    pmmngr_init(memsize);
 
     // init regions
     for(unsigned int i = 0; i < mmap_length; i += sizeof(multiboot_memory_map_t)) {
@@ -62,29 +58,13 @@ void mem_init(uint32_t mmap_addr, uint32_t mmap_length) {
     }
 
     // deinit regions
-    pmmngr_deinit_region(kernel_start, kernel_size); // kernel
-    pmmngr_deinit_region(kernel_end + 1, pmmngr_get_size()/MMNGR_BLOCK_SIZE); // pmmngr
-    pmmngr_deinit_region(video_addr, video_height * video_pitch); // video
+    pmmngr_deinit_region(0, 2*1024*1024 + kernel_size); // kernel start at 2MiB
 
     pmmngr_update_usage(); // always run this after init and deinit regions
-    print_debug(LT_OK, "initialised pmmngr with %d MiB\n", pmmngr_get_free_size()/1024/1024);
 
     // vmmngr init
-    MEM_ERR merr = vmmngr_init();
-    if(merr != ERR_MEM_SUCCESS) {
-        print_debug(LT_CR, "error while enabling paging. system halted. error code %x", merr);
-        kpanic();
-    }
-    
-    // map video address before printing anything
-    virtual_addr_t virt_video_addr = 0xc0000000 + kernel_size;
-    for(int i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
-        vmmngr_map_page(video_addr + i, virt_video_addr + i);
-    if(video_using_framebuffer()) video_framebuffer_set_ptr(virt_video_addr);
-    else video_textmode_set_ptr(virt_video_addr);
-    video_addr = virt_video_addr;
-
-    print_debug(LT_OK, "paging enabled\n");
+    MEM_ERR err = vmmngr_init();
+    if(err != ERR_MEM_SUCCESS) kpanic();
 }
 void disk_init() {
     if(!ata_pio_init((uint16_t*)freebuff)) {
@@ -130,19 +110,23 @@ void disk_init() {
     }
 }
 
-void kmain(multiboot_info_t* mbd, unsigned int magic) {
-    // hang until i set up higher half kernel properly
-    asm("cli; hlt");
+extern void* kernel_start;
+extern void* kernel_end;
+void kmain(multiboot_info_t* mbd) {
+    // since we have mapped 0x0 to 0xc0000000
+    // any physical address under 4MiB can be converted to virtual address
+    // by adding 0xc0000000 to it
+    // i think that grub will not give any address that are larger than 4 MiB
+    // except the framebuffer
+    mbd = (void*)mbd + VMBASE_KERNEL;
 
-    // calculate kernel_size
-    kernel_size = kernel_end - kernel_start;
-    if(kernel_size % MMNGR_PAGE_SIZE > 0) {
-        kernel_size += MMNGR_PAGE_SIZE - (kernel_size % MMNGR_PAGE_SIZE);
-        kernel_end = kernel_start + kernel_size - 1;
-    }
+    kernel_size = &kernel_end - &kernel_start;
 
-    // disable interrupts at the start to set up things
+    // disable interrupts to set up things
     asm volatile("cli");
+
+    if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) kpanic();
+    mem_init((void*)mbd->mmap_addr + VMBASE_KERNEL, mbd->mmap_length);
 
     // init video
     if(mbd->flags & MULTIBOOT_INFO_FRAMEBUFFER_INFO) {
@@ -159,14 +143,12 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
                 break;
             case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
                 // TODO: do sth with framebuffer color_info
-                video_framebuffer_set_ptr(video_addr);
-                video_framebuffer_init(video_pitch,
-                                       video_width,
-                                       video_height,
-                                       video_bpp);
+                video_framebuffer_init(
+                    video_width, video_height,
+                    video_pitch, video_bpp
+                );
                 break;
             case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
-                video_textmode_set_ptr(video_addr);
                 video_textmode_init(video_width, video_height);
                 break;
         }
@@ -175,13 +157,20 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
         // textmode video memory at VIDEO_TEXTMODE_ADDRESS should be available
         // with or without GRUB
         video_textmode_init(80, 25);
-        video_textmode_set_ptr(VIDEO_TEXTMODE_ADDRESS);
         video_addr = VIDEO_TEXTMODE_ADDRESS;
         video_width = 80;
         video_height = 25;
         video_pitch = 160;
         video_bpp = 16;
     }
+
+    // map video ptr
+    for(unsigned i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
+        vmmngr_map_page(video_addr + i, VMBASE_VIDEO + i);
+    video_addr = VMBASE_VIDEO;
+
+    if(video_using_framebuffer()) video_framebuffer_set_ptr(video_addr);
+    else video_textmode_set_ptr(video_addr);
 
     // greeting msg to let us know we are in the kernel
     video_set_attr(VIDEO_LIGHT_CYAN, VIDEO_BLACK); puts("hello");
@@ -190,13 +179,8 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     video_set_attr(VIDEO_LIGHT_GREY, VIDEO_BLACK);
     printf("build datetime: %s, %s\n", __TIME__, __DATE__);
 
-    if(magic != MULTIBOOT_BOOTLOADER_MAGIC) {
-        print_debug(LT_CR, "invalid magic number. system halted\n");
-        kpanic();
-    }
-
     if(mbd->flags & MULTIBOOT_INFO_BOOT_LOADER_NAME)
-        print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name);
+        print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + VMBASE_KERNEL);
 
     gdt_init();
     print_debug(LT_OK, "GDT initialised\n");
@@ -208,12 +192,6 @@ void kmain(multiboot_info_t* mbd, unsigned int magic) {
     print_debug(LT_OK, "IDT initialised\n");
     isr_init();
     print_debug(LT_OK, "ISR initialised\n");
-
-    if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) {
-        print_debug(LT_CR, "no memory map given by bootloader. system halted\n");
-        kpanic();
-    }
-    mem_init(mbd->mmap_addr, mbd->mmap_length);
 
     disk_init();
 

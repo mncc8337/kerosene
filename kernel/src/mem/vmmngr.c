@@ -1,11 +1,22 @@
 #include "mem.h"
-#include "string.h"
 
-extern void load_page_directory(uint32_t*);
-extern void enable_paging();
+extern void load_page_directory(physical_addr_t);
 
 static pdir* current_directory = 0;
-static uint32_t current_pdbr = 0;
+static physical_addr_t phys_pdir;
+
+void* _get_physaddr(void *virtualaddr) {
+    virtual_addr_t pdindex = (virtual_addr_t)virtualaddr >> 22;
+    virtual_addr_t ptindex = (virtual_addr_t)virtualaddr >> 12 & 0x03FF;
+
+    virtual_addr_t *pd = (virtual_addr_t*)0xFFFFF000;
+    // Here you need to check whether the PD entry is present.
+
+    virtual_addr_t *pt = ((virtual_addr_t*)0xFFC00000) + (0x400 * pdindex);
+    // Here you need to check whether the PT entry is present.
+
+    return (void *)((pt[ptindex] & ~0xFFF) + ((virtual_addr_t)virtualaddr & 0xFFF));
+}
 
 pte_t* vmmngr_ptable_lookup_entry(ptable* p, virtual_addr_t addr) {
     return &(p->entry[PAGE_TABLE_INDEX(addr)]);
@@ -19,7 +30,7 @@ MEM_ERR vmmngr_switch_pdirectory(pdir* dir) {
     if(!dir) return ERR_MEM_INVALID_DIR;
 
     current_directory = dir;
-    load_page_directory((uint32_t*)current_pdbr);
+    load_page_directory((physical_addr_t)phys_pdir);
     return ERR_MEM_SUCCESS;
 }
 
@@ -27,8 +38,8 @@ pdir* vmmngr_get_directory() {
     return current_directory;
 }
 
-void vmmngr_flush_tlb_entry(virtual_addr_t addr) {
-	asm volatile("cli; invlpg (%0); sti" : : "r" (addr) : "memory");
+void vmmngr_flush_tlb_entry(void* addr) {
+	asm volatile("invlpg (%0)" : : "b" (addr) : "memory");
 }
 
 MEM_ERR vmmngr_alloc_page(pte_t* e) {
@@ -49,62 +60,58 @@ void vmmngr_free_page(pte_t* e) {
 }
 
 MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt) {
-    // get page directory
-    pdir* page_directory = vmmngr_get_directory();
+    pdir* pdirectory = vmmngr_get_directory();
 
-    // get page table
-    pde_t* e = &page_directory->entry[PAGE_DIRECTORY_INDEX(virt)];
-    if((*e & PTE_PRESENT) != PTE_PRESENT) {
+    int pd_index = PAGE_DIRECTORY_INDEX((uint32_t)virt);
+    pde_t* pde = &pdirectory->entry[pd_index];
+
+    bool new_table = false;
+    if((*pde & PTE_PRESENT) != PTE_PRESENT) {
         // if page table not present then allocate it
         ptable* table = (ptable*)pmmngr_alloc_block();
         if(!table) return ERR_MEM_OOM;
-
-        // clear page table
-        memset(table, 0, sizeof(ptable));
+        new_table = true;
 
         // create a new entry
-        pde_t* entry = &page_directory->entry[PAGE_DIRECTORY_INDEX(virt)];
-        pde_add_attrib(entry, PDE_PRESENT);
-        pde_add_attrib(entry, PDE_WRITABLE);
-        pde_set_frame(entry, (physical_addr_t)table);
+        pde_add_attrib(pde, PDE_PRESENT);
+        pde_add_attrib(pde, PDE_WRITABLE);
+        pde_set_frame(pde, (physical_addr_t)table);
+
    }
 
-    // get table
-    ptable* table = (ptable*)PAGE_GET_PHYSICAL_ADDRESS(e);
+    // unsigned table_phys = PAGE_GET_PHYSICAL_ADDRESS(pde);
 
-    // get page
-    pte_t* page = &table->entry[PAGE_TABLE_INDEX(virt)];
-    pte_set_frame(page, phys);
-    pte_add_attrib(page, PTE_PRESENT);
+    // our page table VIRTUAL address can be get by adding 0xffc00000 (4*1024*1024*1023)
+    // with page directory index multiply by page size
+    // we can do this because we have recursive paging (see kernel_entry.asm)
+    // we need to use virtual address because accessing physical address will result in a page fault
+    ptable* table = (ptable*)(0xffc00000 + pd_index * MMNGR_PAGE_SIZE);
+
+    // clear the table if we have just created it
+    if(new_table) {
+        for(unsigned i = 0; i < 1024; i++)
+            table->entry[i] = 0x0;
+    }
+
+    pte_t* pte = &table->entry[PAGE_TABLE_INDEX((uint32_t)virt)];
+    pte_add_attrib(pte, PTE_PRESENT);
+    pte_add_attrib(pte, PTE_WRITABLE);
+    pte_set_frame(pte, phys);
+
+    vmmngr_flush_tlb_entry((void*)virt);
 
     return ERR_MEM_SUCCESS;
 }
 
+extern void* page_directory;
+extern uint32_t kernel_size;
 MEM_ERR vmmngr_init() {
-    ptable* table1 = (ptable*)pmmngr_alloc_block();
-    if(!table1) return ERR_MEM_OOM;
-
-    for(int i = 0, frame = 0; i < 1024; i++, frame += 4096) {
-        pte_t page = 0;
-        pte_add_attrib(&page, PTE_PRESENT);
-        pte_set_frame(&page, frame);
-        table1->entry[PAGE_TABLE_INDEX(frame)] = page;
-    }
-
-    pdir* page_directory = (pdir*)pmmngr_alloc_block();
-    if(!page_directory) return ERR_MEM_OOM;
-
-    for(int i = 0; i < 1024; i++)
-        page_directory->entry[i] = 0x0;
-
-    pde_t* entry1 = vmmngr_pdirectory_lookup_entry(page_directory, 0);
-    pde_add_attrib(entry1, PDE_PRESENT);
-    pde_add_attrib(entry1, PDE_WRITABLE);
-    pde_set_frame(entry1, (physical_addr_t)table1);
-
-    current_pdbr = (uint32_t)(&page_directory->entry);
-    vmmngr_switch_pdirectory(page_directory);
-    enable_paging();
+    // reuse the page_directory in kernel_entry
+    // note that the page_directory is allocated in the kernel
+    // and the kernel is mapped to virtual memory
+    // so we can access it in any time
+    current_directory = (pdir*)(&page_directory);
+    phys_pdir = (unsigned)&page_directory - VMBASE_KERNEL;
 
     return ERR_MEM_SUCCESS;
 }

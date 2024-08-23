@@ -36,8 +36,7 @@ void pit_set_count(unsigned count) {
 
 void pit_beep_start() {
     uint8_t tmp = port_inb(PORT_PC_SPEAKER);
-    if(tmp != (tmp | 3))
-        port_outb(PORT_PC_SPEAKER, tmp | 3);
+    port_outb(PORT_PC_SPEAKER, tmp | 3);
 }
 
 void pit_beep_stop() {

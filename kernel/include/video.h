@@ -69,5 +69,5 @@ extern void (*video_print_char)(char chr, int offset, int fg, int bg, bool move)
 
 // video_init.c
 void video_textmode_init(uint8_t cols, uint8_t rows);
-void video_framebuffer_init(uint32_t pitch, uint32_t width, uint32_t height, uint8_t bpp);
+void video_framebuffer_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bpp);
 bool video_using_framebuffer();

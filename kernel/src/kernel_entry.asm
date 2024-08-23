@@ -9,8 +9,7 @@ MBFLAGS  equ  MBALIGN | MEMINFO | VIDMODE
 MAGIC    equ  0x1BADB002
 CHECKSUM equ -(MAGIC + MBFLAGS)
 
-; virtual memory of kernel
-KVMBASE equ 0xc0000000
+%define phys_to_virt(phys) (((phys) >> 22) * 4)
 
 section .multiboot
 align 4
@@ -34,70 +33,92 @@ resb 16384 ; 16 KiB
 kernel_stack_top:
 
 section .data
+multiboot_ptr: dd 0
 align 4096
-boot_page_directory:
-    times 1024 dd 0x00000002
-boot_page_table_4mb:
+global page_directory
+page_directory:
     times 1024 dd 0x00000000
-boot_page_table_kernel1: ; extend if exceed 4MiB
+page_table_4mib:
+    times 1024 dd 0x00000000
+page_table_kernel1: ; extend if exceed 4MiB
     times 1024 dd 0x00000000
 
 section .text
 global kernel_entry
 kernel_entry:
-    ; identity map first 4mb
-    mov ecx, boot_page_table_4mb - KVMBASE
-    or ecx, 3 ; supervisor level, read/write, present
-    mov [boot_page_directory - KVMBASE], ecx
+    cmp eax, 0x2BADB002 ; check multiboot magic
+    jne hang ;  hang if invalid
+    mov [multiboot_ptr - VMBASE_KERNEL], ebx ; save multiboot ptr
+    ; now eax and ebx are free to use
 
-    mov esi, boot_page_table_4mb - KVMBASE
-    mov ecx, 0x0 + 0b011 ; start at 0, supervisor level, read/write, present
-.loop_4mb:
-    mov [esi], ecx
-    add esi, 4
-    add ecx, 4096
-    cmp esi, boot_page_table_4mb - KVMBASE + 4096
-    jb .loop_4mb
+    ; add page tables to page directory
+
+    ; recursive paging
+    ; by putting the page directory address in the last page directory entry
+    ; the system will process the page directory as a page table
+    ; thus mapping all the page table address for us
+    ; isn't it genius?
+    mov eax, page_directory - VMBASE_KERNEL
+    or eax, 0b011
+    mov [page_directory - VMBASE_KERNEL + 1023 * 4], eax
+
+    mov eax, page_table_4mib - VMBASE_KERNEL
+    or eax, 0b011
+    mov [page_directory - VMBASE_KERNEL + phys_to_virt(0)], eax
+
+    mov eax, page_table_kernel1 - VMBASE_KERNEL
+    or eax, 0b011
+    mov [page_directory - VMBASE_KERNEL + phys_to_virt(VMBASE_KERNEL)], eax
+
+    ; map the first 4mb
+    mov edi, page_table_4mib - VMBASE_KERNEL
+    mov eax, 0x0
+    or eax, 0b011
+    mov ecx, 1024
+.loop_4mib:
+    mov [edi], eax
+    add edi, 4
+    add eax, 4096
+    loop .loop_4mib
 
     ; map kernel to 0xc0000000
-    mov ecx, boot_page_table_kernel1 - KVMBASE
-    or ecx, 3 ; supervisor level, read/write, present
-    mov [boot_page_directory - KVMBASE + (KVMBASE >> 22) * 4], ecx
-
-    mov esi, boot_page_table_kernel1 - KVMBASE
-    mov ecx, 0x0 + 0b011 ; start at 0, supervisor level, read/write, present
+    mov edi, page_table_kernel1 - VMBASE_KERNEL
+    mov eax, 0x0
+    or eax, 0b011
+    ; NOTE: .text and .rodata are actually should only be readable
+    ; but idk how to do it separately so just set them to read/write for now
+    mov ecx, 1024
 .loop_kernel1:
-    mov [esi], ecx
-    add esi, 4
-    add ecx, 4096
-    cmp esi, boot_page_table_kernel1 - KVMBASE + 4096
-    jb .loop_kernel1
+    mov [edi], eax
+    add edi, 4
+    add eax, 4096
+    loop .loop_kernel1
 
     ; load page directory
-    mov ecx, boot_page_directory - KVMBASE
-    mov cr3, ecx
+    mov eax, page_directory - VMBASE_KERNEL
+    mov cr3, eax
 
     ; enable paging
-    mov ecx, cr0
-    or ecx, 0x80000000
-    mov cr0, ecx
+    mov eax, cr0
+    or eax, 0x80000000
+    mov cr0, eax
 
     ; now jump
-    lea ecx, [higher_half]
-    jmp ecx
+    lea eax, [higher_half]
+    jmp eax
 
 higher_half:
-    ; TODO: map video addr before entering the kernel
+    ; unmap the first 4MiB identity
+    mov dword [page_directory], 0x0
+    invlpg [0]
 
     mov esp, kernel_stack_top
-    push eax ; magic value
-    push ebx ; multiboot infomation structure
     extern kmain
+    push dword [multiboot_ptr]
     call kmain
 
-.hang:
+hang:
     cli
     hlt
-    jmp .hang
-
-.end:
+    jmp hang
+end:

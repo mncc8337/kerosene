@@ -75,7 +75,7 @@ void* pmmngr_alloc_block();
 void* pmmngr_alloc_multi_block(size_t cnt);
 void pmmngr_free_block(void* base);
 void pmmngr_free_multi_block(void* base, size_t cnt);
-void pmmngr_init(physical_addr_t base, size_t size);
+void pmmngr_init(size_t size);
 
 // vmmngr_pte.c
 void pte_add_attrib(pte_t* e, uint32_t attrib);
@@ -101,7 +101,7 @@ uint32_t* vmmngr_ptable_lookup_entry(ptable* p, virtual_addr_t addr);
 uint32_t* vmmngr_pdirectory_lookup_entry(pdir* p, virtual_addr_t addr);
 MEM_ERR vmmngr_switch_pdirectory(pdir* dir);
 pdir* vmmngr_get_directory();
-void vmmngr_flush_tlb_entry(virtual_addr_t addr);
+void vmmngr_flush_tlb_entry(void* addr);
 MEM_ERR vmmngr_alloc_page(pte_t* e);
 void vmmngr_free_page(pte_t* e);
 MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt);

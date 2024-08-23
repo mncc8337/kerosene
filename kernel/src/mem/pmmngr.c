@@ -1,6 +1,7 @@
 #include "mem.h"
 
-static physical_addr_t* mem_addr;
+// bitmap, the length is hardcoded because memory size will not exceed 3GiB
+static physical_addr_t mem_addr[24576]; // 3GiB * 1024*1024*1024 / 4096(block size) / 32 (uint32_t)
 static size_t used_block;
 static size_t total_block;
 
@@ -136,8 +137,7 @@ void pmmngr_free_multi_block(void* base, size_t cnt) {
     used_block -= cnt;
 }
 
-void pmmngr_init(physical_addr_t base, size_t size) {
-    mem_addr = (physical_addr_t*)base;
+void pmmngr_init(size_t size) {
     total_block = size / MMNGR_BLOCK_SIZE;
 
     // assume that all memory are in use

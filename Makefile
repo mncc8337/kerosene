@@ -33,7 +33,9 @@ _OBJ += $(addsuffix .o, $(notdir $(wildcard $(ASM_SRC))))
 LIBC_OBJ = $(addprefix $(BIN), $(_LIBC_OBJ))
 OBJ = $(addprefix $(BIN), $(_OBJ))
 
-DEFINES = -DTIMER_FREQUENCY=1000 \
+DEFINES = -DVMBASE_KERNEL=0xc0000000 \
+		  -DVMBASE_VIDEO=0xcd000000 \
+		  -DTIMER_FREQUENCY=1000 \
 		  -DMMNGR_KHEAP_START=0xc0000000 \
 		  -DMMNGR_KHEAP_INITAL_SIZE=0x100000 \
 		  -D__is_libk \
