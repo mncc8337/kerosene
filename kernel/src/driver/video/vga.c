@@ -39,11 +39,117 @@ void video_textmode_disable_cursor() {
     port_outb(PORT_SCREEN_DATA, 0x20);
 }
 
+static unsigned color_difference(unsigned r1, unsigned g1, unsigned b1, unsigned r2, unsigned g2, unsigned b2) {
+    signed r = r1 - r2;
+    signed g = g1 - g2;
+    signed b = b1 - b2;
+
+    return r*r + g*g + b*b;
+}
+
 // TODO: implement textmode rgb
 int video_textmode_rgb(int r, int g, int b) {
-    if(!r && !g && !b)
-        return 0x0;
-    return 0x7;
+    int ret = 0x7;
+    unsigned color_diff;
+    unsigned _color_diff;
+
+    // is there a much more elegant way to do this lol
+
+    _color_diff = color_difference(r, g, b, VIDEO_BLACK);
+    color_diff = _color_diff;
+    ret = VIDEO_VGA_BLACK;
+
+    _color_diff = color_difference(r, g, b, VIDEO_BLUE);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_BLUE;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_GREEN);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_GREEN;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_CYAN);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_CYAN;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_RED);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_RED;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_MAGENTA);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_MAGENTA;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_YELLOW);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_YELLOW;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_GREY);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_LIGHT_GREY;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_DARK_GREY);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_DARK_GREY;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_BLUE);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_LIGHT_BLUE;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_GREEN);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_LIGHT_GREEN;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_CYAN);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_LIGHT_CYAN;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_RED);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_LIGHT_RED;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_MAGENTA);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_LIGHT_MAGENTA;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_YELLOW);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_LIGHT_YELLOW;
+    }
+
+    _color_diff = color_difference(r, g, b, VIDEO_WHITE);
+    if(_color_diff < color_diff) {
+        color_diff = _color_diff;
+        ret = VIDEO_VGA_WHITE;
+    }
+
+    return ret;
 }
 
 int video_textmode_get_cursor() {

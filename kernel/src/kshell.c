@@ -63,9 +63,9 @@ static bool list_dir(fs_node_t node) {
         printf("|   ");
     printf("|---");
 
-    if(node.isdir) video_set_attr(VIDEO_LIGHT_BLUE, VIDEO_BLACK);
+    if(node.isdir) video_set_attr(video_rgb(VIDEO_LIGHT_BLUE), video_rgb(VIDEO_BLACK));
     puts(node.name);
-    if(node.isdir) video_set_attr(VIDEO_LIGHT_GREY, VIDEO_BLACK);
+    if(node.isdir) video_set_attr(video_rgb(VIDEO_LIGHT_GREY), video_rgb(VIDEO_BLACK));
 
     if(node.isdir && !strcmp(node.name, ".") && !strcmp(node.name, ".."))
         fs_list_dir(&node, list_dir);
@@ -766,11 +766,11 @@ static void print_prompt() {
         putchar('\n');
 
     putchar('[');
-    video_set_attr(VIDEO_GREEN, VIDEO_BLACK);
+    video_set_attr(video_rgb(VIDEO_GREEN), video_rgb(VIDEO_BLACK));
     printf("kernel@kshell");
-    video_set_attr(VIDEO_LIGHT_BLUE, VIDEO_BLACK);
+    video_set_attr(video_rgb(VIDEO_LIGHT_BLUE), video_rgb(VIDEO_BLACK));
     printf(" %s ", node_stack[node_stack_offset].name);
-    video_set_attr(VIDEO_LIGHT_GREY, VIDEO_BLACK);
+    video_set_attr(video_rgb(VIDEO_LIGHT_GREY), video_rgb(VIDEO_BLACK));
     printf("]$ ");
 }
 

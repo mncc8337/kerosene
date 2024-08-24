@@ -16,8 +16,6 @@
 
 #include "kshell.h"
 
-#include "access/my_avt.h"
-
 uint32_t kernel_size;
 
 char freebuff[512];
@@ -95,6 +93,7 @@ void video_init(multiboot_info_t* mbd) {
         }
     }
     else {
+        using_framebuffer = false;
         video_addr = VIDEO_TEXTMODE_ADDRESS;
         video_width = 80;
         video_height = 25;
@@ -219,18 +218,6 @@ void kmain(multiboot_info_t* mbd) {
     asm volatile("sti");
 
     print_debug(LT_IF, "done initialising\n");
-
-    // if(video_using_framebuffer()) {
-    //     char* my_avt_data = my_avt_header_data;
-    //     for(int y = 0; y < (signed)my_avt_height; y++) {
-    //         for(int x = 0; x < (signed)my_avt_width; x++) {
-    //             int pixel[3];
-    //             HEADER_PIXEL(my_avt_data, pixel);
-    //             uint32_t color = (pixel[2] << 24) | (pixel[0] << 16) | (pixel[1] << 8);
-    //             video_framebuffer_plot_pixel(x, y, color);
-    //         }
-    //     }
-    // }
 
     shell_set_root_node(fs->root_node);
     shell_start();

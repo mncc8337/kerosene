@@ -74,11 +74,11 @@ static void* exception_handlers[32] = {
 
 // default exception handler
 static void exception_handler(regs_t* r) {
-    video_set_attr(VIDEO_WHITE, VIDEO_BLACK);
+    video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
     printf("\nException: ");
-    video_set_attr(VIDEO_LIGHT_RED, VIDEO_BLACK);
+    video_set_attr(video_rgb(VIDEO_LIGHT_RED), video_rgb(VIDEO_BLACK));
     puts(exception_message[r->int_no]);
-    video_set_attr(VIDEO_WHITE, VIDEO_BLACK);
+    video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
     printf("Error code: 0b%b\n", r->err_code);
 
     void (*handler)(regs_t*) = exception_handlers[r->int_no];

@@ -8,22 +8,39 @@
 
 #define VIDEO_TEXTMODE_ADDRESS 0xb8000
 
-#define VIDEO_BLACK         video_rgb(0, 0, 0) // 0x0
-#define VIDEO_BLUE          video_rgb(0, 0, 255) // 0x1
-#define VIDEO_GREEN         video_rgb(0, 255, 0) // 0x2
-#define VIDEO_CYAN          video_rgb(100, 100, 255) // 0x3
-#define VIDEO_RED           video_rgb(255, 0, 0) // 0x4
-#define VIDEO_MAGENTA       video_rgb(255, 0, 255) // 0x5
-#define VIDEO_BROWN         video_rgb(0, 0, 0) // 0x6
-#define VIDEO_LIGHT_GREY    video_rgb(150, 150, 150) // 0x7
-#define VIDEO_DARK_GREY     video_rgb(60, 60, 60) // 0x8
-#define VIDEO_LIGHT_BLUE    video_rgb(100, 100, 255) // 0x9
-#define VIDEO_LIGHT_GREEN   video_rgb(100, 255, 100) // 0xa
-#define VIDEO_LIGHT_CYAN    video_rgb(150, 150, 255) // 0xb
-#define VIDEO_LIGHT_RED     video_rgb(255, 100, 100) // 0xc
-#define VIDEO_LIGHT_MAGENTA video_rgb(255, 100, 255) // 0xd
-#define VIDEO_LIGHT_BROWN   video_rgb(0, 0, 0) // 0xe
-#define VIDEO_WHITE         video_rgb(255, 255, 255) // 0xf
+#define VIDEO_VGA_BLACK         0x0
+#define VIDEO_VGA_BLUE          0x1
+#define VIDEO_VGA_GREEN         0x2
+#define VIDEO_VGA_CYAN          0x3
+#define VIDEO_VGA_RED           0x4
+#define VIDEO_VGA_MAGENTA       0x5
+#define VIDEO_VGA_YELLOW        0x6
+#define VIDEO_VGA_LIGHT_GREY    0x7
+#define VIDEO_VGA_DARK_GREY     0x8
+#define VIDEO_VGA_LIGHT_BLUE    0x9
+#define VIDEO_VGA_LIGHT_GREEN   0xa
+#define VIDEO_VGA_LIGHT_CYAN    0xb
+#define VIDEO_VGA_LIGHT_RED     0xc
+#define VIDEO_VGA_LIGHT_MAGENTA 0xd
+#define VIDEO_VGA_LIGHT_YELLOW  0xe
+#define VIDEO_VGA_WHITE         0xf
+
+#define VIDEO_BLACK         0  , 0  , 0
+#define VIDEO_BLUE          0  , 0  , 170
+#define VIDEO_GREEN         0  , 170, 0
+#define VIDEO_CYAN          0  , 170, 170
+#define VIDEO_RED           170, 0  , 0
+#define VIDEO_MAGENTA       170, 0  , 170
+#define VIDEO_YELLOW        170, 85 , 0
+#define VIDEO_LIGHT_GREY    170, 170, 170
+#define VIDEO_DARK_GREY     85 , 85 , 85
+#define VIDEO_LIGHT_BLUE    85 , 85 , 255
+#define VIDEO_LIGHT_GREEN   85 , 255, 85
+#define VIDEO_LIGHT_CYAN    85 , 255, 255
+#define VIDEO_LIGHT_RED     255, 85 , 85
+#define VIDEO_LIGHT_MAGENTA 255, 85 , 255
+#define VIDEO_LIGHT_YELLOW  255, 255, 85
+#define VIDEO_WHITE         255, 255, 255
 
 // vga.c
 void video_textmode_set_ptr(int ptr);
