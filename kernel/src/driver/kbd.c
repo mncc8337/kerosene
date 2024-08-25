@@ -2,7 +2,7 @@
 #include "system.h"
 #include "ps2.h"
 
-static unsigned char keycode[] = {
+static uint8_t keycode[] = {
     0, // nothing
     // escape
     (0 << 4) + 0,
@@ -108,7 +108,7 @@ static unsigned char keycode[] = {
     (0 << 4) + 12
 };
 
-static unsigned char keycode_extended_byte[] = {
+static uint8_t keycode_extended_byte[] = {
     // null
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 
@@ -209,8 +209,8 @@ static unsigned char keycode_extended_byte[] = {
     (6 << 4) + 2
 };
 
-static unsigned char keymap[175];
-static unsigned char keymap_shift[175];
+static char keymap[175];
+static char keymap_shift[175];
 
 static bool key_pressed[175];
 
@@ -224,8 +224,8 @@ static void (*key_listener)(key_t) = 0;
 // predefined it here to be used in trash interrupt handler
 static void kbd_handler(regs_t* r);
 
-static unsigned char interrupt_progress_cnt = 0;
-static unsigned char interrupt_loop_cnt = 0;
+static uint8_t interrupt_progress_cnt = 0;
+static uint8_t interrupt_loop_cnt = 0;
 static void kbd_trash_int_handler() {
     ps2_wait_for_reading_data();
     ps2_read_data();
@@ -238,12 +238,13 @@ static void kbd_trash_int_handler() {
     }
 }
 
+static volatile bool lastest_key_handled = true;
 static bool extended_byte = false;
 static void kbd_handler(regs_t* r) {
     (void)(r); // avoid unused arg
 
     ps2_wait_for_reading_data();
-    unsigned char scancode = ps2_read_data();
+    uint8_t scancode = ps2_read_data();
 
     if(scancode == EXTENDED_BYTE) {
         // turn on the flag 
@@ -276,7 +277,7 @@ static void kbd_handler(regs_t* r) {
     bool released = (scancode & 0x80) == 0x80;
     scancode -= 0x80 * released;
 
-    unsigned char kcode;
+    uint8_t kcode;
     if(extended_byte) kcode = keycode_extended_byte[scancode];
     else kcode = keycode[scancode];
    
@@ -298,12 +299,16 @@ static void kbd_handler(regs_t* r) {
         else if(!capslock_on) mapped = keymap_shift[kcode];
     }
     // convert to uppercase if only capslock is on
-    if(capslock_on && mapped >= 0x61 && mapped <= 0x7a && !key_pressed[KEYCODE_LSHIFT] && !key_pressed[KEYCODE_RSHIFT])
+    if(capslock_on && mapped >= 0x61
+            && mapped <= 0x7a
+            && !key_pressed[KEYCODE_LSHIFT]
+            && !key_pressed[KEYCODE_RSHIFT])
         mapped -= 32;
 
     current_key.keycode = kcode;
     current_key.mapped = mapped;
     current_key.released = released;
+    lastest_key_handled = false;
     
 call_key_listener:
     if(key_listener) key_listener(current_key);
@@ -312,11 +317,22 @@ call_key_listener:
     extended_byte = false;
 }
 
-unsigned char kbd_get_keycode(unsigned char group, unsigned char no) {
+// wait until key event occurr
+void kbd_wait_key(key_t* k) {
+    lastest_key_handled = true; // make sure to get a new key
+    // wait until get a new key (unhandled)
+    while(lastest_key_handled)
+        asm volatile("sti; hlt; cli");
+    asm volatile("sti");
+    lastest_key_handled = true;
+    *k = current_key;
+}
+
+uint8_t kbd_get_keycode(uint8_t group, uint8_t no) {
     return (group << 4) + no;
 }
 
-unsigned char kbd_key_map(unsigned char keycode, unsigned int layout) {
+uint8_t kbd_key_map(uint8_t keycode, unsigned layout) {
     switch(layout) {
         case KBL_US:
             return keymap[keycode];
@@ -324,7 +340,7 @@ unsigned char kbd_key_map(unsigned char keycode, unsigned int layout) {
             return keymap[keycode];
     }
 }
-unsigned char kbd_key_shift_map(unsigned char keycode, unsigned int layout) {
+uint8_t kbd_key_shift_map(uint8_t keycode, unsigned layout) {
     switch(layout) {
         case KBL_US:
             return keymap_shift[keycode];
@@ -333,7 +349,7 @@ unsigned char kbd_key_shift_map(unsigned char keycode, unsigned int layout) {
     }
 }
 
-bool kbd_is_key_pressed(unsigned char keycode) {
+bool kbd_is_key_pressed(uint8_t keycode) {
     return key_pressed[keycode];
 }
 

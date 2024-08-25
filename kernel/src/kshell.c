@@ -43,14 +43,6 @@ static void node_stack_pop() {
     if(node_stack_offset > 0) node_stack_offset--;
 }
 
-static volatile bool key_handled = true;
-static volatile key_t current_key;
-static void kbd_listener(key_t k) {
-    if(k.released) return;
-    key_handled = false;
-    current_key = k;
-}
-
 static int indent_level = 0;
 static int max_depth = 0;
 static bool show_hidden = false;
@@ -463,9 +455,10 @@ static void write(char* path) {
     input_len = 0;
     puts("writing mode. press ESC to exit");
 
+    key_t current_key; current_key.keycode = 1;
     while(current_key.keycode != KEYCODE_ESC) {
-        while(key_handled) continue; // wait for new key
-        key_handled = true;
+        kbd_wait_key(&current_key);
+        if(current_key.released) continue;
 
         if(current_key.mapped == '\0') continue;
 
@@ -779,14 +772,14 @@ void shell_set_root_node(fs_node_t node) {
     node_stack_offset = 0;
 }
 void shell_start() {
-    kbd_install_key_listener(kbd_listener);
     puts("welcome to keroshell");
     puts("type `help` t show all command. `help <command>` to see all available argument");
     print_prompt();
 
+    key_t current_key;
     while(true) {
-        if(key_handled) continue; // wait for new key
-        key_handled = true;
+        kbd_wait_key(&current_key);
+        if(current_key.released) continue;
 
         if(current_key.keycode == KEYCODE_UP) {
             int currpos = video_get_cursor();

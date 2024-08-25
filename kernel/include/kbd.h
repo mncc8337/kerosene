@@ -1,6 +1,7 @@
 #pragma once
 
 #include "stdbool.h"
+#include "stdint.h"
 
 #define EXTENDED_BYTE 0xe0
 
@@ -124,8 +125,8 @@
 #define KEYCODE_RIGHT ((7 << 4) | 3)
 
 typedef struct {
-    unsigned char keycode;
-    unsigned char mapped;
+    uint8_t keycode;
+    uint8_t mapped;
     bool released;
 } key_t;
 
@@ -133,11 +134,13 @@ enum KEYBOARD_LAYOUT {
     KBL_US
 };
 
-unsigned char kbd_get_keycode(unsigned char group, unsigned char no);
-unsigned char kbd_key_shift_map(unsigned char keycode, unsigned int layout);
-unsigned char kbd_key_map(unsigned char keycode, unsigned int layout);
+void kbd_wait_key(key_t* key);
 
-bool kbd_is_key_pressed(unsigned char keycode);
+uint8_t kbd_get_keycode(uint8_t group, uint8_t no);
+uint8_t kbd_key_shift_map(uint8_t keycode, unsigned layout);
+uint8_t kbd_key_map(uint8_t keycode, unsigned layout);
+
+bool kbd_is_key_pressed(uint8_t keycode);
 
 bool kbd_is_capslock_on(); 
 bool kbd_is_scrolllock_on();

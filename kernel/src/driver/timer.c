@@ -50,7 +50,8 @@ void timer_wait(unsigned ms) {
     eseconds += seconds_since_start;
 
     while(eseconds > (unsigned)seconds_since_start || eticks > ticks)
-        asm volatile("hlt");
+        asm volatile("sti; hlt; cli");
+    asm volatile("sti");
 }
 
 void timer_init() {
