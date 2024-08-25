@@ -1,26 +1,26 @@
 #include "mem.h"
 
 // bitmap, the length is hardcoded because memory size will not exceed 3GiB
-static physical_addr_t mem_addr[24576]; // 3GiB * 1024*1024*1024 / 4096(block size) / 32 (uint32_t)
+static uint32_t bitmap[24576]; // 3GiB * 1024*1024*1024 / 4096(block size) / 32 (size of uint32_t)
 static size_t used_block;
 static size_t total_block;
 
 static void set_bit(uint32_t bit) {
-    mem_addr[bit/32] |= (1 << (bit % 32));
+    bitmap[bit/32] |= (1 << (bit % 32));
 }
 static void unset_bit(uint32_t bit) {
-    mem_addr[bit/32] &= ~(1 << (bit % 32));
+    bitmap[bit/32] &= ~(1 << (bit % 32));
 }
 // static bool test_bit(uint32_t bit) {
-//     return (mem_addr[bit/32] >> (bit % 32)) & 1;
+//     return (bitmap[bit/32] >> (bit % 32)) & 1;
 // }
 
 static int find_first_free_block() {
     for(unsigned i = 0; i < total_block/32; i++) {
-        if(mem_addr[i] == 0xffffffff) continue;
+        if(bitmap[i] == 0xffffffff) continue;
         for(int j = 0; j < 32;j++) {
             int bit = 1 << j;
-            if(!(mem_addr[i] & bit)) return i * 32 + j;
+            if(!(bitmap[i] & bit)) return i * 32 + j;
         }
     }
     return -1;
@@ -30,13 +30,13 @@ static int find_first_free(size_t frame_cnt) {
     if(frame_cnt == 1) return find_first_free_block();
 
     for(unsigned int i = 0; i < total_block/32; i++) {
-        if(mem_addr[i] == 0xfffffff) continue;
+        if(bitmap[i] == 0xfffffff) continue;
         for(int j = 0; j < 32;j++) {
             int bit = 1 << j;
-            if(mem_addr[i] & bit) continue;
+            if(bitmap[i] & bit) continue;
 
             for(uint32_t k = 1; k < frame_cnt; k++) {
-                if(mem_addr[i] & (bit << k)) {
+                if(bitmap[i] & (bit << k)) {
                     // we know that this segment has not enough space so we can skip
                     j += k;
                     break;
@@ -53,13 +53,13 @@ static int find_first_free(size_t frame_cnt) {
 void pmmngr_update_usage() {
     used_block = 0;
     for(unsigned i = 0; i < total_block/32; i++) {
-        if(mem_addr[i] == 0xffffffff) {
+        if(bitmap[i] == 0xffffffff) {
             used_block += 32;
             continue;
         }
         for(int j = 0; j < 32;j++) {
             int bit = 1 << j;
-            if((mem_addr[i] & bit)) used_block++;
+            if((bitmap[i] & bit)) used_block++;
         }
     }
     if(used_block > total_block) used_block = total_block;
@@ -93,7 +93,7 @@ void pmmngr_deinit_region(physical_addr_t base, size_t size) {
 }
 
 void* pmmngr_alloc_block() {
-    if(total_block - used_block == 0) return NULL;
+    if(total_block == used_block) return NULL;
     int frame = find_first_free_block();
     if(frame == -1) return NULL;
 
@@ -143,5 +143,5 @@ void pmmngr_init(size_t size) {
     // assume that all memory are in use
     used_block = total_block;
     for(unsigned i = 0; i < total_block / 32; i++)
-        mem_addr[i] = 0xffffffff;
+        bitmap[i] = 0xffffffff;
 }

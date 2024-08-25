@@ -106,16 +106,16 @@ void video_init(multiboot_info_t* mbd) {
         vmmngr_map_page(video_addr + i, VMBASE_VIDEO + i, PTE_WRITABLE);
     video_addr = VMBASE_VIDEO;
     if(using_framebuffer) {
-        video_framebuffer_set_ptr(video_addr);
-        video_framebuffer_init(
+        video_vesa_set_ptr(video_addr);
+        video_vesa_init(
             video_width, video_height,
             video_pitch, video_bpp
         );
         print_debug(LT_OK, "VESA video initialised\n");
     }
     else {
-        video_textmode_set_ptr(video_addr);
-        video_textmode_init(video_width, video_height);
+        video_vga_set_ptr(video_addr);
+        video_vga_init(video_width, video_height);
         print_debug(LT_OK, "VGA video initialised\n");
     }
 }

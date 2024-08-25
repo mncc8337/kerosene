@@ -760,7 +760,7 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
 
 static void print_prompt() {
     int w, h;
-    if(video_using_framebuffer()) video_framebuffer_get_rowcol(&w, &h);
+    if(video_using_framebuffer()) video_vesa_get_rowcol(&w, &h);
     else video_get_size(&w, &h);
     if(video_get_cursor() % w != 0)
         putchar('\n');

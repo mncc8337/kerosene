@@ -8,25 +8,25 @@ static uint8_t current_attr = 0x7;
 static int text_rows;
 static int text_cols;
 
-void video_textmode_set_ptr(int ptr) {
+void video_vga_set_ptr(int ptr) {
     vid_mem = (uint8_t*)ptr;
 }
 
-void video_textmode_set_attr(int fg, int bg) {
+void video_vga_set_attr(int fg, int bg) {
     current_attr = (bg << 4) | fg;
 }
 
-void video_textmode_set_size(int w, int h) {
+void video_vga_set_size(int w, int h) {
     text_cols = w;
     text_rows = h;
 }
 
-void video_textmode_get_size(int* w, int* h) {
+void video_vga_get_size(int* w, int* h) {
     *w = text_cols;
     *h = text_rows;
 }
 
-void video_textmode_enable_cursor(int cursor_scanline_start, int cursor_scanline_end) {
+void video_vga_enable_cursor(int cursor_scanline_start, int cursor_scanline_end) {
     port_outb(PORT_SCREEN_CTRL, 0x0a);
     port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xc0) | cursor_scanline_start);
 
@@ -34,7 +34,7 @@ void video_textmode_enable_cursor(int cursor_scanline_start, int cursor_scanline
     port_outb(PORT_SCREEN_DATA, (port_inb(PORT_SCREEN_DATA) & 0xe0) | cursor_scanline_end);
 }
 
-void video_textmode_disable_cursor() {
+void video_vga_disable_cursor() {
     port_outb(PORT_SCREEN_CTRL, 0x0a);
     port_outb(PORT_SCREEN_DATA, 0x20);
 }
@@ -47,8 +47,7 @@ static unsigned color_difference(unsigned r1, unsigned g1, unsigned b1, unsigned
     return r*r + g*g + b*b;
 }
 
-// TODO: implement textmode rgb
-int video_textmode_rgb(int r, int g, int b) {
+int video_vga_rgb(int r, int g, int b) {
     int ret = 0x7;
     unsigned color_diff;
     unsigned _color_diff;
@@ -152,7 +151,7 @@ int video_textmode_rgb(int r, int g, int b) {
     return ret;
 }
 
-int video_textmode_get_cursor() {
+int video_vga_get_cursor() {
     int offset = 0;
     port_outb(PORT_SCREEN_CTRL, 0x0f);
     offset |= port_inb(PORT_SCREEN_DATA);
@@ -161,23 +160,23 @@ int video_textmode_get_cursor() {
     return offset;
 }
 
-void video_textmode_set_cursor(int offset) {
+void video_vga_set_cursor(int offset) {
     port_outb(PORT_SCREEN_CTRL, 14);
     port_outb(PORT_SCREEN_DATA, (uint8_t)(offset >> 8));
     port_outb(PORT_SCREEN_CTRL, 15);
     port_outb(PORT_SCREEN_DATA, (uint8_t)(offset));
 }
 
-void video_textmode_cls(int bg) {
+void video_vga_cls(int bg) {
     for(int i = 0; i < text_rows * text_cols; i++) {
         vid_mem[i * 2 + 1] = (bg & 0xf) << 4;
         vid_mem[i * 2]     = ' ';
     }
-    video_textmode_set_cursor(0);
+    video_vga_set_cursor(0);
 }
 
-void video_textmode_scroll_screen(unsigned ammount) {
-    int end = video_textmode_get_cursor();
+void video_vga_scroll_screen(unsigned ammount) {
+    int end = video_vga_get_cursor();
 
     int start = end - text_cols * ammount;
     // already on top
@@ -192,13 +191,13 @@ void video_textmode_scroll_screen(unsigned ammount) {
         vid_mem[i * 2 + 1] = 0xf;
     }
 
-    video_textmode_set_cursor(start);
+    video_vga_set_cursor(start);
 }
 
-void video_textmode_print_char(char chr, int offset, int fg, int bg, bool move) {
+void video_vga_print_char(char chr, int offset, int fg, int bg, bool move) {
     if(chr == 0) return;
 
-    if(offset < 0) offset = video_textmode_get_cursor();
+    if(offset < 0) offset = video_vga_get_cursor();
 
     uint8_t attr = current_attr;
     if(fg >= 0) attr = (attr & 0x0f) | fg;
@@ -214,7 +213,7 @@ void video_textmode_print_char(char chr, int offset, int fg, int bg, bool move) 
     else if(chr == '\t') {
         // handle tabs like spaces
         // change later
-        video_textmode_print_char(' ', offset, fg, bg, move);
+        video_vga_print_char(' ', offset, fg, bg, move);
         // offset += - offset % text_cols % 8 + 8;
     }
     else {
@@ -224,7 +223,7 @@ void video_textmode_print_char(char chr, int offset, int fg, int bg, bool move) 
     }
 
     if(move) {
-        video_textmode_set_cursor(offset);
-        if(offset > text_rows * text_cols - 1) video_textmode_scroll_screen(1);
+        video_vga_set_cursor(offset);
+        if(offset > text_rows * text_cols - 1) video_vga_scroll_screen(1);
     }
 }

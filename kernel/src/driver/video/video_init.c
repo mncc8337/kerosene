@@ -42,46 +42,46 @@ void (*video_cls)(int color) = video_preinit_cls;
 void (*video_scroll_screen)(unsigned ammount) = video_preinit_scroll_screen;
 void (*video_print_char)(char chr, int offset, int fg, int bg, bool move) = video_preinit_print_char;
 
-void video_textmode_init(uint8_t cols, uint8_t rows) {
+void video_vga_init(uint8_t cols, uint8_t rows) {
     linear_graphics_mode = false;
 
-    video_set_attr       = video_textmode_set_attr;
-    video_get_size       = video_textmode_get_size;
-    video_rgb            = video_textmode_rgb;
-    video_get_cursor     = video_textmode_get_cursor;
-    video_set_cursor     = video_textmode_set_cursor;
-    video_cls            = video_textmode_cls;
-    video_print_char     = video_textmode_print_char;
-    video_scroll_screen  = video_textmode_scroll_screen;
+    video_set_attr       = video_vga_set_attr;
+    video_get_size       = video_vga_get_size;
+    video_rgb            = video_vga_rgb;
+    video_get_cursor     = video_vga_get_cursor;
+    video_set_cursor     = video_vga_set_cursor;
+    video_cls            = video_vga_cls;
+    video_print_char     = video_vga_print_char;
+    video_scroll_screen  = video_vga_scroll_screen;
 
-    video_textmode_set_size(cols, rows);
+    video_vga_set_size(cols, rows);
 
     if(preinit_buffer_len > 0) {
         for(unsigned i = 0; i < preinit_buffer_len; i++)
-            video_textmode_print_char(preinit_buffer[i], -1, -1, -1, true);
+            video_vga_print_char(preinit_buffer[i], -1, -1, -1, true);
     }
 }
-void video_framebuffer_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bpp) {
+void video_vesa_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bpp) {
     linear_graphics_mode = true;
 
-    video_set_attr       = video_framebuffer_set_attr;
-    video_get_size       = video_framebuffer_get_size;
-    video_rgb            = video_framebuffer_rgb;
-    video_get_cursor     = video_framebuffer_get_cursor;
-    video_set_cursor     = video_framebuffer_set_cursor;
-    video_cls            = video_framebuffer_cls;
-    video_print_char     = video_framebuffer_print_char;
-    video_scroll_screen  = video_framebuffer_scroll_screen;
+    video_set_attr       = video_vesa_set_attr;
+    video_get_size       = video_vesa_get_size;
+    video_rgb            = video_vesa_rgb;
+    video_get_cursor     = video_vesa_get_cursor;
+    video_set_cursor     = video_vesa_set_cursor;
+    video_cls            = video_vesa_cls;
+    video_print_char     = video_vesa_print_char;
+    video_scroll_screen  = video_vesa_scroll_screen;
 
-    video_framebuffer_set_size(pitch, bpp, width, height);
+    video_vesa_set_size(pitch, bpp, width, height);
 
     int font_width, font_height, font_bpg;
     psf_get_font_geometry(&font_width, &font_height, &font_bpg);
-    video_framebuffer_set_font_size(font_width, font_height, font_bpg);
+    video_vesa_set_font_size(font_width, font_height, font_bpg);
 
     if(preinit_buffer_len > 0) {
         for(unsigned i = 0; i < preinit_buffer_len; i++)
-            video_framebuffer_print_char(preinit_buffer[i], -1, -1, -1, true);
+            video_vesa_print_char(preinit_buffer[i], -1, -1, -1, true);
     }
 }
 
