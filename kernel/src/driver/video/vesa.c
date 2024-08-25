@@ -67,7 +67,11 @@ void video_vesa_get_rowcol(int* c, int* r) {
     *r = text_rows;
 }
 
-void video_vesa_plot_pixel(int x, int y, int color) {
+void video_vesa_plot_pixel(unsigned x, unsigned y, int color) {
+    // TODO: support other bpp
+
+    if(x >= fb_width || y >= fb_height) return;
+
     if(fb_bpp == 8) {
         uint8_t* pixel = framebuffer + y * fb_pitch + x;
         *pixel = color;
@@ -80,12 +84,13 @@ void video_vesa_plot_pixel(int x, int y, int color) {
         uint32_t* pixel = (uint32_t*)(framebuffer + y * fb_pitch) + x;
         *pixel = color;
     }
-    else {
-        // who the hell use this is not deserved a pixel
-    }
 }
 
-int video_vesa_get_pixel(int x, int y) {
+int video_vesa_get_pixel(unsigned x, unsigned y) {
+    // TODO: support other bpp
+
+    if(x >= fb_width || y >= fb_height) return 0;
+
     if(fb_bpp == 8) {
         uint8_t* pixel = framebuffer + y * fb_pitch + x;
         return *pixel;
@@ -99,8 +104,135 @@ int video_vesa_get_pixel(int x, int y) {
          return *pixel;
     }
     else {
-        // who the hell use this is not deserved a pixel
-        return 0x0;
+        return 0;
+    }
+}
+
+void video_vesa_fill_rectangle(int x0, int y0, int x1, int y1, int color) {
+    // TODO: support other bpp
+
+    int dx = x1 - x0;
+    if(dx < 0) {
+        dx *= -1;
+        int _x1 = x1;
+        x1 = x0;
+        x0 = _x1;
+    }
+    int dy = y1 - y0;
+    if(dy < 0) {
+        dy *= -1;
+        int _y1 = y1;
+        y1 = y0;
+        y0 = _y1;
+    }
+
+    int bytes_per_pixel = fb_bpp / 8;
+    uint8_t* fb = framebuffer;
+    fb += y0 * fb_pitch + x0 * bytes_per_pixel;
+
+    for(int y = y0; y <= y1; y++) {
+        if((unsigned)y == fb_height) return;
+        for(int x = x0; x <= x1; x++) {
+            if((unsigned)x == fb_width) break;
+            if(fb_bpp == 8) *fb = color;
+            else if(fb_bpp == 16) *(uint16_t*)fb = color;
+            else if(fb_bpp == 32) *(uint32_t*)fb = color;
+            fb += bytes_per_pixel;
+        }
+        fb += fb_pitch - (dx+1) * bytes_per_pixel;
+    }
+}
+
+static void draw_line_low(int x0, int y0, int x1, int y1, int color) {
+    int dx = x1 - x0;
+    int dy = y1 - y0;
+    int yi = 1;
+
+    if(dy < 0) {
+        yi = -1;
+        dy *= -1;
+    }
+    int D = (2 * dy) - dx;
+    int y = y0;
+
+    for(int x = x0; x <= x1; x++) {
+        video_vesa_plot_pixel(x, y, color);
+        if(D > 0) {
+            y += yi;
+            D += 2 * (dy - dx);
+        }
+        else D += 2 * dy;
+    }
+}
+static void draw_line_high(int x0, int y0, int x1, int y1, int color) {
+    int dx = x1 - x0;
+    int dy = y1 - y0;
+    int xi = 1;
+
+    if(dx < 0) {
+        xi = -1;
+        dx *= -1;
+    }
+    int D = (2 * dx) - dy;
+    int x = x0;
+
+    for(int y = y0; y <= y1; y++) {
+        video_vesa_plot_pixel(x, y, color);
+        if(D > 0) {
+            x += xi;
+            D += 2 * (dx - dy);
+        }
+        else D += 2 * dx;
+    }
+}
+void video_vesa_draw_line(int x0, int y0, int x1, int y1, int color) {
+    int dy = y1 - y0;
+    if(y1 < y0) dy = y0 - y1;
+
+    int dx = x1 - x0;
+    if(x1 < x0) dx = x0 - x1;
+
+    if(dy < dx) {
+        if(x0 > x1) draw_line_low(x1, y1, x0, y0, color);
+        else draw_line_low(x0, y0, x1, y1, color);
+    }
+    else {
+        if(y0 > y1) draw_line_high(x1, y1, x0, y0, color);
+        else draw_line_high(x0, y0, x1, y1, color);
+    }
+}
+
+void video_vesa_draw_circle(int x0, int y0, int r, int color) {
+    int x = r;
+    int y = 0;
+
+    video_vesa_plot_pixel(x + x0, y + y0, color);
+
+    video_vesa_plot_pixel(x + x0, -y + y0, color);
+    video_vesa_plot_pixel(y + x0, x + y0 , color);
+    video_vesa_plot_pixel(-y + x0, x + y0, color);
+
+    int P = 1 - r;
+    while(x > y) {
+        y++;
+        if(P <= 0) P += 2 * y + 1;
+        else {
+            x--;
+            P += 2 * (y - x) + 1;
+        }
+
+        if(x < y) break;
+
+        video_vesa_plot_pixel(x + x0, y + y0, color);
+        video_vesa_plot_pixel(-x + x0, y + y0, color);
+        video_vesa_plot_pixel(x + x0, -y + y0, color);
+        video_vesa_plot_pixel(-x + x0, -y + y0, color);
+        if(x != y) {
+            video_vesa_plot_pixel(y + x0, x + y0, color);
+            video_vesa_plot_pixel(-y + x0, x + y0, color);
+            video_vesa_plot_pixel(y + x0, -x + y0, color);
+            video_vesa_plot_pixel(-y + x0, -x + y0, color);
+        }
     }
 }
 

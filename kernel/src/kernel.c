@@ -59,7 +59,7 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
     }
 
     // deinit regions
-    pmmngr_deinit_region(0, 2*1024*1024 + kernel_size); // kernel start at 2MiB
+    pmmngr_deinit_region(0, 4*1024*1024); // first 4MiB is preserved for kernel
 
     pmmngr_update_usage(); // always run this after init and deinit regions
 
@@ -164,15 +164,18 @@ void disk_init() {
     }
 }
 
-extern void* kernel_start;
-extern void* kernel_end;
+extern char kernel_start;
+extern char kernel_end;
 void kmain(multiboot_info_t* mbd) {
+    kernel_size = &kernel_end - &kernel_start;
+
     // greeting msg to let us know we are in the kernel
     // note that this will print into preinit video buffer
     // and will not drawn to screen until video is initialised
     puts("hello");
     printf("this is "); puts("kernosene!");
     printf("build datetime: %s, %s\n", __TIME__, __DATE__);
+    printf("kernel size: %d bytes\n", kernel_size);
 
     // since we have mapped 4MiB from 0x0 to 0xc0000000
     // any physical address under 4MiB can be converted to virtual address
@@ -180,8 +183,6 @@ void kmain(multiboot_info_t* mbd) {
     // i think that GRUB will not give any address that are larger than 4 MiB
     // except the framebuffer
     mbd = (void*)mbd + VMBASE_KERNEL;
-
-    kernel_size = &kernel_end - &kernel_start;
 
     // disable interrupts to set up things
     asm volatile("cli");

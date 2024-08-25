@@ -102,7 +102,7 @@ static void process_prompt(char* prompts, unsigned prompts_len);
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help . .<n dot> echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep");
+        puts("help . .<n dot> echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw");
     }
     else {
         arg = strtok(arg, " ");
@@ -110,11 +110,14 @@ static void help(char* arg) {
         else if(arg[0] == '.') printf("go back %d dir\n", strlen(arg)-1);
         else if(strcmp(arg, "echo")) puts("echo <string>");
         else if(strcmp(arg, "clocks")) puts("clocks <no-args>");
-        else if(strcmp(arg, "ls")) puts(
+        else if(strcmp(arg, "ls")) {
+            puts(
                 "ls <args> <directory>\n"
                 "available arg:\n"
                 "    -a          show hidden\n"
-                "    -d <num>    tree depth");
+                "    -d <num>    tree depth"
+            );
+        }
         else if(strcmp(arg, "read")) puts("read <path>");
         else if(strcmp(arg, "cd")) puts("cd <path>");
         else if(strcmp(arg, "mkdir")) puts("mkdir <path>");
@@ -127,6 +130,15 @@ static void help(char* arg) {
         else if(strcmp(arg, "pwd")) puts("pwd <no-args>");
         else if(strcmp(arg, "datetime")) puts("datetime <no-args>");
         else if(strcmp(arg, "beep")) puts("beep <frequency> <duration>");
+        else if(strcmp(arg, "draw")) {
+            puts(
+                "draw <mode> <args>\n"
+                "available mode:\n"
+                "    line  <arg> = x0 y0 x1 y1 color\n"
+                "    rect  <arg> = x0 y0 x1 y1 color\n"
+                "    circ  <arg> = x y r color"
+            );
+        }
     }
 }
 
@@ -161,7 +173,7 @@ static void run_sh(char* args) {
     input_len = 0;
     input[0] = '\0';
     while(file_read(&f, (uint8_t*)(&chr), 1) != ERR_FS_EOF) {
-        if(chr != '\n')
+        if(chr != '\n' && chr != ';')
             input[input_len++] = chr;
         else {
             input[input_len] = '\0';
@@ -271,6 +283,7 @@ static void read(char* path) {
     FILE f = file_open(&node, FILE_READ);
     char chr;
     while(file_read(&f, (uint8_t*)(&chr), 1) != ERR_FS_EOF) {
+        // if(f.position == 512) puts("");
         putchar(chr);
     }
     file_close(&f);
@@ -711,6 +724,175 @@ static void beep(char* arg) {
     pit_beep_stop();
 }
 
+static void _color(char* rgb, int* r, int* g, int* b) {
+    char* r_str;
+    char* g_str;
+    char* b_str;
+
+    r_str = strtok(rgb, ",");
+    if(r_str == NULL) goto return_error;
+    *r = atoi(r_str);
+
+    g_str = strtok(NULL, ",");
+    if(g_str == NULL) goto return_error;
+    *g = atoi(g_str);
+
+    b_str = strtok(NULL, ",");
+    if(b_str == NULL) goto return_error;
+    *b = atoi(b_str);
+    return;
+
+    return_error:
+    *r = -1;
+    *g = -1;
+    *b = -1;
+}
+static void draw(char* arg) {
+    if(!video_using_framebuffer()) {
+        puts("framebuffer not available");
+        return;
+    }
+
+    char* mode = strtok(arg, " ");
+    if(mode == NULL) {
+        puts("no mode provided");
+        return;
+    }
+
+    if(strcmp(mode, "line")) {
+        char* x0_str = strtok(NULL, " ");
+        char* y0_str = strtok(NULL, " ");
+        char* x1_str = strtok(NULL, " ");
+        char* y1_str = strtok(NULL, " ");
+        char* color_str = strtok(NULL, " ");
+
+        int x0, y0, x1, y1, color;
+
+        if(x0_str == NULL) {
+            puts("no x0 provided");
+            return;
+        }
+        if(y0_str == NULL) {
+            puts("no y0 provided");
+            return;
+        }
+        if(x1_str == NULL) {
+            puts("no x1 provided");
+            return;
+        }
+        if(y1_str == NULL) {
+            puts("no y1 provided");
+            return;
+        }
+
+        if(color_str == NULL) color = video_vesa_rgb(255, 255, 255);
+        else {
+            int r, g, b;
+            _color(color_str, &r, &g, &b);
+            if(b == -1) {
+                puts("color not provided");
+                return;
+            }
+
+            color = video_vesa_rgb(r, g, b);
+        }
+
+        x0 = atoi(x0_str);
+        y0 = atoi(y0_str);
+        x1 = atoi(x1_str);
+        y1 = atoi(y1_str);
+
+        video_vesa_draw_line(x0, y0, x1, y1, color);
+    }
+    else if(strcmp(mode, "rect")) {
+        char* x0_str = strtok(NULL, " ");
+        char* y0_str = strtok(NULL, " ");
+        char* x1_str = strtok(NULL, " ");
+        char* y1_str = strtok(NULL, " ");
+        char* color_str = strtok(NULL, " ");
+
+        int x0, y0, x1, y1, color;
+
+        if(x0_str == NULL) {
+            puts("no x0 provided");
+            return;
+        }
+        if(y0_str == NULL) {
+            puts("no y0 provided");
+            return;
+        }
+        if(x1_str == NULL) {
+            puts("no x1 provided");
+            return;
+        }
+        if(y1_str == NULL) {
+            puts("no y1 provided");
+            return;
+        }
+
+        if(color_str == NULL) color = video_vesa_rgb(255, 255, 255);
+        else {
+            int r, g, b;
+            _color(color_str, &r, &g, &b);
+            if(b == -1) {
+                puts("color not provided");
+                return;
+            }
+
+            color = video_vesa_rgb(r, g, b);
+        }
+
+        x0 = atoi(x0_str);
+        y0 = atoi(y0_str);
+        x1 = atoi(x1_str);
+        y1 = atoi(y1_str);
+
+        video_vesa_fill_rectangle(x0, y0, x1, y1, color);
+    }
+    else if(strcmp(mode, "circ")) {
+        char* x_str = strtok(NULL, " ");
+        char* y_str = strtok(NULL, " ");
+        char* r_str = strtok(NULL, " ");
+        char* color_str = strtok(NULL, " ");
+
+        int x, y, r, color;
+
+        if(x_str == NULL) {
+            puts("no x provided");
+            return;
+        }
+        if(y_str == NULL) {
+            puts("no y provided");
+            return;
+        }
+        if(r_str == NULL) {
+            puts("no r provided");
+            return;
+        }
+
+        if(color_str == NULL) color = video_vesa_rgb(255, 255, 255);
+        else {
+            int r, g, b;
+            _color(color_str, &r, &g, &b);
+            if(b == -1) {
+                puts("color not provided");
+                return;
+            }
+
+            color = video_vesa_rgb(r, g, b);
+        }
+
+        x = atoi(x_str);
+        y = atoi(y_str);
+        r = atoi(r_str);
+
+        video_vesa_draw_circle(x, y, r, color);
+    }
+    else {
+        puts("mode not recognised");
+    }
+}
+
 static void process_prompt(char* prompts, unsigned prompts_len) {
     char* prompt = strtok(prompts, ";\n");
     unsigned tot_len = 0;
@@ -743,6 +925,7 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
         else if(strcmp(cmd_name, "pwd")) pwd(remain_arg);
         else if(strcmp(cmd_name, "datetime")) datetime(remain_arg);
         else if(strcmp(cmd_name, "beep")) beep(remain_arg);
+        else if(strcmp(cmd_name, "draw")) draw(remain_arg);
         else if(prompt_len == 0); // just skip
         else printf("unknow command '%s'\n", prompt);
 
