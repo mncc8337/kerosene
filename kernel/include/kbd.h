@@ -133,17 +133,17 @@ enum KEYBOARD_LAYOUT {
     KBL_US
 };
 
-unsigned char get_keycode(unsigned char group, unsigned char no);
-unsigned char key_shift_map(unsigned char keycode, unsigned int layout);
-unsigned char key_map(unsigned char keycode, unsigned int layout);
+unsigned char kbd_get_keycode(unsigned char group, unsigned char no);
+unsigned char kbd_key_shift_map(unsigned char keycode, unsigned int layout);
+unsigned char kbd_key_map(unsigned char keycode, unsigned int layout);
 
-bool is_key_pressed(unsigned char keycode);
+bool kbd_is_key_pressed(unsigned char keycode);
 
-bool is_capslock_on(); 
-bool is_scrolllock_on();
-bool is_numlock_on();
+bool kbd_is_capslock_on(); 
+bool kbd_is_scrolllock_on();
+bool kbd_is_numlock_on();
 
-void install_key_listener(void (*klis)(key_t));
-void uninstall_key_listener();
+void kbd_install_key_listener(void (*klis)(key_t));
+void kbd_uninstall_key_listener();
 
 void kbd_init();

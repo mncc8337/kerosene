@@ -312,11 +312,11 @@ call_key_listener:
     extended_byte = false;
 }
 
-unsigned char get_keycode(unsigned char group, unsigned char no) {
+unsigned char kbd_get_keycode(unsigned char group, unsigned char no) {
     return (group << 4) + no;
 }
 
-unsigned char key_map(unsigned char keycode, unsigned int layout) {
+unsigned char kbd_key_map(unsigned char keycode, unsigned int layout) {
     switch(layout) {
         case KBL_US:
             return keymap[keycode];
@@ -324,7 +324,7 @@ unsigned char key_map(unsigned char keycode, unsigned int layout) {
             return keymap[keycode];
     }
 }
-unsigned char key_shift_map(unsigned char keycode, unsigned int layout) {
+unsigned char kbd_key_shift_map(unsigned char keycode, unsigned int layout) {
     switch(layout) {
         case KBL_US:
             return keymap_shift[keycode];
@@ -333,18 +333,18 @@ unsigned char key_shift_map(unsigned char keycode, unsigned int layout) {
     }
 }
 
-bool is_key_pressed(unsigned char keycode) {
+bool kbd_is_key_pressed(unsigned char keycode) {
     return key_pressed[keycode];
 }
 
-bool is_capslock_on() { return capslock_on; }
-bool is_scrolllock_on() { return scrolllock_on; }
-bool is_numlock_on() { return numlock_on; }
+bool kbd_is_capslock_on() { return capslock_on; }
+bool kbd_is_scrolllock_on() { return scrolllock_on; }
+bool kbd_is_numlock_on() { return numlock_on; }
 
-void install_key_listener(void (*klis)(key_t)) {
+void kbd_install_key_listener(void (*klis)(key_t)) {
     key_listener = klis;
 }
-void uninstall_key_listener() {
+void kbd_uninstall_key_listener() {
     key_listener = 0;
 }
 
