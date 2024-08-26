@@ -290,7 +290,6 @@ static void read(char* path) {
     FILE f = file_open(&node, FILE_READ);
     char chr;
     while(file_read(&f, (uint8_t*)(&chr), 1) != ERR_FS_EOF) {
-        // if(f.position == 512) puts("");
         putchar(chr);
     }
     file_close(&f);

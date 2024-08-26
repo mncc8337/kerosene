@@ -325,7 +325,7 @@ void kbd_wait_key(key_t* k) {
         asm volatile("sti; hlt; cli");
     asm volatile("sti");
     lastest_key_handled = true;
-    *k = current_key;
+    if(k) *k = current_key;
 }
 
 uint8_t kbd_get_keycode(uint8_t group, uint8_t no) {

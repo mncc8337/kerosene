@@ -12,9 +12,12 @@
 #include "filesystem.h"
 
 #include "stdio.h"
+#include "string.h"
 #include "debug.h"
 
 #include "kshell.h"
+
+#include "misc/elf.h"
 
 uint32_t kernel_size;
 
@@ -183,6 +186,8 @@ void kmain(multiboot_info_t* mbd) {
     // by adding 0xc0000000 to it
     // i think that GRUB will not give any address that are larger than 4 MiB
     // except the framebuffer
+    // note that the ELF section also included in the kernel (which lies in the first 4MiB)
+    // so those physical address of ELF section headers need to offset to VMBASE_KERNEL too
     mbd = (void*)mbd + VMBASE_KERNEL;
 
     // disable interrupts to set up things
@@ -220,6 +225,37 @@ void kmain(multiboot_info_t* mbd) {
     asm volatile("sti");
 
     print_debug(LT_IF, "done initialising\n");
+
+    // if(mbd->flags & MULTIBOOT_INFO_AOUT_SYMS) {
+    //     aout_sym = mbd->u.aout_sym;
+    //     using_elf_sec = false;
+    // }
+
+    // we gave GRUB an ELF binary so GRUB will not give us the a.out symbol table option (commented above)
+    // also only one of the two must be existed so we dont need to check the flag
+    multiboot_elf_section_header_table_t elf_sec;
+    // if(mbd->flags & MULTIBOOT_INFO_ELF_SHDR)
+    elf_sec = mbd->u.elf_sec;
+
+    printf("ELF sections");
+    printf("num: %d\n", elf_sec.num);
+    printf("size: %d\n", elf_sec.size);
+    printf("addr: 0x%x\n", elf_sec.addr);
+    printf("shndx: %d\n", elf_sec.shndx); // shndx means Section Header iNDeX lmao
+
+    elf_section_header_t* strtab =
+        (elf_section_header_t*)(elf_sec.addr + VMBASE_KERNEL + elf_sec.shndx * elf_sec.size);
+    char* string_table = (char*)(strtab->addr + VMBASE_KERNEL);
+
+    // print name of each section
+    for(unsigned i = 0; i < elf_sec.num; i++) {
+        elf_section_header_t* sh = (elf_section_header_t*)
+            (elf_sec.addr + VMBASE_KERNEL + i * elf_sec.size);
+        printf("%d: %s\n", i, string_table + sh->name);
+        printf("type: %d\n", sh->type);
+        printf("addr: 0x%x\n\n", sh->addr);
+        kbd_wait_key(NULL);
+    }
 
     // only set if fs is available
     if(fs) shell_set_root_node(fs->root_node);
