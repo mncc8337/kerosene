@@ -100,7 +100,6 @@ static void exception_handler(regs_t* r) {
     void (*handler)(regs_t*) = exception_handlers[r->int_no];
     if(handler) handler(r);
 
-    puts("System halted!");
     kpanic();
 }
 

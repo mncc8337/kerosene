@@ -15,12 +15,14 @@ static bool print(const char* data, size_t length) {
 static size_t intlen(int num, int radix) {
     if(num == 0) return 1;
     size_t len = 0;
+    unsigned n;
     if(radix == 10 && num < 0) {
         len++; // minus sign
-        num *= -1;
+        n = -num;
     }
-    while(num > 0) {
-        num /= radix;
+    else n = (unsigned)num;
+    while(n > 0) {
+        n /= radix;
         len++;
     }
     return len;
@@ -82,19 +84,6 @@ int printf(const char* restrict format, ...) {
             int integer = va_arg(parameters, int);
             size_t len = intlen(integer, 2);
             char str[len + 1]; itoa(integer, str, 2);
-            if(maxrem < len) {
-                // TODO: set errno to ERR_OVERFLOW
-                return -1;
-            }
-            if(!print(str, len))
-                return -1;
-            written += len;
-        }
-        else if(*format == 'o') {
-            format++;
-            int integer = va_arg(parameters, int);
-            size_t len = intlen(integer, 8);
-            char str[len + 1]; itoa(integer, str, 8);
             if(maxrem < len) {
                 // TODO: set errno to ERR_OVERFLOW
                 return -1;

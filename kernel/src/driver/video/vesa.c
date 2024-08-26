@@ -111,6 +111,11 @@ int video_vesa_get_pixel(unsigned x, unsigned y) {
 void video_vesa_fill_rectangle(int x0, int y0, int x1, int y1, int color) {
     // TODO: support other bpp
 
+    if((unsigned)x0 >= fb_width) x0 = fb_width-1;
+    if((unsigned)x1 >= fb_width) x1 = fb_width-1;
+    if((unsigned)y0 >= fb_height) y0 = fb_height-1;
+    if((unsigned)y1 >= fb_height) y1 = fb_height-1;
+
     int dx = x1 - x0;
     if(dx < 0) {
         dx *= -1;
@@ -131,9 +136,7 @@ void video_vesa_fill_rectangle(int x0, int y0, int x1, int y1, int color) {
     fb += y0 * fb_pitch + x0 * bytes_per_pixel;
 
     for(int y = y0; y <= y1; y++) {
-        if((unsigned)y == fb_height) return;
         for(int x = x0; x <= x1; x++) {
-            if((unsigned)x == fb_width) break;
             if(fb_bpp == 8) *fb = color;
             else if(fb_bpp == 16) *(uint16_t*)fb = color;
             else if(fb_bpp == 32) *(uint32_t*)fb = color;
@@ -281,9 +284,7 @@ void video_vesa_set_cursor(int offset) {
 }
 
 void video_vesa_cls(int bg) {
-    for(unsigned y = 0; y < fb_height; y++)
-        for(unsigned x = 0; x < fb_width; x++)
-            video_vesa_plot_pixel(x, y, bg);
+    video_vesa_fill_rectangle(0, 0, fb_width-1, fb_height-1, bg);
 }
 
 void video_vesa_scroll_screen(unsigned ammount) {
@@ -298,12 +299,12 @@ void video_vesa_scroll_screen(unsigned ammount) {
     }
 
     memcpy(
-        (char*)framebuffer,
-        (char*)framebuffer + ammount * font_height * fb_pitch,
+        framebuffer,
+        framebuffer + ammount * font_height * fb_pitch,
         cursor_posy * font_height * fb_pitch
     );
     memset(
-        (char*)framebuffer + cursor_posy * font_height * fb_pitch,
+        framebuffer + cursor_posy * font_height * fb_pitch,
         0, ammount * font_height * fb_pitch
     );
 }

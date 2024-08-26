@@ -34,6 +34,7 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
     size_t memsize = 0;
     for(unsigned int i = 0; i < mmap_length; i += sizeof(multiboot_memory_map_t)) {
         multiboot_memory_map_t* mmmt = (multiboot_memory_map_t*)(mmap_addr + i);
+
         // ignore memory higher than 4GiB
         if((mmmt->addr >> 32) > 0 || (mmmt->len  >> 32) > 0) continue;
         // probaly bugs

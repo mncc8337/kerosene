@@ -3,7 +3,7 @@
 
 char* itoa(int num, char* buff, int radix) {
     int i;
-    unsigned int n;
+    unsigned n;
 
     if(num == 0) {
         buff[0] = '0';
