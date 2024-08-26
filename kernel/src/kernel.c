@@ -21,7 +21,7 @@ uint32_t kernel_size;
 char freebuff[512];
 
 int FS_ID = 0;
-fs_t* fs;
+fs_t* fs = NULL;
 
 virtual_addr_t video_addr = 0;
 unsigned video_width = 0;
@@ -220,7 +220,8 @@ void kmain(multiboot_info_t* mbd) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    shell_set_root_node(fs->root_node);
+    // only set if fs is available
+    if(fs) shell_set_root_node(fs->root_node);
     shell_start();
 
     // // i cannot get this to work :(

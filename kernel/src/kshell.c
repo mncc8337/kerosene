@@ -102,11 +102,12 @@ static void process_prompt(char* prompts, unsigned prompts_len);
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw");
+        puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw");
     }
     else {
         arg = strtok(arg, " ");
-        if(strcmp(arg, ".")) puts(". <path>");
+        if(strcmp(arg, "clear")) puts("clear <no-args>");
+        else if(strcmp(arg, ".")) puts(". <path>");
         else if(strcmp(arg, "echo")) puts("echo <string>");
         else if(strcmp(arg, "clocks")) puts("clocks <no-args>");
         else if(strcmp(arg, "ls")) {
