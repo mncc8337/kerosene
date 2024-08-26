@@ -102,12 +102,11 @@ static void process_prompt(char* prompts, unsigned prompts_len);
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help . .<n dot> echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw");
+        puts("help . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw");
     }
     else {
         arg = strtok(arg, " ");
         if(strcmp(arg, ".")) puts(". <path>");
-        else if(arg[0] == '.') printf("go back %d dir\n", strlen(arg)-1);
         else if(strcmp(arg, "echo")) puts("echo <string>");
         else if(strcmp(arg, "clocks")) puts("clocks <no-args>");
         else if(strcmp(arg, "ls")) {
@@ -140,6 +139,13 @@ static void help(char* arg) {
             );
         }
     }
+}
+
+static void clear(char* arg) {
+    (void)(arg);
+
+    video_cls(video_rgb(VIDEO_BLACK));
+    video_set_cursor(0);
 }
 
 static void run_sh(char* args) {
@@ -904,12 +910,8 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
         if(remain_arg - cmd_name >= (signed)prompt_len) remain_arg = NULL;
 
         if(strcmp(cmd_name, "help")) help(remain_arg);
+        else if(strcmp(cmd_name, "clear")) clear(remain_arg);
         else if(strcmp(cmd_name, ".")) run_sh(remain_arg);
-        else if(cmd_name[0] == '.') { // special command to go to parent dir
-            unsigned int back_cnt = strlen(cmd_name) - 1;
-            if(back_cnt > node_stack_offset) node_stack_offset = 0;
-            else node_stack_offset -= back_cnt;
-        }
         else if(strcmp(cmd_name, "echo")) echo(remain_arg);
         else if(strcmp(cmd_name, "clocks")) clocks(remain_arg);
         else if(strcmp(cmd_name, "ls")) ls(remain_arg);
