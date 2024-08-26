@@ -5,6 +5,7 @@
  // 0x7f ELF
 #define ELF_MAGIC 0x7f454c46
 
+// INSSET = instruction set
 #define ELF_INSSET_UNKNOWN 0x00
 #define ELF_INSSET_SPARC   0x02
 #define ELF_INSSET_X86     0x03
@@ -21,6 +22,7 @@
 #define ELF_WRITABLE   2
 #define ELF_READABLE   4
 
+// SHT = section header type
 #define ELF_SHT_NULL         0
 #define ELF_SHT_PROGBITS     1
 #define ELF_SHT_SYMTAB       2
@@ -31,9 +33,24 @@
 #define ELF_SHT_NOTE         7
 #define ELF_SHT_NOBITS       8
 #define ELF_SHT_RELOC        9
+#define ELF_SHT_SHLIB        10
 #define ELF_SHT_DYNSYM       11
-// there's more ...
+#define ELF_SHT_LOPROC       0x70000000
+#define ELF_SHT_HIPROC       0x7fffffff
+#define ELF_SHT_LOUSER       0x80000000
+#define ELF_SHT_HIUSER       0xffffffff
 
+#define ELF_ST_BIND(i) ((i) >> 4)
+#define ELF_ST_TYPE(i) ((i) & 0xf)
+
+// STB = symbol table binding
+#define ELF_STB_LOCAL  0
+#define ELF_STB_GLOBAL 1
+#define ELF_STB_WEAK   2
+#define ELF_STB_LOPROC 13
+#define ELF_STB_HIPROC 15
+
+// STT = symbol table type
 #define ELF_STT_NOTYPE  0
 #define ELF_STT_OBJECT  1
 #define ELF_STT_FUNC    2
@@ -61,7 +78,7 @@ typedef struct {
     uint16_t pht_entry_count;
     uint16_t sht_entry_size;
     uint16_t sht_entry_count;
-    uint16_t string_table_section_index;
+    uint16_t shstrndx; // Section Header STRing iNDeX (the index of the section name string table)
 } elf_header_t;
 
 // addr: uint32
@@ -100,7 +117,7 @@ typedef struct {
     uint32_t size;
     uint8_t info;
     uint8_t other;
-    uint16_t shndx;
+    uint16_t shndx; // Section Header iNDeX (the index in the string table)
 } elf_symbol_table_t;
 
 // TODO: fully implement ELF32
