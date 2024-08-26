@@ -49,24 +49,40 @@ static void page_fault_handler(regs_t* r) {
     uint32_t faulting_address;
     asm volatile("mov %%cr2, %0" : "=r" (faulting_address));
 
-    bool present = !(r->err_code & 0x1);   // page not present
-    bool rw = r->err_code & 0x2;           // write operation
-    bool us = r->err_code & 0x4;           // processor was in user-mode
-    bool reserved = r->err_code & 0x8;     // overwritten CPU-reserved bits of page entry
-    bool id = r->err_code & 0x10;          // caused by an instruction fetch
+    bool p    = r->err_code & 0x1;
+    bool rw   = r->err_code & 0x2;
+    bool us   = r->err_code & 0x4;
+    bool rsvd = r->err_code & 0x8;
+    bool id   = r->err_code & 0x10;
+    bool pk   = r->err_code & 0x20;
+    bool ss   = r->err_code & 0x40;
+    bool sgx  = r->err_code & 0x8000;
 
-    // output an error message
-    printf("page fault at 0x%x\n", faulting_address);
+    printf("page fault at address 0x%x\n", faulting_address);
     printf("flags: ");
-    if(present) printf("present ");
-    if(rw) printf("read-only ");
-    if(us) printf("user-mode ");
-    if(reserved) printf("reserved ");
-    if(id) printf("instruction fetch ");
+
+    if(p) printf("present, ");
+    else printf("not-present, ");
+
+    if(rw) printf("read/write, ");
+    else printf("read-only, ");
+
+    if(us) printf("user, ");
+    else printf("supervisor, ");
+
+    if(rsvd) printf("reserved, ");
+
+    if(id) printf("instruction fetch, ");
+    else printf("data access, ");
+
+    if(pk) printf("protection-key violation, ");
+    if(ss) printf("shadow-stack access fault, ");
+    if(sgx) printf("SGX violation, ");
+
     putchar('\n');
 }
 
-static void* exception_handlers[32] = {
+static void* exception_handlers[] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     page_fault_handler,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -82,7 +98,7 @@ static void exception_handler(regs_t* r) {
     printf("Error code: 0b%b\n", r->err_code);
 
     void (*handler)(regs_t*) = exception_handlers[r->int_no];
-    if(!handler) handler(r);
+    if(handler) handler(r);
 
     puts("System halted!");
     kpanic();
