@@ -503,6 +503,20 @@ FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t ext_buffer[cluster_size];
 
+    while((unsigned)cluster_offset >= cluster_size) {
+        // get next cluster
+        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
+        if(FAT_val == FAT_BAD_CLUSTER)
+            return ERR_FS_BAD_CLUSTER;
+
+        current_cluster = FAT_val;
+        cluster_offset -= cluster_size;
+
+        // if we need to iterate more but there is no cluster then return
+        if(FAT_val >= FAT_EOC && (unsigned)current_cluster >= cluster_size)
+            return ERR_FS_EOF;
+    }
+
     if(cluster_offset > 0) {
         // align buffer to cluster size
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
@@ -567,6 +581,19 @@ FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t ext_buffer[cluster_size];
 
+    while((unsigned)cluster_offset >= cluster_size) {
+        // get next cluster
+        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
+
+        if(FAT_val >= FAT_EOC)
+            return ERR_FS_EOF;
+        if(FAT_val == FAT_BAD_CLUSTER)
+            return ERR_FS_BAD_CLUSTER;
+
+        current_cluster = FAT_val;
+        cluster_offset -= cluster_size;
+    }
+
     if(cluster_offset > 0) {
         // align buffer to cluster size
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
@@ -603,9 +630,9 @@ FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size
         uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
 
         if(FAT_val >= FAT_EOC)
-            break; // end of cluster
+            break;
         if(FAT_val == FAT_BAD_CLUSTER)
-            return ERR_FS_BAD_CLUSTER; // bad cluster
+            return ERR_FS_BAD_CLUSTER;
 
         current_cluster = FAT_val;
         write_time++;

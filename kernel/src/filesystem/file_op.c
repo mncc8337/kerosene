@@ -127,8 +127,8 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
 
     if(new_parent->fs->type == FS_FAT32)
         copied = fat32_add_entry(new_parent,
-                (new_name == NULL ? node->name : new_name),
-                node->start_cluster, node->isdir | node->hidden, node->size);
+                                 new_name == NULL ? node->name : new_name,
+                                 node->start_cluster, node->isdir | node->hidden, node->size);
     else return ERR_FS_UNKNOWN_FS;
 
     if(!copied.valid) return ERR_FS_FAILED;
@@ -149,8 +149,8 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
         if(start_cluster == 0) return ERR_FS_FAILED;
 
         *copied = fat32_add_entry(new_parent,
-                (new_name == NULL ? node->name : new_name),
-                start_cluster, node->isdir | node->hidden, node->size);
+                                  new_name == NULL ? node->name : new_name,
+                                  start_cluster, node->isdir | node->hidden, node->size);
     }
     else return ERR_FS_UNKNOWN_FS;
 
@@ -170,7 +170,9 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
         uint32_t start_cluster = fat32_allocate_clusters(new_parent->fs, 1);
         if(start_cluster == 0) return ERR_FS_FAILED;
 
-        *copied = fat32_mkdir(new_parent, (new_name == NULL ? node->name : new_name), start_cluster, node->hidden | FAT_ATTR_DIRECTORY);
+        *copied = fat32_mkdir(new_parent,
+                              new_name == NULL ? node->name : new_name,
+                              start_cluster, node->hidden | FAT_ATTR_DIRECTORY);
         if(!copied->valid) return ERR_FS_FAILED;
         copy_current_dir = *copied;
 
@@ -231,17 +233,21 @@ FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
             file->node->size = 0;
         }
 
+        int offset = file->position % cluster_size;
+        if(offset == 0 && file->position > 0) {
+            // send offset = 512 so we will know to change to the next cluster
+            offset = 512;
+        }
         FS_ERR err = fat32_write_file(file->node->fs,
-            &(file->current_cluster), data, size, file->position % cluster_size);
+                                      &(file->current_cluster), data, size, offset);
         if(err != ERR_FS_SUCCESS) return err;
-
-        file->position += size;
-        file->node->size += size;
-        file->node->modified_timestamp = time(NULL);
-        return ERR_FS_SUCCESS;
     }
+    else return ERR_FS_UNKNOWN_FS;
 
-    return ERR_FS_UNKNOWN_FS;
+    file->position += size;
+    file->node->size += size;
+    file->node->modified_timestamp = time(NULL);
+    return ERR_FS_SUCCESS;
 }
 
 FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
@@ -249,28 +255,33 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
 
     if(file->position == file->node->size) return ERR_FS_EOF;
 
+    FS_ERR err;
     if(file->node->fs->type == FS_FAT32) {
         fat32_bootrecord_t* bootrec = &(file->node->fs->fat32_info.bootrec);
         int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
 
-        FS_ERR err = fat32_read_file(file->node->fs, &(file->current_cluster), buffer, size, file->position % cluster_size);
-        if(err != ERR_FS_SUCCESS) return err;
-
-        file->position += size;
-        if(file->position > file->node->size) file->position = file->node->size;
-        return ERR_FS_SUCCESS;
+        int offset = file->position % cluster_size;
+        if(offset == 0 && file->position > 0) {
+            // send offset = 512 so we will know to change to the next cluster
+            offset = 512;
+        }
+        err = fat32_read_file(file->node->fs,
+                              &(file->current_cluster), buffer, size, offset);
     }
+    else return ERR_FS_UNKNOWN_FS;
 
-    return ERR_FS_UNKNOWN_FS;
+    if(err != ERR_FS_SUCCESS) return err;
+    file->position += size;
+    if(file->position > file->node->size) file->position = file->node->size;
+    return ERR_FS_SUCCESS;
 
 }
 
 FS_ERR file_close(FILE* file) {
-    if(file->node->fs->type == FS_FAT32) {
+    if(file->node->fs->type == FS_FAT32)
         fat32_update_entry(file->node);
-        file->valid = false;
-        return ERR_FS_SUCCESS;
-    }
+    else return ERR_FS_UNKNOWN_FS;
 
-    return ERR_FS_UNKNOWN_FS;
+    file->valid = false;
+    return ERR_FS_SUCCESS;
 }

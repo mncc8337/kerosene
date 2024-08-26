@@ -220,9 +220,6 @@ void kmain(multiboot_info_t* mbd) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    int* tmp = (int*)0x100;
-    *tmp = 0;
-
     shell_set_root_node(fs->root_node);
     shell_start();
 
