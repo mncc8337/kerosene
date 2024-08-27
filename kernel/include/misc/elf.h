@@ -18,10 +18,6 @@
 #define ELF_INSSET_AARCH64 0xb7
 #define ELF_INSSET_RISC_V  0xf3
 
-#define ELF_EXECUTABLE 1
-#define ELF_WRITABLE   2
-#define ELF_READABLE   4
-
 // SHT = section header type
 #define ELF_SHT_NULL         0
 #define ELF_SHT_PROGBITS     1
@@ -88,17 +84,6 @@ typedef struct {
 // word uint32
 
 typedef struct {
-    uint32_t type;
-    uint32_t offset;
-    uint32_t vaddr;
-    uint32_t paddr;
-    uint32_t file_segment_size;
-    uint32_t mem_segment_size;
-    uint32_t flags;
-    uint32_t align;
-} elf_program_header_t;
-
-typedef struct {
     uint32_t name;
     uint32_t type;
     uint32_t flags;
@@ -119,5 +104,16 @@ typedef struct {
     uint8_t other;
     uint16_t shndx; // Section Header iNDeX (the index in the string table)
 } elf_symbol_table_t;
+
+typedef struct {
+    uint32_t type;
+    uint32_t offset;
+    uint32_t vaddr;
+    uint32_t paddr;
+    uint32_t file_segment_size;
+    uint32_t mem_segment_size;
+    uint32_t flags;
+    uint32_t align;
+} elf_program_header_t;
 
 // TODO: fully implement ELF32

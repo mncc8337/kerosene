@@ -2,7 +2,6 @@
 
 #include "system.h"
 #include "syscall.h"
-#include "kpanic.h"
 #include "mem.h"
 
 #include "video.h"
@@ -69,7 +68,7 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
 
     // vmmngr init
     MEM_ERR err = vmmngr_init();
-    if(err != ERR_MEM_SUCCESS) kpanic();
+    if(err != ERR_MEM_SUCCESS) kernel_panic(NULL);
 }
 
 void video_init(multiboot_info_t* mbd) {
@@ -193,13 +192,34 @@ void kmain(multiboot_info_t* mbd) {
     // disable interrupts to set up things
     asm volatile("cli");
 
-    if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) kpanic();
+    if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) kernel_panic(NULL);
     mem_init((void*)mbd->mmap_addr + VMBASE_KERNEL, mbd->mmap_length);
 
     video_init(mbd);
 
     if(mbd->flags & MULTIBOOT_INFO_BOOT_LOADER_NAME)
         print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + VMBASE_KERNEL);
+
+    
+    // if(mbd->flags & MULTIBOOT_INFO_AOUT_SYMS) {
+    //     aout_sym = mbd->u.aout_sym;
+    // }
+
+    // TODO: implement the a.out option, assumption is bad
+
+    // we gave GRUB an ELF binary so GRUB will not give us the a.out symbol table option (commented above)
+    // also only one of the two (a.out option or ELF option) must be existed
+    // so we dont need to check the flag
+    multiboot_elf_section_header_table_t elf_sec = mbd->u.elf_sec;
+    // find symtab and strtab
+    for(unsigned i = 0; i < elf_sec.num; i++) {
+        elf_section_header_t* sh = (elf_section_header_t*)
+            (elf_sec.addr + VMBASE_KERNEL + i * elf_sec.size);
+        if(sh->type == ELF_SHT_SYMTAB)
+            kernel_set_symtabsh_ptr((uint32_t)sh);
+        else if(i != elf_sec.shndx && sh->type == ELF_SHT_STRTAB)
+            kernel_set_strtab_ptr(sh->addr + VMBASE_KERNEL);
+    }
 
     gdt_init();
     print_debug(LT_OK, "GDT initialised\n");
@@ -225,41 +245,6 @@ void kmain(multiboot_info_t* mbd) {
     asm volatile("sti");
 
     print_debug(LT_IF, "done initialising\n");
-
-    // if(mbd->flags & MULTIBOOT_INFO_AOUT_SYMS) {
-    //     aout_sym = mbd->u.aout_sym;
-    // }
-
-    // we gave GRUB an ELF binary so GRUB will not give us the a.out symbol table option (commented above)
-    // also only one of the two (a.out option or ELF option) must be existed
-    // so we dont need to check the flag
-    multiboot_elf_section_header_table_t elf_sec = mbd->u.elf_sec;
-
-    // // get the string table
-    // elf_section_header_t* strtab =
-    //     (elf_section_header_t*)(elf_sec.addr + VMBASE_KERNEL + elf_sec.shndx * elf_sec.size);
-    // char* string_table = (char*)(strtab->addr + VMBASE_KERNEL);
-
-    // find symtab and strtab
-    elf_section_header_t* symtab_sh;
-    elf_section_header_t* strtab_sh;
-    for(unsigned i = 0; i < elf_sec.num; i++) {
-        elf_section_header_t* sh = (elf_section_header_t*)
-            (elf_sec.addr + VMBASE_KERNEL + i * elf_sec.size);
-        if(sh->type == ELF_SHT_SYMTAB) symtab_sh = sh;
-        else if(i != elf_sec.shndx && sh->type == ELF_SHT_STRTAB)
-            strtab_sh = sh;
-    }
-
-    char* strtab = (char*)(strtab_sh->addr + VMBASE_KERNEL);
-
-    // print all functions
-    for(unsigned i = 0; i < symtab_sh->size / symtab_sh->entry_size; i++) {
-        elf_symbol_table_t* stt =
-            (elf_symbol_table_t*)(symtab_sh->addr + VMBASE_KERNEL + i * symtab_sh->entry_size);
-        if(ELF_ST_TYPE(stt->info) != ELF_STT_FUNC) continue;
-        printf("%s, 0x%x\n", strtab + stt->name, stt->value);
-    }
 
     // only set if fs is available
     if(fs) shell_set_root_node(fs->root_node);

@@ -1,5 +1,4 @@
 #include "system.h"
-#include "kpanic.h"
 #include "pic.h"
 #include "stdio.h"
 #include "string.h"
@@ -100,7 +99,8 @@ static void exception_handler(regs_t* r) {
     void (*handler)(regs_t*) = exception_handlers[r->int_no];
     if(handler) handler(r);
 
-    kpanic();
+    stackframe_t stk = {(stackframe_t*)r->ebp, r->eip};
+    kernel_panic(&stk);
 }
 
 // default ISR. every interrupt will be "handled" by this function

@@ -70,12 +70,23 @@ typedef struct {
     uint16_t iomap_base;
 } __attribute__((packed)) tss_entry_t;
 
+typedef struct stackframe {
+  struct stackframe* ebp;
+  uint32_t eip;
+} stackframe_t;
+
 // port_io.c
 uint8_t port_inb(uint16_t port);
 void port_outb(uint16_t port, uint8_t data);
 uint16_t port_inw(uint16_t port);
 void port_outw(uint16_t port, uint16_t data);
 void io_wait();
+
+// kpanic.c
+void kernel_set_strtab_ptr(uint32_t ptr);
+void kernel_set_symtabsh_ptr(uint32_t ptr);
+char* kernel_find_symbol(unsigned addr, int type);
+void kernel_panic(stackframe_t* stk);
 
 // gdt.c
 void gdt_set_gate(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran);

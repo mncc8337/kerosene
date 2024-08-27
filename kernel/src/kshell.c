@@ -1,4 +1,5 @@
 #include "kshell.h"
+#include "system.h"
 #include "kbd.h"
 #include "timer.h"
 #include "video.h"
@@ -102,36 +103,39 @@ static void process_prompt(char* prompts, unsigned prompts_len);
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw");
+        puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic");
     }
     else {
         arg = strtok(arg, " ");
-        if(strcmp(arg, "clear")) puts("clear <no-args>");
-        else if(strcmp(arg, ".")) puts(". <path>");
-        else if(strcmp(arg, "echo")) puts("echo <string>");
-        else if(strcmp(arg, "clocks")) puts("clocks <no-args>");
+        if(strcmp(arg, "help")) puts("print help\nhelp <command name, optional>");
+        else if(strcmp(arg, "clear")) puts("clear screen\nclear <no-args>");
+        else if(strcmp(arg, ".")) puts("execute file content as shell command\n. <path>");
+        else if(strcmp(arg, "echo")) puts("print string\necho <string>");
+        else if(strcmp(arg, "clocks")) puts("print current clocks\nclocks <no-args>");
         else if(strcmp(arg, "ls")) {
             puts(
+                "list directory contents\n"
                 "ls <args> <directory>\n"
                 "available arg:\n"
                 "    -a          show hidden\n"
                 "    -d <num>    tree depth"
             );
         }
-        else if(strcmp(arg, "read")) puts("read <path>");
-        else if(strcmp(arg, "cd")) puts("cd <path>");
-        else if(strcmp(arg, "mkdir")) puts("mkdir <path>");
-        else if(strcmp(arg, "rm")) puts("rm <path>");
-        else if(strcmp(arg, "touch")) puts("touch <path>");
-        else if(strcmp(arg, "write")) puts("write <path>");
-        else if(strcmp(arg, "mv")) puts("mv <source-path> <destination-path>");
-        else if(strcmp(arg, "cp")) puts("cp <source-path> <destination-path>");
-        else if(strcmp(arg, "stat")) puts("stat <path>");
-        else if(strcmp(arg, "pwd")) puts("pwd <no-args>");
-        else if(strcmp(arg, "datetime")) puts("datetime <no-args>");
-        else if(strcmp(arg, "beep")) puts("beep <frequency> <duration>");
+        else if(strcmp(arg, "read")) puts("print file content\nread <path>");
+        else if(strcmp(arg, "cd")) puts("change directory\ncd <path>");
+        else if(strcmp(arg, "mkdir")) puts("make a directory\nmkdir <path>");
+        else if(strcmp(arg, "rm")) puts("remove a file or directory\nrm <path>");
+        else if(strcmp(arg, "touch")) puts("make an empty file\ntouch <path>");
+        else if(strcmp(arg, "write")) puts("write to a file\nwrite <path>");
+        else if(strcmp(arg, "mv")) puts("move a file or directory\nmv <source-path> <destination-path>");
+        else if(strcmp(arg, "cp")) puts("copy a file or directory\ncp <source-path> <destination-path>");
+        else if(strcmp(arg, "stat")) puts("print a file or directory stat\nstat <path>");
+        else if(strcmp(arg, "pwd")) puts("print current directory absolute path\npwd <no-args>");
+        else if(strcmp(arg, "datetime")) puts("print current datetime\ndatetime <no-args>");
+        else if(strcmp(arg, "beep")) puts("make a beep\nbeep <frequency> <duration, optional>");
         else if(strcmp(arg, "draw")) {
             puts(
+                "draw stuffs\n"
                 "draw <mode> <args>\n"
                 "available mode:\n"
                 "    line  <arg> = x0 y0 x1 y1 color\n"
@@ -139,6 +143,7 @@ static void help(char* arg) {
                 "    circ  <arg> = x y r color"
             );
         }
+        else if(strcmp(arg, "panic")) puts("causes the kernel to panic\npanic <interrupt no, optional>");
     }
 }
 
@@ -899,6 +904,16 @@ static void draw(char* arg) {
     }
 }
 
+static void panic(char* arg) {
+    char* interrupt_no_str = strtok(arg, " ");
+
+    if(interrupt_no_str) {
+        int interrupt_no = atoi(interrupt_no_str) % 32;
+        asm("int $0" :: "r"(interrupt_no));
+    }
+    else kernel_panic(NULL);
+}
+
 static void process_prompt(char* prompts, unsigned prompts_len) {
     char* prompt = strtok(prompts, ";\n");
     unsigned tot_len = 0;
@@ -928,6 +943,7 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
         else if(strcmp(cmd_name, "datetime")) datetime(remain_arg);
         else if(strcmp(cmd_name, "beep")) beep(remain_arg);
         else if(strcmp(cmd_name, "draw")) draw(remain_arg);
+        else if(strcmp(cmd_name, "panic")) panic(remain_arg);
         else if(prompt_len == 0); // just skip
         else printf("unknow command '%s'\n", prompt);
 

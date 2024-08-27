@@ -123,3 +123,4 @@ Note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.or
 - https://www.intel.com/content/www/us/en/developer/articles/technical/intel-sdm.html
 - https://www.gnu.org/software/grub/manual/multiboot/multiboot.html
 - https://download.microsoft.com/download/1/6/1/161ba512-40e2-4cc9-843a-923143f3456c/fatgen103.doc
+- http://www.skyfree.org/linux/references/ELF_Format.pdf
