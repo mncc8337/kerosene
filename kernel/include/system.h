@@ -88,6 +88,11 @@ void kernel_set_symtabsh_ptr(uint32_t ptr);
 char* kernel_find_symbol(unsigned addr, int type);
 void kernel_panic(stackframe_t* stk);
 
+// tss.c
+void tss_set_stack(uint32_t esp);
+void tss_install(int gate, uint16_t kernel_ss, uint32_t kernel_esp);
+void tss_flush();
+
 // gdt.c
 void gdt_set_gate(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran);
 void gdt_init();
@@ -101,10 +106,3 @@ void irq_install_handler(int irq, void (*handler)(regs_t *r));
 void irq_uninstall_handler(int irq);
 void isr_new_interrupt(int isr, uint8_t flags, void (*handler)(regs_t* r));
 void isr_init();
-
-// tss.c
-void tss_set_stack(uint32_t esp);
-void tss_install(uint16_t kernel_ss, uint16_t kernel_esp);
-
-// usermode.asm
-void enter_usermode();

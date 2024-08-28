@@ -7,12 +7,12 @@ QEMUFLAGS="-m 128M \
           -audiodev pa,id=speaker \
           -machine pcspk-audiodev=speaker \
           -accel tcg,thread=single \
+          -d int \
           -usb"
-          # -d int \
 
 if [ "$1" == "debug" ]; then
     qemu-system-i386 -hda disk.img $QEMUFLAGS -s -S &
-    gdb bin/kerosene.bin \
+    gdb bin/kerosene.elf \
         -ex 'target remote localhost:1234' \
         -ex 'layout src' \
         -ex 'layout reg' \

@@ -60,7 +60,7 @@ endif
 
 .PHONY: all libc libk kernel disk copyfs run run-debug clean clean-all
 
-all: $(BIN) $(BIN)kerosene.bin disk copyfs
+all: $(BIN) $(BIN)kerosene.elf disk copyfs
 
 $(BIN):
 	mkdir $(BIN)
@@ -104,7 +104,7 @@ $(BIN)%.o: kernel/src/mem/%.c
 $(BIN)%.asm.o: kernel/src/system/%.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
-$(BIN)kerosene.bin: $(BIN)kernel_entry.o $(OBJ) $(BIN)libk.a
+$(BIN)kerosene.elf: $(BIN)kernel_entry.o $(OBJ) $(BIN)libk.a
 	# use GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lk
 
@@ -112,14 +112,14 @@ libc: $(BIN)libc.a
 
 libk: $(BIN)libk.a
 
-kernel: $(BIN)kerosene.bin
+kernel: $(BIN)kerosene.elf
 
 disk: kernel
 	./script/gendiskimage.sh 65536
 
 copyfs: disk
 	./script/cpyfile.sh grub.cfg ./mnt/boot/grub/ # update grub config
-	./script/cpyfile.sh bin/kerosene.bin ./mnt/boot/ # update kernel
+	./script/cpyfile.sh bin/kerosene.elf ./mnt/boot/ # update kernel
 	for file in fsfiles/*; do ./script/cpyfile.sh $$file ./mnt/; done
 
 run:

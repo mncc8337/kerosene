@@ -24,14 +24,17 @@ void gdt_init() {
     
     // NULL descriptor
     gdt_set_gate(0, 0, 0, 0, 0);
-    // kernelmode code segment
+    // ring0 code segment
     gdt_set_gate(1, 0, 0xfffff, 0x9a, 0xc);
-    // kernelmode data segment
+    // ring0 data segment
     gdt_set_gate(2, 0, 0xfffff, 0x92, 0xc);
-    // usermode code segment
+    // ring3 code segment
     gdt_set_gate(3, 0, 0xfffff, 0xfa, 0xc);
-    // usermode data segment
+    // ring3 data segment
     gdt_set_gate(4, 0, 0xfffff, 0xf2, 0xc);
+    // TSS
+    tss_install(5, 0x10, 0x0);
 
     gdt_flush();
+    tss_flush();
 }

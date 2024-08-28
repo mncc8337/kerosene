@@ -21,6 +21,8 @@ typedef enum {
     ERR_SHELL_NOT_A_DIR
 } SHELL_ERR;
 
+static bool shell_running = true;
+
 static char input[MAX_INPUT];
 static unsigned input_len = 0;
 
@@ -103,7 +105,7 @@ static void process_prompt(char* prompts, unsigned prompts_len);
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic");
+        puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic exit");
     }
     else {
         arg = strtok(arg, " ");
@@ -144,6 +146,7 @@ static void help(char* arg) {
             );
         }
         else if(strcmp(arg, "panic")) puts("causes the kernel to panic\npanic <interrupt no, optional>");
+        else if(strcmp(arg, "exit")) puts("quit shell and continue to usermode\nexit <no-arg>");
     }
 }
 
@@ -914,6 +917,12 @@ static void panic(char* arg) {
     else kernel_panic(NULL);
 }
 
+static void exit(char* arg) {
+    (void)(arg);
+
+    shell_running = false;
+}
+
 static void process_prompt(char* prompts, unsigned prompts_len) {
     char* prompt = strtok(prompts, ";\n");
     unsigned tot_len = 0;
@@ -944,6 +953,7 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
         else if(strcmp(cmd_name, "beep")) beep(remain_arg);
         else if(strcmp(cmd_name, "draw")) draw(remain_arg);
         else if(strcmp(cmd_name, "panic")) panic(remain_arg);
+        else if(strcmp(cmd_name, "exit")) exit(remain_arg);
         else if(prompt_len == 0); // just skip
         else printf("unknow command '%s'\n", prompt);
 
@@ -953,6 +963,8 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
 }
 
 static void print_prompt() {
+    if(!shell_running) return;
+
     int w, h;
     if(video_using_framebuffer()) video_vesa_get_rowcol(&w, &h);
     else video_get_size(&w, &h);
@@ -974,11 +986,12 @@ void shell_set_root_node(fs_node_t node) {
 }
 void shell_start() {
     puts("welcome to keroshell");
-    puts("type `help` t show all command. `help <command>` to see all available argument");
+    puts("type `help` t show all command. `help <command>` to see all available argument.");
+    puts("type `exit` to quit shell and continue to usermode");
     print_prompt();
 
     key_t current_key;
-    while(true) {
+    while(shell_running) {
         kbd_wait_key(&current_key);
         if(current_key.released) continue;
 

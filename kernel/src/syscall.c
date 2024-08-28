@@ -39,7 +39,5 @@ void syscall_dispatcher(regs_t* regs) {
 }
 
 void syscall_init() {
-     // note that the flag should be 0x60 not 0x8e because im testing in kernel space
-    // TODO: actually goto usermode and call some syscalls
-    isr_new_interrupt(0x80, 0x8e, syscall_dispatcher);
+    isr_new_interrupt(0x80, 0x60, syscall_dispatcher);
 }

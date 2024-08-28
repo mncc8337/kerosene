@@ -223,10 +223,6 @@ void kmain(multiboot_info_t* mbd) {
 
     gdt_init();
     print_debug(LT_OK, "GDT initialised\n");
-    uint32_t esp = 0;
-    asm volatile("mov %%esp, %%eax" : "=a" (esp));
-    tss_install(0x10, esp);
-    print_debug(LT_OK, "TSS installed\n");
     idt_init();
     print_debug(LT_OK, "IDT initialised\n");
     isr_init();
@@ -250,11 +246,37 @@ void kmain(multiboot_info_t* mbd) {
     if(fs) shell_set_root_node(fs->root_node);
     shell_start();
 
-    // i cannot get this to work :(
-    // enter_usermode();
+    // enter usermode
+    asm volatile(
+        "cli;"
+        "mov $0x23, %ax;"
+        "mov %ax, %ds;"
+        "mov %ax, %es;"
+        "mov %ax, %fs;"
+        "mov %ax, %gs;"
 
-    // // test "syscall"
-    // // the privilege is still ring 0, though
+        "mov %esp, %eax;"
+        "pushl $0x23;"
+        "pushl %eax;"
+        "pushf;"
+
+        // FIXME:
+        // uncomment the block of comment below (which will enable interrupt)
+        // will cause a double fault
+
+        // "pop %eax;"
+        // "or $0x200, %eax;"
+        // "push %eax;"
+
+        "pushl $0x1b;"
+        "push $1f;"
+        "iret;"
+        "1:"
+     );
+
+    // FIXME: uncomment the block of comment below will cause a GPF
+    // and then a invalid TSS fault result in double fault
+    // // test syscall
     // asm volatile("xor %eax, %eax; int $0x80"); // SYS_SYSCALL_TEST
     // asm volatile("xor %eax, %eax; inc %eax; int $0x80"); // SYS_PUTCHAR
 
