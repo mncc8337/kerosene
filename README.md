@@ -106,7 +106,6 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [ ] load and run ELF file
 ## Known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
-- enter_usermode() crash after run `iret`: Invalid TSS fired and caused double fault (not handled!)
 - `print_debug` gives gliberrish result if put in many formats
 ## Learning resources
 Note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
