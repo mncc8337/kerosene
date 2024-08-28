@@ -15,6 +15,7 @@ enter_usermode:
     push eax
     pushf
 
+    ; enable interrupt flag
     pop eax
     or eax, 0x200
     push eax

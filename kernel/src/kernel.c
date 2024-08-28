@@ -250,8 +250,8 @@ void kmain(multiboot_info_t* mbd) {
     if(fs) shell_set_root_node(fs->root_node);
     shell_start();
 
-    // // i cannot get this to work :(
-    // // enter_usermode();
+    // i cannot get this to work :(
+    // enter_usermode();
 
     // // test "syscall"
     // // the privilege is still ring 0, though

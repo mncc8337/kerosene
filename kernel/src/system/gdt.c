@@ -9,7 +9,7 @@ void gdt_set_gate(int num, uint32_t base, uint32_t limit, uint8_t access, uint8_
     gdt[num].base_high = (base >> 24) & 0xff;
 
     gdt[num].limit_low = limit & 0xffff;
-    gdt[num].granularity = (limit >> 16) & 0x0f;
+    gdt[num].granularity = (limit >> 16) & 0xf;
 
     gdt[num].granularity |= (gran << 4) & 0xf0;
     gdt[num].access = access;
@@ -20,7 +20,7 @@ extern void gdt_flush();
 void gdt_init() {
     // setup the GDT pointer and limit
     gdtr.limit = sizeof(gdt_entry_t) * GDT_MAX_DESCRIPTORS - 1;
-    gdtr.base = (int)&gdt;
+    gdtr.base = (unsigned)&gdt;
     
     // NULL descriptor
     gdt_set_gate(0, 0, 0, 0, 0);
