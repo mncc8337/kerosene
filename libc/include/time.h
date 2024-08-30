@@ -9,6 +9,9 @@
 #define CLOCKS_PER_SEC 1000
 #endif
 
+#ifndef NULL
+#define NULL ((void *)0)
+#endif
 
 // epochalypse is still 14 years away :)
 typedef int32_t time_t;

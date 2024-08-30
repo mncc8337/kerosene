@@ -7,7 +7,6 @@ QEMUFLAGS="-m 128M \
           -audiodev pa,id=speaker \
           -machine pcspk-audiodev=speaker \
           -accel tcg,thread=single \
-          -d int \
           -usb"
 
 if [ "$1" == "debug" ]; then
@@ -19,5 +18,5 @@ if [ "$1" == "debug" ]; then
         -ex 'break kmain' \
         -ex 'continue'
 else
-    qemu-system-i386 -drive format=raw,file=disk.img $QEMUFLAGS
+    qemu-system-i386 -drive format=raw,file=disk.img $QEMUFLAGS -d int
 fi

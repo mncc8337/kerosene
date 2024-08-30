@@ -11,6 +11,7 @@
 #include "filesystem.h"
 
 #include "stdio.h"
+#include "stdlib.h"
 #include "string.h"
 #include "debug.h"
 
@@ -287,8 +288,42 @@ void kmain(multiboot_info_t* mbd) {
     );
 
     // test syscall
-    asm volatile("mov $0, %eax; int $0x80"); // SYS_SYSCALL_TEST
-    asm volatile("mov $1, %eax; int $0x80"); // SYS_PUTCHAR
+    int ret;
+    SYSCALL_0P(SYSCALL_TEST, ret);
+
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'h');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'o');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'u');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 's');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, '!');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, '\n');
+
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'c');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'u');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'n');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 't');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 't');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'i');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'm');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ':');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
+
+    SYSCALL_0P(SYSCALL_TIME, ret);
+    itoa(ret, freebuff, 10);
+    int i = 0;
+    while(freebuff[i] != '\0')
+        SYSCALL_1P(SYSCALL_PUTCHAR, ret, freebuff[i++]);
 
     while(true);
 }

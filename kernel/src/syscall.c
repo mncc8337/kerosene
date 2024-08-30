@@ -1,23 +1,32 @@
 #include "syscall.h"
 #include "system.h"
 #include "stdio.h"
+#include "time.h"
 
-void sys_syscall_test() {
-    printf("its a system call\n");
+static void syscall_test() {
+    puts("this is a syscall!");
 }
-void sys_putchar() {
-    printf("this is the putchar syscall\n");
+
+static void syscall_putchar(char chr) {
+    putchar(chr);
+}
+
+static unsigned syscall_time() {
+    return time(NULL);
 }
 
 static void* syscalls[MAX_SYSCALL] = {
-    sys_syscall_test,
-    sys_putchar
+    syscall_test,
+    syscall_putchar,
+    syscall_time
 };
 
 static void syscall_dispatcher(regs_t* regs) {
     if(regs->eax >= MAX_SYSCALL) return;
 
     void* fn = syscalls[regs->eax];
+
+    // eax = func(ebx, ecx, edx, esi, edi)
 
     int ret;
     asm volatile (
@@ -26,14 +35,18 @@ static void syscall_dispatcher(regs_t* regs) {
         "push %3;"
         "push %4;"
         "push %5;"
+
         "call *%6;"
+
         "pop %%ebx;"
         "pop %%ebx;"
         "pop %%ebx;"
         "pop %%ebx;"
         "pop %%ebx;"
+
         : "=a" (ret)
-        : "r" (regs->edi), "r" (regs->esi), "r" (regs->edx), "r" (regs->ecx), "r" (regs->ebx), "r" (fn));
+        : "r" (regs->edi), "r" (regs->esi), "r" (regs->edx), "r" (regs->ecx), "r" (regs->ebx), "r" (fn)
+    );
     regs->eax = ret;
 }
 

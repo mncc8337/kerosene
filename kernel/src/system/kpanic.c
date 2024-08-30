@@ -4,7 +4,7 @@
 #include "video.h"
 
 #define MAX_FRAMES 30
-#define NULL 0
+#define NULL ((void *)0)
 
 static char* string_table = 0;
 static elf_section_header_t* symtab_sh = 0;
