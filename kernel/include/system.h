@@ -84,7 +84,7 @@ void io_wait();
 
 // kpanic.c
 void kernel_set_strtab_ptr(uint32_t ptr);
-void kernel_set_symtabsh_ptr(uint32_t ptr);
+void kernel_set_symtab_sh_ptr(uint32_t ptr);
 char* kernel_find_symbol(unsigned addr, int type);
 void kernel_panic(stackframe_t* stk);
 
@@ -99,10 +99,10 @@ void gdt_init();
 
 // idt.c
 void idt_init();
-void idt_set_descriptor(uint8_t vector, void* isr, uint8_t flags);
+void idt_set_descriptor(uint8_t vector, void (*isr)(regs_t*), uint8_t flags);
 
 // isr.c
-void irq_install_handler(int irq, void (*handler)(regs_t *r));
+void irq_install_handler(int irq, void (*handler)(regs_t*));
 void irq_uninstall_handler(int irq);
-void isr_new_interrupt(int isr, uint8_t flags, void (*handler)(regs_t* r));
+void isr_new_interrupt(int isr, void (*handler)(regs_t*), uint8_t flags);
 void isr_init();

@@ -210,15 +210,25 @@ void kmain(multiboot_info_t* mbd) {
     // we gave GRUB an ELF binary so GRUB will not give us the a.out symbol table option (commented above)
     // also only one of the two (a.out option or ELF option) must be existed
     // so we dont need to check the flag
-    multiboot_elf_section_header_table_t elf_sec = mbd->u.elf_sec;
+    multiboot_elf_section_header_table_t* elf_sec = &(mbd->u.elf_sec);
+    elf_section_header_t* shstrtab_sh = (elf_section_header_t*)
+            (elf_sec->addr + VMBASE_KERNEL + elf_sec->shndx * elf_sec->size);
+    char* shstrtab = (char*)(shstrtab_sh->addr + VMBASE_KERNEL);
+
     // find symtab and strtab
-    for(unsigned i = 0; i < elf_sec.num; i++) {
+    for(unsigned i = 0; i < elf_sec->num; i++) {
         elf_section_header_t* sh = (elf_section_header_t*)
-            (elf_sec.addr + VMBASE_KERNEL + i * elf_sec.size);
-        if(sh->type == ELF_SHT_SYMTAB)
-            kernel_set_symtabsh_ptr((uint32_t)sh);
-        else if(i != elf_sec.shndx && sh->type == ELF_SHT_STRTAB)
+            (elf_sec->addr + VMBASE_KERNEL + i * elf_sec->size);
+        char* sec_name = shstrtab + sh->name;
+
+        if(strcmp(sec_name, ".symtab")) {
+            print_debug(LT_IF, "found .symtab section\n");
+            kernel_set_symtab_sh_ptr((uint32_t)sh);
+        }
+        else if(strcmp(sec_name, ".strtab")) {
+            print_debug(LT_IF, "found .strtab section\n");
             kernel_set_strtab_ptr(sh->addr + VMBASE_KERNEL);
+        }
     }
 
     gdt_init();
@@ -246,7 +256,12 @@ void kmain(multiboot_info_t* mbd) {
     if(fs) shell_set_root_node(fs->root_node);
     shell_start();
 
+    puts("entering usermode ...");
+
     // enter usermode
+    uint32_t esp = 0;
+    asm volatile("mov %%esp, %%eax" : "=a" (esp));
+    tss_set_stack(esp);
     asm volatile(
         "cli;"
         "mov $0x23, %ax;"
@@ -260,25 +275,20 @@ void kmain(multiboot_info_t* mbd) {
         "pushl %eax;"
         "pushf;"
 
-        // FIXME:
-        // uncomment the block of comment below (which will enable interrupt)
-        // will cause a double fault
-
-        // "pop %eax;"
-        // "or $0x200, %eax;"
-        // "push %eax;"
+        // enabler IF flag in EFLAGS (which will enable interrupts after `iret`)
+        "pop %eax;"
+        "or $0x200, %eax;"
+        "push %eax;"
 
         "pushl $0x1b;"
         "push $1f;"
         "iret;"
         "1:"
-     );
+    );
 
-    // FIXME: uncomment the block of comment below will cause a GPF
-    // and then a invalid TSS fault result in double fault
-    // // test syscall
-    // asm volatile("xor %eax, %eax; int $0x80"); // SYS_SYSCALL_TEST
-    // asm volatile("xor %eax, %eax; inc %eax; int $0x80"); // SYS_PUTCHAR
+    // test syscall
+    asm volatile("mov $0, %eax; int $0x80"); // SYS_SYSCALL_TEST
+    asm volatile("mov $1, %eax; int $0x80"); // SYS_PUTCHAR
 
     while(true);
 }

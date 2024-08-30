@@ -2,14 +2,12 @@
 
 %macro isr_err_stub 1
 isr_stub_%1:
-    cli
     push %1
     jmp isr_common_stub
 %endmacro
 
 %macro isr_no_err_stub 1
 isr_stub_%1:
-    cli
     push byte 0
     push %1
     jmp isr_common_stub
@@ -67,7 +65,7 @@ isr_no_err_stub 46
 isr_no_err_stub 47
 ; empty stubs from 48 to 256, reserved for future
 %assign i 48
-%rep 208
+%rep (256 - 48)
     isr_no_err_stub i
 %assign i i+1
 %endrep

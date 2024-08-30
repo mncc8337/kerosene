@@ -33,7 +33,7 @@ void gdt_init() {
     // ring3 data segment
     gdt_set_gate(4, 0, 0xfffff, 0xf2, 0xc);
     // TSS
-    tss_install(5, 0x10, 0x0);
+    tss_install(5, 0x10, 0);
 
     gdt_flush();
     tss_flush();

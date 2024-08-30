@@ -145,7 +145,7 @@ static void help(char* arg) {
                 "    circ  <arg> = x y r color"
             );
         }
-        else if(strcmp(arg, "panic")) puts("causes the kernel to panic\npanic <interrupt no, optional>");
+        else if(strcmp(arg, "panic")) puts("causes the kernel to panic\npanic <no-args>");
         else if(strcmp(arg, "exit")) puts("quit shell and continue to usermode\nexit <no-arg>");
     }
 }
@@ -908,13 +908,8 @@ static void draw(char* arg) {
 }
 
 static void panic(char* arg) {
-    char* interrupt_no_str = strtok(arg, " ");
-
-    if(interrupt_no_str) {
-        int interrupt_no = atoi(interrupt_no_str) % 32;
-        asm("int $0" :: "r"(interrupt_no));
-    }
-    else kernel_panic(NULL);
+    (void)(arg);
+   kernel_panic(NULL);
 }
 
 static void exit(char* arg) {

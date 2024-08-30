@@ -113,7 +113,7 @@ void isr_handler(regs_t* reg) {
         pic_send_eoi(reg->int_no - 32);
 }
 
-void irq_install_handler(int irq, void (*handler)(regs_t* r)) {
+void irq_install_handler(int irq, void (*handler)(regs_t*)) {
     if(irq > 15) return;
     routines[irq+32] = handler;
 }
@@ -122,7 +122,7 @@ void irq_uninstall_handler(int irq) {
     routines[irq+32] = 0;
 }
 
-void isr_new_interrupt(int isr, uint8_t flags, void (*handler)(regs_t* r)) {
+void isr_new_interrupt(int isr, void (*handler)(regs_t*), uint8_t flags) {
     idt_set_descriptor(isr, isr_table[isr], flags);
     routines[isr] = handler;
 }
@@ -130,7 +130,7 @@ void isr_new_interrupt(int isr, uint8_t flags, void (*handler)(regs_t* r)) {
 void isr_init() {
     // set exception handler
     for(unsigned char vector = 0; vector < 32; vector++) {
-        idt_set_descriptor(vector, isr_table[vector], 0x8e);
+        idt_set_descriptor(vector, isr_table[vector], 0x8f);
         routines[vector] = exception_handler;
     }
 

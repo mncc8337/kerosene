@@ -2,11 +2,6 @@
 #include "system.h"
 #include "stdio.h"
 
-void* _syscalls[MAX_SYSCALL] = {
-    sys_syscall_test,
-    sys_putchar
-};
-
 void sys_syscall_test() {
     printf("its a system call\n");
 }
@@ -14,12 +9,16 @@ void sys_putchar() {
     printf("this is the putchar syscall\n");
 }
 
-void syscall_dispatcher(regs_t* regs) {
+static void* syscalls[MAX_SYSCALL] = {
+    sys_syscall_test,
+    sys_putchar
+};
+
+static void syscall_dispatcher(regs_t* regs) {
     if(regs->eax >= MAX_SYSCALL) return;
 
-    void* fn = _syscalls[regs->eax];
+    void* fn = syscalls[regs->eax];
 
-    // asm volatile("call *%0" : : "r" (fn));
     int ret;
     asm volatile (
         "push %1;"
@@ -39,5 +38,5 @@ void syscall_dispatcher(regs_t* regs) {
 }
 
 void syscall_init() {
-    isr_new_interrupt(0x80, 0x60, syscall_dispatcher);
+    isr_new_interrupt(0x80, syscall_dispatcher, 0xee);
 }
