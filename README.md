@@ -102,7 +102,12 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [ ] vfs
 ### Userland
 - [x] TSS setup
-- [x] simple kshell
+- [x] enter usermode
+- [ ] syscall
+    - [x] putchar
+    - [x] current time
+    - [ ] read file
+    - [ ] write file
 - [ ] process manager
 - [ ] load and run ELF file
 ## Known bugs
