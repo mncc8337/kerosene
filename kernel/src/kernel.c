@@ -325,5 +325,8 @@ void kmain(multiboot_info_t* mbd) {
     while(freebuff[i] != '\0')
         SYSCALL_1P(SYSCALL_PUTCHAR, ret, freebuff[i++]);
 
+    // hlt instruction should be illegal
+    asm("hlt");
+
     while(true);
 }

@@ -18,5 +18,5 @@ if [ "$1" == "debug" ]; then
         -ex 'break kmain' \
         -ex 'continue'
 else
-    qemu-system-i386 -drive format=raw,file=disk.img $QEMUFLAGS -d int
+    qemu-system-i386 -drive format=raw,file=disk.img $QEMUFLAGS
 fi

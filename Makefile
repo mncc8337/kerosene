@@ -8,10 +8,10 @@ ASM = nasm
 
 BIN = bin/
 
-LIBC_SRC = libc/stdio/*.c \
-		   libc/stdlib/*.c \
-		   libc/string/*.c \
-		   libc/time/*.c \
+LIBC_SRC = libc/src/stdio/*.c \
+		   libc/src/stdlib/*.c \
+		   libc/src/string/*.c \
+		   libc/src/time/*.c \
 
 C_SRC = kernel/src/*.c \
 		kernel/src/misc/*.c \
@@ -25,11 +25,13 @@ C_SRC = kernel/src/*.c \
 
 ASM_SRC = kernel/src/system/*.asm \
 
-_LIBC_OBJ = $(addsuffix .o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
+_LIBC_OBJ = $(addsuffix _libc.o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
+_LIBK_OBJ = $(addsuffix _libk.o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
 _OBJ  = $(addsuffix .o, $(basename $(notdir $(wildcard $(C_SRC)))))
 _OBJ += $(addsuffix .o, $(notdir $(wildcard $(ASM_SRC))))
 
 LIBC_OBJ = $(addprefix $(BIN), $(_LIBC_OBJ))
+LIBK_OBJ = $(addprefix $(BIN), $(_LIBK_OBJ))
 OBJ = $(addprefix $(BIN), $(_OBJ))
 
 DEFINES = -DVMBASE_KERNEL=0xc0000000 \
@@ -60,24 +62,38 @@ endif
 
 .PHONY: all libc libk kernel disk copyfs run run-debug clean clean-all
 
-all: $(BIN) $(BIN)kerosene.elf disk copyfs
+all: $(BIN) $(BIN)kerosene.elf libk libc disk copyfs
 
 $(BIN):
 	mkdir $(BIN)
 
-$(BIN)%.o: libc/stdio/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-$(BIN)%.o: libc/stdlib/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-$(BIN)%.o: libc/string/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-$(BIN)%.o: libc/time/%.c
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-$(BIN)libk.a: $(LIBC_OBJ)
+# libk
+$(BIN)%_libk.o: libc/src/stdio/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $< -D__is_libk
+$(BIN)%_libk.o: libc/src/stdlib/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $< -D__is_libk
+$(BIN)%_libk.o: libc/src/string/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $< -D__is_libk
+$(BIN)%_libk.o: libc/src/time/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $< -D__is_libk
+$(BIN)libk.a: $(LIBK_OBJ)
 	$(AR) rcs $@ $^
 	@echo done building libk
+
+# libc
+$(BIN)%_libc.o: libc/src/stdio/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)%_libc.o: libc/src/stdlib/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)%_libc.o: libc/src/string/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)%_libc.o: libc/src/time/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)libc.a: $(LIBC_OBJ)
-	@echo libc is not ready for build, yet
+	$(AR) rcs $@ $^
+	@echo done building libc
+
+# kernel
 
 $(BIN)kernel_entry.o: kernel/src/kernel_entry.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<

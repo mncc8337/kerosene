@@ -1,12 +1,15 @@
 #include "stdlib.h"
 #include "stdio.h"
 
+#if defined(__is_libk)
+#include "system.h"
+#endif
+
 __attribute__((__noreturn__))
 void abort(void) {
 #if defined(__is_libk)
-    // TODO: add proper kernel panic
-    printf("kernel: panic: abort()\n");
-    asm volatile("hlt");
+    puts("kernel: abort()");
+    kernel_panic(0);
 #else
     // TODO: abnormally terminate the process as if by SIGABRT
     printf("abort()\n");

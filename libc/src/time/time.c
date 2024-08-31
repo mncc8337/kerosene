@@ -3,6 +3,8 @@
 
 #if defined(__is_libk)
 #include "timer.h"
+#else
+#include "syscall.h"
 #endif
 
 // TODO: fix this :(
@@ -12,7 +14,7 @@ time_t time(time_t* timer) {
 #if defined(__is_libk)
     curr_time = timer_get_current_time();
 #else
-    // TODO: implement libc time syscall
+    SYSCALL_0P(SYSCALL_TIME, curr_time);
 #endif
 
     if(timer != NULL)
