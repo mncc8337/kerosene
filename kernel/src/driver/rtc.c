@@ -1,5 +1,6 @@
 #include "rtc.h"
 #include "system.h"
+#include "locale.h"
 
 static bool is_update_in_progress() {
     port_outb(PORT_RTC_SELECT_REG, RTC_REG_A);
@@ -103,6 +104,8 @@ struct tm rtc_get_current_time() {
 
     // ok until next century comes :)
     curr_time.tm_year += 2000;
+
+    locale_map_timezone(&curr_time);
 
     return curr_time;
 }

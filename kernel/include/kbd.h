@@ -124,21 +124,15 @@
 #define KEYCODE_DOWN  ((7 << 4) | 2)
 #define KEYCODE_RIGHT ((7 << 4) | 3)
 
+#define KEYCODE(group, column) (((group) << 4) | (column))
+
 typedef struct {
     uint8_t keycode;
     uint8_t mapped;
     bool released;
 } key_t;
 
-enum KEYBOARD_LAYOUT {
-    KBL_US
-};
-
 void kbd_wait_key(key_t* key);
-
-uint8_t kbd_get_keycode(uint8_t group, uint8_t no);
-uint8_t kbd_key_shift_map(uint8_t keycode, unsigned layout);
-uint8_t kbd_key_map(uint8_t keycode, unsigned layout);
 
 bool kbd_is_key_pressed(uint8_t keycode);
 

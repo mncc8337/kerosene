@@ -9,6 +9,7 @@
 #include "kbd.h"
 #include "timer.h"
 #include "filesystem.h"
+#include "locale.h"
 
 #include "stdio.h"
 #include "stdlib.h"
@@ -243,6 +244,9 @@ void kmain(multiboot_info_t* mbd) {
 
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
+
+    locale_set_keyboard_layout(KBD_LAYOUT_US);
+    print_debug(LT_IF, "set keyboard layout to US\n");
 
     kbd_init();
 
