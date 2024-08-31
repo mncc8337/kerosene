@@ -1,7 +1,5 @@
 #pragma once
 
-#include "data_structure/ordered_array.h"
-
 #include "stdint.h"
 #include "stddef.h"
 #include "stdbool.h"
@@ -53,15 +51,6 @@ typedef struct {
     pde_t entry[1024] __attribute__((aligned(4096)));
 } __attribute__((packed)) page_directory_t;
 
-typedef struct {
-    ordered_array_t array;
-    virtual_addr_t start_address;
-    virtual_addr_t end_address;
-    virtual_addr_t max_address;
-    bool supervisor;
-    bool readonly;
-} heap_t;
-
 // pmmngr.c
 void pmmngr_update_usage();
 size_t pmmngr_get_size();
@@ -86,8 +75,3 @@ MEM_ERR vmmngr_switch_pdirectory(page_directory_t* dir);
 void vmmngr_load_page_directory(physical_addr_t addr);
 void vmmngr_flush_tlb_entry(virtual_addr_t addr);
 MEM_ERR vmmngr_init();
-
-// heap.c
-void* heap_malloc(heap_t* heap, size_t byte);
-void heap_free(heap_t* heap, void* ptr);
-heap_t* heap_create(virtual_addr_t start, virtual_addr_t end, size_t size, bool supervisor, bool readonly);
