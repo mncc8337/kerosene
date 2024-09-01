@@ -8,7 +8,8 @@ This is an attempt of me to learn about osdev
 - basic VESA driver (i think)
 ## Build and run
 ### Prerequisite
-- A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors. if you are lazy to install one, use `make all NO_CROSS_COMPILER=1` to compile using linux GCC (please do not report any errors if you use this option)
+- A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors.
+    + if you are lazy to install one, use `make all NO_CROSS_COMPILER=1` to compile using linux GCC (please do not report any errors if you use this option)
     + if you use a cross compiler then please check and correct the `CROSS_COMPILER_LOC` in the second line of `Makefile`
 - nasm
 - dosfstools
