@@ -3,6 +3,12 @@
 #include "ps2.h"
 #include "locale.h"
 
+#define KBD_EXTENDED_BYTE 0xe0
+
+#define KBD_PRINTSCREEN_PRESSED_SCANCODE_2ND 0x2a
+#define KBD_PRINTSCREEN_RELEASED_SCANCODE_2ND 0xb7
+#define KBD_PAUSE_SCANCODE_1ST 0xe1
+
 static uint8_t keycode[] = {
     0, // nothing
     // escape
@@ -108,7 +114,6 @@ static uint8_t keycode[] = {
     (0 << 4) + 11,
     (0 << 4) + 12
 };
-
 static uint8_t keycode_extended_byte[] = {
     // null
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -219,13 +224,43 @@ static bool numlock_on = false;
 static key_t current_key;
 static void (*key_listener)(key_t) = 0;
 
+static void set_scancode_set() {
+    unsigned tries = 0;
+
+try_again:
+    if(tries == 3) return;
+
+    // make sure to use scancode set 1
+    ps2_wait_for_writing_data();
+    ps2_write_data(KBD_SCANCODE_SET);
+    ps2_wait_for_writing_data();
+    // NOTE:
+    // the osdev wiki said that
+    // 1 is for scancode set 1 and 2 is for scancode set 2
+    // but for some reason if i use 1 then the controller send scancode set 2
+    // and if i use 2 the controller send scancode set 1
+    // maybe it was sone translation stuff
+    ps2_write_data(2);
+    // wait for respond (ACK or RESEND)
+    uint8_t respond = 0;
+    while(respond != KBD_ACK && respond != KBD_RESEND) {
+        ps2_wait_for_reading_data();
+        respond = ps2_read_data();
+    }
+
+    // if we received RESEND then the previous command has failed
+    if(respond == KBD_RESEND) {
+        tries++;
+        goto try_again;
+    }
+}
+
 // predefined it here to be used in trash interrupt handler
 static void kbd_handler(regs_t* r);
 
 static uint8_t interrupt_progress_cnt = 0;
 static uint8_t interrupt_loop_cnt = 0;
 static void kbd_trash_int_handler() {
-    ps2_wait_for_reading_data();
     ps2_read_data();
     interrupt_progress_cnt++;
     // loop for sometime to discard useless interrupts
@@ -241,16 +276,17 @@ static bool extended_byte = false;
 static void kbd_handler(regs_t* r) {
     (void)(r); // avoid unused arg
 
-    ps2_wait_for_reading_data();
+    // data must be ready at this point
+    // so no need for waiting
     uint8_t scancode = ps2_read_data();
 
-    if(scancode == EXTENDED_BYTE) {
+    if(scancode == KBD_EXTENDED_BYTE) {
         // turn on the flag 
         extended_byte = true;
         // skip
         return;
     }
-    else if(scancode == PAUSE_SCANCODE_1ST) {
+    else if(scancode == KBD_PAUSE_SCANCODE_1ST) {
         interrupt_loop_cnt = 5;
         irq_install_handler(1, kbd_trash_int_handler);
 
@@ -261,14 +297,15 @@ static void kbd_handler(regs_t* r) {
     }
 
     if(extended_byte &&
-       (scancode == PRINTSCREEN_PRESSED_SCANCODE_2ND || scancode == PRINTSCREEN_RELEASED_SCANCODE_2ND)) {
-        key_pressed[0x6e] = (scancode == PRINTSCREEN_PRESSED_SCANCODE_2ND);
+            (scancode == KBD_PRINTSCREEN_PRESSED_SCANCODE_2ND
+            || scancode == KBD_PRINTSCREEN_RELEASED_SCANCODE_2ND)) {
+        key_pressed[0x6e] = (scancode == KBD_PRINTSCREEN_PRESSED_SCANCODE_2ND);
         interrupt_loop_cnt = 2;
         irq_install_handler(1, kbd_trash_int_handler);
 
         current_key.keycode = keycode_extended_byte[0x6e];
         current_key.mapped = 0;
-        current_key.released = (scancode == PRINTSCREEN_RELEASED_SCANCODE_2ND);
+        current_key.released = (scancode == KBD_PRINTSCREEN_RELEASED_SCANCODE_2ND);
         goto call_key_listener;
     }
 
@@ -281,17 +318,26 @@ static void kbd_handler(regs_t* r) {
    
     // pause do not interrupt when released
     // so it is a bad idea to set it to pressed forever
-    if(kcode != KEYCODE_PAUSE) key_pressed[kcode] = !released;
+    if(kcode != KBD_KEYCODE_PAUSE) key_pressed[kcode] = !released;
 
-    if(kcode == KEYCODE_CAPSLOCK && !released)
+    bool led_changed = false;
+    if(kcode == KBD_KEYCODE_CAPSLOCK && !released) {
         capslock_on = !capslock_on;
-    if(kcode == KEYCODE_SCROLLLOCK && !released)
+        led_changed = true;
+    }
+    if(kcode == KBD_KEYCODE_SCROLLLOCK && !released) {
         scrolllock_on = !scrolllock_on;
-    // if(kcode == KEYCODE_NUMLOCK && !released)
+        led_changed = true;
+    }
+    // if(kcode == KEYCODE_NUMLOCK && !released) {
     //     numlock_on = !numlock_on;
+    //     led_changed = true;
+    // }
+    if(led_changed)
+        kbd_set_led(scrolllock_on, numlock_on, capslock_on);
 
     char mapped = locale_map_key(kcode, false);
-    if(key_pressed[KEYCODE_LSHIFT] || key_pressed[KEYCODE_RSHIFT]) {
+    if(key_pressed[KBD_KEYCODE_LSHIFT] || key_pressed[KBD_KEYCODE_RSHIFT]) {
         if(mapped < 0x61 || mapped > 0x7a)
             mapped = locale_map_key(kcode, true);
         else if(!capslock_on) mapped = locale_map_key(kcode, true);
@@ -299,8 +345,8 @@ static void kbd_handler(regs_t* r) {
     // convert to uppercase if only capslock is on
     if(capslock_on && mapped >= 0x61
             && mapped <= 0x7a
-            && !key_pressed[KEYCODE_LSHIFT]
-            && !key_pressed[KEYCODE_RSHIFT])
+            && !key_pressed[KBD_KEYCODE_LSHIFT]
+            && !key_pressed[KBD_KEYCODE_RSHIFT])
         mapped -= 32;
 
     current_key.keycode = kcode;
@@ -313,6 +359,36 @@ call_key_listener:
 
     // reset extended_byte status
     extended_byte = false;
+}
+
+// set keyboard LED indicators
+void kbd_set_led(bool scroll, bool num, bool caps) {
+    uint8_t bits = scroll | (num << 1) | (caps << 2);
+    unsigned tries = 0;
+
+try_again:
+    if(tries == 3) return; // give up after 3 tries
+
+    // send command byte
+    ps2_wait_for_writing_data();
+    ps2_write_data(KBD_LED);
+
+    // send data byte
+    ps2_wait_for_writing_data();
+    ps2_write_data(bits);
+
+    // wait for ACK or RESEND
+    uint8_t respond = 0;
+    while(respond != KBD_ACK && respond != KBD_RESEND) {
+        ps2_wait_for_reading_data();
+        respond = ps2_read_data();
+    }
+
+    // if we received RESEND then the previous command has failed
+    if(respond == KBD_RESEND) {
+        tries++;
+        goto try_again;
+    }
 }
 
 // wait until key event occure
@@ -342,5 +418,16 @@ void kbd_uninstall_key_listener() {
 }
 
 void kbd_init() {
+    // make sure data port is empty
+    ps2_read_data();
+
+    // TODO: detect where is the PS/2 keyboard port located (first port or second port)
+    // the code below assumes that keyboard is in the 1st port
+
+    // ensure that the current scancode set is 1
+    set_scancode_set();
+    // initial LED state
+    kbd_set_led(0, 0, 0);
+
     irq_install_handler(1, kbd_handler);
 }

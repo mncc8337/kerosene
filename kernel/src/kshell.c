@@ -483,7 +483,7 @@ static void write(char* path) {
     puts("writing mode. press ESC to exit");
 
     key_t current_key; current_key.keycode = 1;
-    while(current_key.keycode != KEYCODE_ESC) {
+    while(current_key.keycode != KBD_KEYCODE_ESC) {
         kbd_wait_key(&current_key);
         if(current_key.released) continue;
 
@@ -990,7 +990,7 @@ void shell_start() {
         kbd_wait_key(&current_key);
         if(current_key.released) continue;
 
-        if(current_key.keycode == KEYCODE_UP) {
+        if(current_key.keycode == KBD_KEYCODE_UP) {
             int currpos = video_get_cursor();
             for(int i = 0; i <= (signed)input_len; i++) {
                 video_set_cursor(currpos - i);

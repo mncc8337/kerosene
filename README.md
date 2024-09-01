@@ -1,11 +1,11 @@
 # Kerosene
 A hobby x86 OS written in C  
 This is an attempt of me to learn about osdev  
-It's a working-in-progress project and should not be used as references for osdev  
 ## Features
-- It can print text! (with colors!)
-- A proper keyboard driver (which lacks of LED indicating, shortcuts support lol)
-- FAT32 filesystem support (finally a serious feature hehe)
+- PS/2 keyboard driver
+- ATA PIO mode
+- FAT32 filesystem support
+- basic VESA driver (i think)
 ## Build and run
 ### Prerequisite
 - A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors. if you are lazy to install one, use `make all NO_CROSS_COMPILER=1` to compile using linux GCC (please do not report any errors if you use this option)
@@ -61,10 +61,10 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [x] support multiboot
 - [x] higher half kernel
 ### Hardware drivers
-- [ ] keyboard driver
+- [ ] PS/2 keyboard driver
     + [x] get key scancode
     + [x] translate scancode to keycode
-    + [ ] LED indicating
+    + [x] LED indicating
 - [x] PIT
     - [x] generate ticks
     - [x] PC speaker (beep beep boop boop)
@@ -78,7 +78,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [ ] APCI
 - [ ] APIC
 - [ ] HPET
-- [ ] PS2 mouse driver
+- [ ] PS/2 mouse driver
 - [x] VESA
     - [x] plot pixel
     - [x] render psf fonts

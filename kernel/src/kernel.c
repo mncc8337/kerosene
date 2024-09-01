@@ -249,8 +249,10 @@ void kmain(multiboot_info_t* mbd) {
     print_debug(LT_IF, "set keyboard layout to US\n");
 
     kbd_init();
+    print_debug(LT_OK, "keyboard initialised\n");
 
     timer_init();
+    print_debug(LT_OK, "timer initialised\n");
 
     // start interrupts again after setting up everything
     asm volatile("sti");
