@@ -1,6 +1,12 @@
 #include "mem.h"
+#include <stdint.h>
 
 // simple heap implementation
+// both alloc and free are O(n)
+// and is prone to fragmentation
+// (lmao it's really bad)
+
+#define MIN_REGION_SIZE 4
 
 heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags) {
     // map heap
@@ -43,7 +49,6 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
         next_header:
         header = HEAP_NEXT_HEADER(header);
     }
-
     if((uint32_t)header >= heap->end) {
         // TODO: request more memory
         return 0;
@@ -54,7 +59,7 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
 
     size_t spare_bytes = header->size - size - sizeof(heap_header_t);
     // only split into 2 regions if the remain size is sufficient
-    if(spare_bytes >= 4) {
+    if(spare_bytes >= MIN_REGION_SIZE) {
         heap_header_t* new_header =
             (heap_header_t*)((void*)header + sizeof(heap_header_t) + spare_bytes);
         new_header->magic = HEAP_USED;
@@ -75,5 +80,25 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
 }
 
 void heap_free(heap_t* heap, void* addr) {
-    ;
+    heap_header_t* header = (heap_header_t*)heap->start;
+    heap_header_t* prevh = 0;
+
+    while((uint32_t)header < heap->end) {
+        if(addr > (void*)header && addr < (void*)header + sizeof(heap_header_t) + header->size)
+            break;
+        prevh = header;
+        header = HEAP_NEXT_HEADER(header);
+    }
+    if((uint32_t)header >= heap->end) return;
+
+    header->magic = HEAP_FREE;
+
+    // merge with next region
+    heap_header_t* nexth = HEAP_NEXT_HEADER(header);
+    if((uint32_t)nexth < heap->end && nexth->magic == HEAP_FREE)
+        header->size += nexth->size + sizeof(heap_header_t);
+
+    // merge with previous region
+    if(prevh != 0 && prevh->magic == HEAP_FREE)
+        prevh->size += header->size + sizeof(heap_header_t);
 }

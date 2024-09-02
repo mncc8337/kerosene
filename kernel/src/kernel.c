@@ -177,6 +177,17 @@ void disk_init() {
     }
 }
 
+void print_kheap() {
+    puts("heap info:");
+    heap_header_t* hheader = (heap_header_t*)kheap->start;
+    while((uint32_t)hheader < kheap->end) {
+        printf("0x%x, 0x%x, %s\n", (uint32_t)hheader + sizeof(heap_header_t), (uint32_t)hheader->size,
+               hheader->magic == HEAP_FREE ? "free" : "used");
+        hheader = HEAP_NEXT_HEADER(hheader);
+    }
+
+}
+
 extern char kernel_start;
 extern char kernel_end;
 void kmain(multiboot_info_t* mbd) {
@@ -282,13 +293,23 @@ void kmain(multiboot_info_t* mbd) {
     uint32_t* ptr5 = heap_alloc(kheap, 4*100, false);
     printf("NO ALIGNED: allocate ptr5 4*100 bytes: 0x%x\n", ptr5);
 
-    puts("heap info:");
-    heap_header_t* hheader = (heap_header_t*)kheap->start;
-    while((uint32_t)hheader < kheap->end) {
-        printf("0x%x, 0x%x, %s\n", (uint32_t)hheader + sizeof(heap_header_t), (uint32_t)hheader->size,
-               hheader->magic == HEAP_FREE ? "free" : "used");
-        hheader = HEAP_NEXT_HEADER(hheader);
-    }
+    print_kheap();
+
+    heap_free(kheap, ptr1);
+    puts("freed ptr1");
+    print_kheap();
+    heap_free(kheap, ptr4);
+    puts("freed ptr4");
+    print_kheap();
+    heap_free(kheap, ptr3);
+    puts("freed ptr3");
+    print_kheap();
+    heap_free(kheap, ptr2);
+    puts("freed ptr2");
+    print_kheap();
+    heap_free(kheap, ptr5);
+    puts("freed ptr5");
+    print_kheap();
 
     // only set if fs is available
     if(fs) shell_set_root_node(fs->root_node);

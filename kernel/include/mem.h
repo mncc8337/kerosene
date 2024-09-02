@@ -100,3 +100,4 @@ MEM_ERR vmmngr_init();
 // heap.c
 heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags);
 void* heap_alloc(heap_t* heap, size_t size, bool page_align);
+void heap_free(heap_t* heap, void* addr);
