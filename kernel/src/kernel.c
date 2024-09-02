@@ -181,8 +181,9 @@ void print_kheap() {
     puts("heap info:");
     heap_header_t* hheader = (heap_header_t*)kheap->start;
     while((uint32_t)hheader < kheap->end) {
-        printf("0x%x, 0x%x, %s\n", (uint32_t)hheader + sizeof(heap_header_t), (uint32_t)hheader->size,
-               hheader->magic == HEAP_FREE ? "free" : "used");
+        printf("0x%x, 0x%x, %s, prev: 0x%x\n", (uint32_t)hheader + sizeof(heap_header_t), (uint32_t)hheader->size,
+               hheader->magic == HEAP_FREE ? "free" : "used",
+               hheader->prev);
         hheader = HEAP_NEXT_HEADER(hheader);
     }
 

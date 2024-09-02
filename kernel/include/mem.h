@@ -69,6 +69,7 @@ typedef struct {
 typedef struct heap_header {
     uint32_t magic;
     uint32_t size;
+    struct heap_header* prev;
     // uint32_t caller;
 } __attribute__((packed)) heap_header_t;
 

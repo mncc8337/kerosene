@@ -1,10 +1,9 @@
 #include "mem.h"
-#include <stdint.h>
 
-// simple heap implementation
-// both alloc and free are O(n)
-// and is prone to fragmentation
-// (lmao it's really bad)
+// heap implementation using first-fit algorithm
+// allocating complexity is O(n)
+// freeing complexity is O(1)
+// very prone to fragmentation
 
 #define MIN_REGION_SIZE 4
 
@@ -27,6 +26,7 @@ heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags) 
     heap_header_t* header = (heap_header_t*)heap->start;
     header->magic = HEAP_FREE;
     header->size = heap->end - heap->start - sizeof(heap_header_t);
+    header->prev = NULL;
 
     return heap;
 }
@@ -64,13 +64,16 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
             (heap_header_t*)((void*)header + sizeof(heap_header_t) + spare_bytes);
         new_header->magic = HEAP_USED;
         new_header->size = size;
+        new_header->prev = header;
+        // update next header
+        heap_header_t* n = HEAP_NEXT_HEADER(new_header);
+        if((uint32_t)n < heap->end) n->prev = new_header;
 
+        // set new size
         header->size = spare_bytes;
 
-        // swap
-        heap_header_t* t = header;
+        // set current header
         header = new_header;
-        new_header = t;
     }
     else header->magic = HEAP_USED;
 
@@ -80,25 +83,31 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
 }
 
 void heap_free(heap_t* heap, void* addr) {
-    heap_header_t* header = (heap_header_t*)heap->start;
-    heap_header_t* prevh = 0;
+    // the header is always behind the addr so this should works
+    heap_header_t* header = (heap_header_t*)(addr - sizeof(heap_header_t));
+    // if the magic does not match or it is not in use then skip
+    if(header->magic != HEAP_USED) return;
 
-    while((uint32_t)header < heap->end) {
-        if(addr > (void*)header && addr < (void*)header + sizeof(heap_header_t) + header->size)
-            break;
-        prevh = header;
-        header = HEAP_NEXT_HEADER(header);
-    }
-    if((uint32_t)header >= heap->end) return;
+    heap_header_t* prevh = header->prev;
+    heap_header_t* nexth = HEAP_NEXT_HEADER(header);
 
     header->magic = HEAP_FREE;
 
     // merge with next region
-    heap_header_t* nexth = HEAP_NEXT_HEADER(header);
-    if((uint32_t)nexth < heap->end && nexth->magic == HEAP_FREE)
+    if((uint32_t)nexth < heap->end && nexth->magic == HEAP_FREE) {
         header->size += nexth->size + sizeof(heap_header_t);
 
+        // update next header
+        heap_header_t* n = HEAP_NEXT_HEADER(header);
+        if((uint32_t)n < heap->end) n->prev = header;
+    }
+
     // merge with previous region
-    if(prevh != 0 && prevh->magic == HEAP_FREE)
+    if(prevh && prevh->magic == HEAP_FREE) {
         prevh->size += header->size + sizeof(heap_header_t);
+
+        // update next header
+        heap_header_t* n = HEAP_NEXT_HEADER(prevh);
+        if((uint32_t)n < heap->end) n->prev = prevh;
+    }
 }
