@@ -72,13 +72,6 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
 
     MEM_ERR err = vmmngr_init();
     if(err != ERR_MEM_SUCCESS) kernel_panic(NULL);
-
-    kheap = heap_new(
-        KHEAP_START,
-        KHEAP_INITAL_SIZE,
-        KHEAP_MAX_SIZE,
-        HEAP_SUPERVISOR
-    );
 }
 
 void video_init(multiboot_info_t* mbd) {
@@ -181,9 +174,10 @@ void print_kheap() {
     puts("heap info:");
     heap_header_t* hheader = (heap_header_t*)kheap->start;
     while((uint32_t)hheader < kheap->end) {
-        printf("0x%x, 0x%x, %s, prev: 0x%x\n", (uint32_t)hheader + sizeof(heap_header_t), (uint32_t)hheader->size,
-               hheader->magic == HEAP_FREE ? "free" : "used",
-               hheader->prev);
+        printf("0x%x, 0x%x, 0x%x, 0x%x, %s\n",
+               hheader, (uint32_t)hheader + sizeof(heap_header_t), (uint32_t)hheader->size,
+               hheader->prev,
+               hheader->magic == HEAP_FREE ? "free" : "used");
         hheader = HEAP_NEXT_HEADER(hheader);
     }
 
@@ -218,6 +212,18 @@ void kmain(multiboot_info_t* mbd) {
     mem_init((void*)mbd->mmap_addr + VMBASE_KERNEL, mbd->mmap_length);
 
     video_init(mbd);
+
+    kheap = heap_new(
+        KHEAP_START,
+        KHEAP_INITAL_SIZE,
+        KHEAP_MAX_SIZE,
+        HEAP_SUPERVISOR
+    );
+    if(!kheap) {
+        print_debug(LT_ER, "failed to initialise kernel heap. not enough memory\n");
+        kernel_panic(NULL);
+    }
+    print_debug(LT_OK, "initialised kernel heap\n");
 
     if(mbd->flags & MULTIBOOT_INFO_BOOT_LOADER_NAME)
         print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + VMBASE_KERNEL);
@@ -279,18 +285,16 @@ void kmain(multiboot_info_t* mbd) {
 
     print_debug(LT_IF, "done initialising\n");
 
+    print_kheap();
+
     uint32_t* ptr1 = heap_alloc(kheap, 4, false);
     printf("NO ALIGNED: allocate ptr1 4 bytes: 0x%x\n", ptr1);
-
     uint32_t* ptr2 = heap_alloc(kheap, 4, false);
     printf("NO ALIGNED: allocate ptr2 4 bytes: 0x%x\n", ptr2);
-
     uint32_t* ptr3 = heap_alloc(kheap, 4, true);
     printf("ALIGNED   : allocate ptr3 4 bytes: 0x%x\n", ptr3);
-
     uint32_t* ptr4 = heap_alloc(kheap, 4*100, true);
     printf("ALIGNED   : allocate ptr4 4*100 bytes: 0x%x\n", ptr4);
-
     uint32_t* ptr5 = heap_alloc(kheap, 4*100, false);
     printf("NO ALIGNED: allocate ptr5 4*100 bytes: 0x%x\n", ptr5);
 
@@ -298,18 +302,39 @@ void kmain(multiboot_info_t* mbd) {
 
     heap_free(kheap, ptr1);
     puts("freed ptr1");
-    print_kheap();
     heap_free(kheap, ptr4);
     puts("freed ptr4");
-    print_kheap();
     heap_free(kheap, ptr3);
     puts("freed ptr3");
-    print_kheap();
     heap_free(kheap, ptr2);
     puts("freed ptr2");
-    print_kheap();
     heap_free(kheap, ptr5);
     puts("freed ptr5");
+    
+    heap_header_t* last_header = (heap_header_t*)kheap->start;
+    while(true) {
+        heap_header_t* test = HEAP_NEXT_HEADER(last_header);
+        if((uint32_t)test >= kheap->end) break;
+        last_header = test;
+    }
+    bool heap_exp_res = heap_expand(kheap, 5, last_header);
+    if(heap_exp_res) puts("kheap expanded by 5 pages");
+    else puts("failed to expand kheap");
+
+    print_kheap();
+
+    ptr1 = heap_alloc(kheap, 1024 * 1024, false);
+    printf("NO ALIGNED: allocate ptr1 1 MB: 0x%x\n", ptr1);
+    ptr2 = heap_alloc(kheap, 1024 * 3, true);
+    printf("ALIGNED   : allocate ptr2 4 KB: 0x%x\n", ptr2);
+
+    print_kheap();
+
+    heap_free(kheap, ptr1);
+    puts("freed ptr1");
+    heap_free(kheap, ptr2);
+    puts("freed ptr2");
+
     print_kheap();
 
     // only set if fs is available

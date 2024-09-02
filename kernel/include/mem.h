@@ -63,6 +63,7 @@ typedef struct {
     uint32_t start;
     uint32_t end;
     uint32_t max_addr;
+    uint32_t min_size;
     uint8_t flags;
 } heap_t;
 
@@ -100,5 +101,7 @@ MEM_ERR vmmngr_init();
 
 // heap.c
 heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags);
+bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header);
+bool heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header);
 void* heap_alloc(heap_t* heap, size_t size, bool page_align);
 void heap_free(heap_t* heap, void* addr);
