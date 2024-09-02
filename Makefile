@@ -37,8 +37,9 @@ OBJ = $(addprefix $(BIN), $(_OBJ))
 DEFINES = -DVMBASE_KERNEL=0xc0000000 \
 		  -DVMBASE_VIDEO=0xcd000000 \
 		  -DTIMER_FREQUENCY=1000 \
-		  -DMMNGR_KHEAP_START=0xc0000000 \
+		  -DMMNGR_KHEAP_START=0xcf000000 \
 		  -DMMNGR_KHEAP_INITAL_SIZE=0x100000 \
+		  -DMMNGR_KHEAP_MAX_SIZE=0x1000000 \
 		  -D__is_libk \
 
 C_INCLUDES = -I./kernel/src -I./kernel/include -I./libc/include

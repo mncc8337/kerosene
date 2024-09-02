@@ -10,7 +10,6 @@ typedef enum {
     ERR_MEM_INVALID_DIR,
 } MEM_ERR;
 
-#define MMNGR_BLOCK_SIZE 4096
 #define MMNGR_PAGE_SIZE 4096
 
 typedef uint32_t pde_t;
@@ -47,9 +46,31 @@ typedef uint32_t virtual_addr_t;
 typedef struct {
     pte_t entry[1024] __attribute__((aligned(4096)));
 } __attribute__((packed)) page_table_t;
+
 typedef struct {
     pde_t entry[1024] __attribute__((aligned(4096)));
 } __attribute__((packed)) page_directory_t;
+
+#define HEAP_SUPERVISOR 0b01
+#define HEAP_READONLY   0b10
+
+#define HEAP_FREE 0x7ea9f2ee
+#define HEAP_USED 0x7ea942ed
+
+#define HEAP_NEXT_HEADER(header) (heap_header_t*)((void*)(header) + sizeof(heap_header_t) + header->size)
+
+typedef struct {
+    uint32_t start;
+    uint32_t end;
+    uint32_t max_addr;
+    uint8_t flags;
+} heap_t;
+
+typedef struct heap_header {
+    uint32_t magic;
+    uint32_t size;
+    // uint32_t caller;
+} __attribute__((packed)) heap_header_t;
 
 // pmmngr.c
 void pmmngr_update_usage();
@@ -75,3 +96,7 @@ MEM_ERR vmmngr_switch_pdirectory(page_directory_t* dir);
 void vmmngr_load_page_directory(physical_addr_t addr);
 void vmmngr_flush_tlb_entry(virtual_addr_t addr);
 MEM_ERR vmmngr_init();
+
+// heap.c
+heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags);
+void* heap_alloc(heap_t* heap, size_t size, bool page_align);

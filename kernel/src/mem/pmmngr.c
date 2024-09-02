@@ -65,18 +65,18 @@ void pmmngr_update_usage() {
     if(used_block > total_block) used_block = total_block;
 }
 size_t pmmngr_get_size() {
-    return total_block * MMNGR_BLOCK_SIZE;
+    return total_block * MMNGR_PAGE_SIZE;
 }
 size_t pmmngr_get_used_size() {
-    return used_block * MMNGR_BLOCK_SIZE;
+    return used_block * MMNGR_PAGE_SIZE;
 }
 size_t pmmngr_get_free_size() {
-    return (total_block - used_block) * MMNGR_BLOCK_SIZE;
+    return (total_block - used_block) * MMNGR_PAGE_SIZE;
 }
 
 void pmmngr_init_region(physical_addr_t base, size_t size) {
-    int start = base / MMNGR_BLOCK_SIZE;
-    int block = size / MMNGR_BLOCK_SIZE;
+    int start = base / MMNGR_PAGE_SIZE;
+    int block = size / MMNGR_PAGE_SIZE;
 
     for (; block > 0; block--)
         unset_bit(start++);
@@ -85,8 +85,8 @@ void pmmngr_init_region(physical_addr_t base, size_t size) {
 }
 
 void pmmngr_deinit_region(physical_addr_t base, size_t size) {
-    int start = base / MMNGR_BLOCK_SIZE;
-    int block = size / MMNGR_BLOCK_SIZE;
+    int start = base / MMNGR_PAGE_SIZE;
+    int block = size / MMNGR_PAGE_SIZE;
 
     for (;block > 0; block--)
         set_bit(start++);
@@ -99,7 +99,7 @@ void* pmmngr_alloc_block() {
 
     set_bit(frame);
 
-    physical_addr_t base = frame * MMNGR_BLOCK_SIZE;
+    physical_addr_t base = frame * MMNGR_PAGE_SIZE;
     used_block++;
 
     return (void*)base;
@@ -112,14 +112,14 @@ void* pmmngr_alloc_multi_block(size_t cnt) {
     for(uint32_t i = 0; i < cnt; i++)
         set_bit(frame + i);
 
-    physical_addr_t addr = frame * MMNGR_BLOCK_SIZE;
+    physical_addr_t addr = frame * MMNGR_PAGE_SIZE;
     used_block += cnt;
 
     return (void*)addr;
 }
 void pmmngr_free_block(void* base) {
     physical_addr_t addr = (physical_addr_t)base;
-    int frame = addr / MMNGR_BLOCK_SIZE;
+    int frame = addr / MMNGR_PAGE_SIZE;
 
     if(frame == 0) return;
 
@@ -128,7 +128,7 @@ void pmmngr_free_block(void* base) {
 }
 void pmmngr_free_multi_block(void* base, size_t cnt) {
     physical_addr_t addr = (physical_addr_t)base;
-    int frame = addr / MMNGR_BLOCK_SIZE;
+    int frame = addr / MMNGR_PAGE_SIZE;
 
     if(frame == 0) return;
 
@@ -138,7 +138,7 @@ void pmmngr_free_multi_block(void* base, size_t cnt) {
 }
 
 void pmmngr_init(size_t size) {
-    total_block = size / MMNGR_BLOCK_SIZE;
+    total_block = size / MMNGR_PAGE_SIZE;
 
     // assume that all memory are in use
     used_block = total_block;

@@ -33,6 +33,8 @@ unsigned video_height = 0;
 unsigned video_pitch = 0;
 unsigned video_bpp = 0;
 
+heap_t* kheap;
+
 void mem_init(void* mmap_addr, uint32_t mmap_length) {
     // get memsize
     size_t memsize = 0;
@@ -68,9 +70,15 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
 
     pmmngr_update_usage(); // always run this after init and deinit regions
 
-    // vmmngr init
     MEM_ERR err = vmmngr_init();
     if(err != ERR_MEM_SUCCESS) kernel_panic(NULL);
+
+    kheap = heap_new(
+        MMNGR_KHEAP_START,
+        MMNGR_KHEAP_INITAL_SIZE,
+        MMNGR_KHEAP_MAX_SIZE,
+        MMNGR_HEAP_SUPERVISOR
+    );
 }
 
 void video_init(multiboot_info_t* mbd) {
@@ -258,6 +266,23 @@ void kmain(multiboot_info_t* mbd) {
     asm volatile("sti");
 
     print_debug(LT_IF, "done initialising\n");
+
+    uint32_t* ptr1 = heap_alloc(kheap, 4, false);
+    printf("NO ALIGNED: allocate ptr1: 0x%x\n", ptr1);
+
+    uint32_t* ptr2 = heap_alloc(kheap, 4, false);
+    printf("NO ALIGNED: allocate ptr2: 0x%x\n", ptr2);
+
+    uint32_t* ptr3 = heap_alloc(kheap, 4, true);
+    printf("ALIGNED   : allocate ptr3: 0x%x\n", ptr3);
+
+    puts("heap info:");
+    heap_header_t* hheader = (heap_header_t*)kheap->start;
+    while((uint32_t)hheader < kheap->end) {
+        printf("0x%x, 0x%x, %s\n", (uint32_t)hheader + sizeof(heap_header_t), (uint32_t)hheader->size,
+               hheader->magic == HEAP_FREE ? "free" : "used");
+        hheader = HEAP_NEXT_HEADER(hheader);
+    }
 
     // only set if fs is available
     if(fs) shell_set_root_node(fs->root_node);
