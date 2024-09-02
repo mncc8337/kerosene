@@ -74,10 +74,10 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
     if(err != ERR_MEM_SUCCESS) kernel_panic(NULL);
 
     kheap = heap_new(
-        MMNGR_KHEAP_START,
-        MMNGR_KHEAP_INITAL_SIZE,
-        MMNGR_KHEAP_MAX_SIZE,
-        MMNGR_HEAP_SUPERVISOR
+        KHEAP_START,
+        KHEAP_INITAL_SIZE,
+        KHEAP_MAX_SIZE,
+        HEAP_SUPERVISOR
     );
 }
 
@@ -268,13 +268,19 @@ void kmain(multiboot_info_t* mbd) {
     print_debug(LT_IF, "done initialising\n");
 
     uint32_t* ptr1 = heap_alloc(kheap, 4, false);
-    printf("NO ALIGNED: allocate ptr1: 0x%x\n", ptr1);
+    printf("NO ALIGNED: allocate ptr1 4 bytes: 0x%x\n", ptr1);
 
     uint32_t* ptr2 = heap_alloc(kheap, 4, false);
-    printf("NO ALIGNED: allocate ptr2: 0x%x\n", ptr2);
+    printf("NO ALIGNED: allocate ptr2 4 bytes: 0x%x\n", ptr2);
 
     uint32_t* ptr3 = heap_alloc(kheap, 4, true);
-    printf("ALIGNED   : allocate ptr3: 0x%x\n", ptr3);
+    printf("ALIGNED   : allocate ptr3 4 bytes: 0x%x\n", ptr3);
+
+    uint32_t* ptr4 = heap_alloc(kheap, 4*100, true);
+    printf("ALIGNED   : allocate ptr4 4*100 bytes: 0x%x\n", ptr4);
+
+    uint32_t* ptr5 = heap_alloc(kheap, 4*100, false);
+    printf("NO ALIGNED: allocate ptr5 4*100 bytes: 0x%x\n", ptr5);
 
     puts("heap info:");
     heap_header_t* hheader = (heap_header_t*)kheap->start;
