@@ -285,6 +285,7 @@ void kmain(multiboot_info_t* mbd) {
 
     print_debug(LT_IF, "done initialising\n");
 
+    /*
     print_kheap();
 
     uint32_t* ptr1 = heap_alloc(kheap, 4, false);
@@ -336,6 +337,7 @@ void kmain(multiboot_info_t* mbd) {
     puts("freed ptr2");
 
     print_kheap();
+    */
 
     // only set if fs is available
     if(fs) shell_set_root_node(fs->root_node);

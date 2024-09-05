@@ -15,6 +15,14 @@ static void page_entry_del_attrib(uint32_t* pe, uint16_t attrib) {
     *pe &= ~(attrib & 0xfff);
 }
 
+static page_table_t* get_page_table(unsigned pd_index) {
+    // our page table VIRTUAL address can be get by adding 0xffc00000 (4*1024*1024*1023)
+    // with page directory index multiply by page size
+    // we can do this because we have recursive paging (see kernel_entry.asm)
+    // we need to use virtual address because accessing physical address will result in a page fault
+    return (page_table_t*)(0xffc00000 + pd_index * MMNGR_PAGE_SIZE);
+}
+
 pte_t* vmmngr_ptable_lookup_entry(page_table_t* p, virtual_addr_t addr) {
     return &(p->entry[PAGE_TABLE_INDEX(addr)]);
 }
@@ -49,22 +57,18 @@ MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt, unsigned flag
     pde_t* pde = &current_page_directory->entry[pd_index];
 
     bool new_table = false;
-    if((*pde & PTE_PRESENT) != PTE_PRESENT) {
-        // if page table not present then allocate it
+    // if page table not present then allocate it
+    if(!(*pde & PTE_PRESENT)) {
         page_table_t* table = (page_table_t*)pmmngr_alloc_block();
         if(!table) return ERR_MEM_OOM;
         new_table = true;
 
         // create a new entry
-        page_entry_add_attrib(pde, PDE_PRESENT | PDE_WRITABLE);
+        page_entry_add_attrib(pde, PDE_PRESENT);
         page_entry_set_frame(pde, (physical_addr_t)table);
    }
 
-    // our page table VIRTUAL address can be get by adding 0xffc00000 (4*1024*1024*1023)
-    // with page directory index multiply by page size
-    // we can do this because we have recursive paging (see kernel_entry.asm)
-    // we need to use virtual address because accessing physical address will result in a page fault
-    page_table_t* table = (page_table_t*)(0xffc00000 + pd_index * MMNGR_PAGE_SIZE);
+    page_table_t* table = get_page_table(pd_index);
 
     // clear the table if we have just created it
     if(new_table) {
@@ -79,6 +83,19 @@ MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt, unsigned flag
     vmmngr_flush_tlb_entry(virt);
 
     return ERR_MEM_SUCCESS;
+}
+
+physical_addr_t vmmngr_to_physical_addr(virtual_addr_t virt) {
+    int pd_index = PAGE_DIRECTORY_INDEX((uint32_t)virt);
+    pde_t* pde = &current_page_directory->entry[pd_index];
+
+    if((*pde & PTE_PRESENT) != PTE_PRESENT) return 0;
+
+    page_table_t* table = get_page_table(pd_index);
+    pte_t* pte = vmmngr_ptable_lookup_entry(table, virt);
+
+    if(!(*pte & PTE_PRESENT)) return 0;
+    return (physical_addr_t)(*pte & PAGE_FRAME_BITS);
 }
 
 MEM_ERR vmmngr_switch_pdirectory(page_directory_t* dir) {

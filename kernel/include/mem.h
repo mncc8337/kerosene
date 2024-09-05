@@ -94,6 +94,7 @@ page_directory_t* vmmngr_get_directory();
 MEM_ERR vmmngr_alloc_page(pte_t* pte);
 void vmmngr_free_page(pte_t* pte);
 MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt, unsigned flags);
+physical_addr_t vmmngr_to_physical_addr(virtual_addr_t virt);
 MEM_ERR vmmngr_switch_pdirectory(page_directory_t* dir);
 void vmmngr_load_page_directory(physical_addr_t addr);
 void vmmngr_flush_tlb_entry(virtual_addr_t addr);
