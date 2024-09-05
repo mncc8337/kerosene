@@ -23,12 +23,12 @@ static page_table_t* get_page_table(unsigned pd_index) {
     return (page_table_t*)(0xffc00000 + pd_index * MMNGR_PAGE_SIZE);
 }
 
-pte_t* vmmngr_ptable_lookup_entry(page_table_t* p, virtual_addr_t addr) {
-    return &(p->entry[PAGE_TABLE_INDEX(addr)]);
+pte_t* vmmngr_page_table_lookup_entry(page_table_t* p, virtual_addr_t addr) {
+    return &p->entry[PAGE_TABLE_INDEX(addr)];
 }
 
-pde_t* vmmngr_pdirectory_lookup_entry(page_directory_t* p, virtual_addr_t addr) {
-    return &(p->entry[PAGE_DIRECTORY_INDEX(addr)]);
+pde_t* vmmngr_page_directory_lookup_entry(page_directory_t* p, virtual_addr_t addr) {
+    return &p->entry[PAGE_DIRECTORY_INDEX(addr)];
 }
 
 page_directory_t* vmmngr_get_directory() {
@@ -76,7 +76,7 @@ MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt, unsigned flag
             table->entry[i] = 0x0;
     }
 
-    pte_t* pte = &table->entry[PAGE_TABLE_INDEX((uint32_t)virt)];
+    pte_t* pte = vmmngr_page_table_lookup_entry(table, virt);
     page_entry_add_attrib(pte, PTE_PRESENT | flags);
     page_entry_set_frame(pte, phys);
 
@@ -89,10 +89,10 @@ physical_addr_t vmmngr_to_physical_addr(virtual_addr_t virt) {
     int pd_index = PAGE_DIRECTORY_INDEX((uint32_t)virt);
     pde_t* pde = &current_page_directory->entry[pd_index];
 
-    if((*pde & PTE_PRESENT) != PTE_PRESENT) return 0;
+    if(!(*pde & PTE_PRESENT)) return 0;
 
     page_table_t* table = get_page_table(pd_index);
-    pte_t* pte = vmmngr_ptable_lookup_entry(table, virt);
+    pte_t* pte = vmmngr_page_table_lookup_entry(table, virt);
 
     if(!(*pte & PTE_PRESENT)) return 0;
     return (physical_addr_t)(*pte & PAGE_FRAME_BITS);

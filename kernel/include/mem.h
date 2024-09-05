@@ -88,8 +88,8 @@ void pmmngr_free_multi_block(void* base, size_t cnt);
 void pmmngr_init(size_t size);
 
 // vmmngr.c
-uint32_t* vmmngr_ptable_lookup_entry(page_table_t* p, virtual_addr_t addr);
-uint32_t* vmmngr_pdirectory_lookup_entry(page_directory_t* p, virtual_addr_t addr);
+uint32_t* vmmngr_page_table_lookup_entry(page_table_t* p, virtual_addr_t addr);
+uint32_t* vmmngr_page_directory_lookup_entry(page_directory_t* p, virtual_addr_t addr);
 page_directory_t* vmmngr_get_directory();
 MEM_ERR vmmngr_alloc_page(pte_t* pte);
 void vmmngr_free_page(pte_t* pte);

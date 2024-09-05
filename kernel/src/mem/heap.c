@@ -6,6 +6,7 @@
 // very prone to fragmentation
 
 #define MIN_REGION_SIZE 4
+#define FREE_RATIO 2/5
 
 heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags) {
     // map heap
@@ -32,11 +33,12 @@ heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags) 
     return heap;
 }
 
+// expand the heap
 bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header) {
     if(heap->end + page_count * MMNGR_PAGE_SIZE > heap->max_addr) return false;
 
     physical_addr_t new_page = (physical_addr_t)pmmngr_alloc_multi_block(page_count);
-    if(!new_page) return false;
+    if(!new_page) return true;
 
     int flags = 0;
     if(!(heap->flags & HEAP_SUPERVISOR)) flags |= PTE_USER;
@@ -59,18 +61,22 @@ bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header) {
 
     heap->end += page_count * MMNGR_PAGE_SIZE;
 
-    return true;
+    return false;
 }
 
-// TODO: implement heap_contract
+// contract heap, ensure that the last_header size is larger that page_count * MMNGR_PAGE_SIZE + MIN_REGION_SIZE
 bool heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header) {
-    // the algorithm is simple
-    // we first translate each virtual addr to phys
-    // and then free them using the pmmngr
-    // and finally change the last_header
-    // remember to check heap min_size
+    int remain_size = (heap->end - page_count * MMNGR_PAGE_SIZE) - heap->start;
+    if(remain_size < 0 || (unsigned)remain_size < heap->min_size) return true;
 
-    // TODO: implement virtual address to physical address translation
+    last_header->size -= page_count * MMNGR_PAGE_SIZE;
+    while(page_count > 0) {
+
+        heap->end -= MMNGR_PAGE_SIZE;
+        physical_addr_t phys = vmmngr_to_physical_addr((virtual_addr_t)heap->end);
+        pmmngr_free_block((void*)phys);
+        page_count--;
+    }
 
     return false;
 }
@@ -79,7 +85,7 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
     heap_header_t* header = (heap_header_t*)heap->start;
 
     size_t reg_size = size + sizeof(heap_header_t);
-    heap_header_t* saved_header = 0;
+    heap_header_t* final_header = 0;
     while((uint32_t)header < heap->end) {
         if(header->magic != HEAP_FREE) goto next_header;
 
@@ -94,15 +100,23 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
         else if(header->size >= reg_size) break;
 
         next_header:
-        saved_header = header;
+        final_header = header;
         header = HEAP_NEXT_HEADER(header);
     }
     if((uint32_t)header >= heap->end) {
         // new memory region should start at the end
         header = (heap_header_t*)heap->end;
 
-        bool err = heap_expand(heap, 1, saved_header);
+        // ensure that we have enough memory after expanding
+        unsigned needed_size = 0;
+        if(final_header->magic == HEAP_USED) needed_size = size;
+        else needed_size = size - final_header->size;
+        needed_size += MMNGR_PAGE_SIZE - size % MMNGR_PAGE_SIZE;
+
+        bool err = heap_expand(heap, needed_size / MMNGR_PAGE_SIZE, final_header);
         if(err) return 0;
+
+        header = final_header;
     }
 
     size_t temp_size = size;
@@ -159,6 +173,8 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
     return (void*)header + sizeof(heap_header_t);
 }
 
+#include "stdio.h"
+
 void heap_free(heap_t* heap, void* addr) {
     // the header is always behind the addr so this should work
     heap_header_t* header = (heap_header_t*)(addr - sizeof(heap_header_t));
@@ -194,14 +210,17 @@ void heap_free(heap_t* heap, void* addr) {
         prev_merged = true;
     }
 
-    // contract if needed
+    // contracting heap if the last region is free
     if(next_merged) {
         heap_header_t* final_reg;
         if(prev_merged) final_reg = prevh;
         else final_reg = header;
 
-        if((uint32_t)HEAP_NEXT_HEADER(final_reg) > heap->end && final_reg->size >= MMNGR_PAGE_SIZE + MIN_REGION_SIZE)
-            heap_contract(heap, 1, final_reg);
+        // contract heap if freesize is larger than FREE_RATIO
+        // also ensure that after contracting, the final region will have at least the size of MIN_REGION_SIZE
+        unsigned ideal_size = (heap->end - heap->start) * FREE_RATIO;
+        if((unsigned)final_reg + sizeof(heap_header_t) + MIN_REGION_SIZE <= heap->start + ideal_size)
+            heap_contract(heap, ideal_size / MMNGR_PAGE_SIZE, final_reg);
     }
 
 }

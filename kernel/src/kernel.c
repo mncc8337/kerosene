@@ -285,59 +285,26 @@ void kmain(multiboot_info_t* mbd) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    /*
     print_kheap();
 
-    uint32_t* ptr1 = heap_alloc(kheap, 4, false);
-    printf("NO ALIGNED: allocate ptr1 4 bytes: 0x%x\n", ptr1);
-    uint32_t* ptr2 = heap_alloc(kheap, 4, false);
-    printf("NO ALIGNED: allocate ptr2 4 bytes: 0x%x\n", ptr2);
-    uint32_t* ptr3 = heap_alloc(kheap, 4, true);
-    printf("ALIGNED   : allocate ptr3 4 bytes: 0x%x\n", ptr3);
-    uint32_t* ptr4 = heap_alloc(kheap, 4*100, true);
-    printf("ALIGNED   : allocate ptr4 4*100 bytes: 0x%x\n", ptr4);
-    uint32_t* ptr5 = heap_alloc(kheap, 4*100, false);
-    printf("NO ALIGNED: allocate ptr5 4*100 bytes: 0x%x\n", ptr5);
-
+    void* ptr1 = heap_alloc(kheap, 4 * 1024 * 1024, false); 
+    printf("alloc 4MiB at addr: 0x%x\n", ptr1);
     print_kheap();
 
-    heap_free(kheap, ptr1);
-    puts("freed ptr1");
-    heap_free(kheap, ptr4);
-    puts("freed ptr4");
+    void* ptr2 = heap_alloc(kheap, 4 * 1024 * 1024, false); 
+    printf("alloc 4MiB at addr: 0x%x\n", ptr2);
+    print_kheap();
+
+    void* ptr3 = heap_alloc(kheap, 4 * 1024 * 1024, false); 
+    printf("alloc 4MiB at addr: 0x%x\n", ptr3);
+    print_kheap();
+
     heap_free(kheap, ptr3);
-    puts("freed ptr3");
+    printf("free addr 0x%x\n", ptr3);
     heap_free(kheap, ptr2);
-    puts("freed ptr2");
-    heap_free(kheap, ptr5);
-    puts("freed ptr5");
-    
-    heap_header_t* last_header = (heap_header_t*)kheap->start;
-    while(true) {
-        heap_header_t* test = HEAP_NEXT_HEADER(last_header);
-        if((uint32_t)test >= kheap->end) break;
-        last_header = test;
-    }
-    bool heap_exp_res = heap_expand(kheap, 5, last_header);
-    if(heap_exp_res) puts("kheap expanded by 5 pages");
-    else puts("failed to expand kheap");
+    printf("free addr 0x%x\n", ptr2);
 
     print_kheap();
-
-    ptr1 = heap_alloc(kheap, 1024 * 1024, false);
-    printf("NO ALIGNED: allocate ptr1 1 MB: 0x%x\n", ptr1);
-    ptr2 = heap_alloc(kheap, 1024 * 3, true);
-    printf("ALIGNED   : allocate ptr2 4 KB: 0x%x\n", ptr2);
-
-    print_kheap();
-
-    heap_free(kheap, ptr1);
-    puts("freed ptr1");
-    heap_free(kheap, ptr2);
-    puts("freed ptr2");
-
-    print_kheap();
-    */
 
     // only set if fs is available
     if(fs) shell_set_root_node(fs->root_node);
