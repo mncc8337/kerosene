@@ -71,7 +71,7 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
     pmmngr_update_usage(); // always run this after init and deinit regions
 
     MEM_ERR err = vmmngr_init();
-    if(err != ERR_MEM_SUCCESS) kernel_panic(NULL);
+    if(err) kernel_panic(NULL);
 }
 
 void video_init(multiboot_info_t* mbd) {
@@ -127,15 +127,16 @@ void video_init(multiboot_info_t* mbd) {
 }
 
 void disk_init() {
-    if(!ata_pio_init((uint16_t*)freebuff)) {
-        print_debug(LT_WN, "failed to initialise ATA PIO mode\n");
+    ATA_PIO_ERR ata_err = ata_pio_init((uint16_t*)freebuff);
+    if(ata_err) {
+        print_debug(LT_WN, "failed to initialise ATA PIO mode. error code %d\n", ata_err);
         return;
     }
 
     print_debug(LT_OK, "ATA PIO mode initialised\n");
 
-    bool mbr_ok = mbr_load();
-    if(!mbr_ok) {
+    bool mbr_err = mbr_load();
+    if(mbr_err) {
         print_debug(LT_ER, "cannot load MBR\n");
         return;
     }
@@ -151,7 +152,7 @@ void disk_init() {
                 break;
             case FS_FAT32:
                 err = fat32_init(part, FS_ID);
-                if(err != ERR_FS_SUCCESS) {
+                if(err) {
                     print_debug(LT_ER, "failed to initialize FAT32 filesystem in partition %d. error code %d\n", i+1, err);
                     break;
                 }

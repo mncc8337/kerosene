@@ -60,7 +60,7 @@ static void software_reset() {
     port_outb(PORT_ATA_PIO_DEV_CTRL, 0);
 }
 
-static bool ata_pio_identify() {
+static ATA_PIO_ERR ata_pio_identify() {
     // select target device
     // 0xa0 for master, 0xb0 for slave
     port_outb(PORT_ATA_PIO_DRIVE, 0xa0);
@@ -125,7 +125,7 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
         port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_WRITE_SECTORS);
 
     ATA_PIO_ERR err = wait_ata(1);
-    if(err != ERR_ATA_PIO_SUCCESS) return err;
+    if(err) return err;
 
     uint16_t dat;
     for(unsigned int j = 0; j < sector_cnt; j++) {
@@ -141,7 +141,7 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
             }
         }
         err = wait_until_data_ready();
-        if(err != ERR_ATA_PIO_SUCCESS) return err;
+        if(err) return err;
     }
     if(!read_op) port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_CACHE_FLUSH);
 
@@ -159,11 +159,12 @@ ATA_PIO_ERR ata_pio_init(uint16_t* buff) {
 
     software_reset();
 
-    bool dev_available = ata_pio_identify();
-    if(!dev_available) return ERR_ATA_PIO_NO_DEV;
+    ATA_PIO_ERR dev_err = ata_pio_identify();
+    // the only error returned by this function is ERR_ATA_PIO_NO_DEV
+    if(dev_err) return ERR_ATA_PIO_NO_DEV;
 
     ATA_PIO_ERR err = wait_ata(1);
-    if(err != ERR_ATA_PIO_SUCCESS) return err;
+    if(err) return err;
 
     for(int i = 0; i < 256; i++) buff[i] = port_inw(PORT_ATA_PIO_DATA);
 

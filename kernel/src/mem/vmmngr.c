@@ -85,6 +85,26 @@ MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt, unsigned flag
     return ERR_MEM_SUCCESS;
 }
 
+MEM_ERR vmmngr_unmap_page(virtual_addr_t virt) {
+    int pd_index = PAGE_DIRECTORY_INDEX((uint32_t)virt);
+    pde_t* pde = &current_page_directory->entry[pd_index];
+
+    if(!(*pde & PTE_PRESENT)) return ERR_MEM_UNMAPPED;
+
+    page_table_t* table = get_page_table(pd_index);
+    pte_t* pte = vmmngr_page_table_lookup_entry(table, virt);
+    if(!(*pte & PTE_PRESENT)) return ERR_MEM_UNMAPPED;
+
+    physical_addr_t phys = (physical_addr_t)(*pte & PAGE_FRAME_BITS);
+    pmmngr_free_block((void*)phys);
+    // clear all attrib
+    *pte = 0x0;
+
+    vmmngr_flush_tlb_entry(virt);
+
+    return ERR_MEM_SUCCESS;
+}
+
 physical_addr_t vmmngr_to_physical_addr(virtual_addr_t virt) {
     int pd_index = PAGE_DIRECTORY_INDEX((uint32_t)virt);
     pde_t* pde = &current_page_directory->entry[pd_index];

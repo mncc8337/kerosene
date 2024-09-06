@@ -27,7 +27,7 @@ static bool rm_node_callback(fs_node_t node) {
     if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
     
     FS_ERR err = fs_rm_recursive(node.parent_node, node);
-    if(err != ERR_FS_SUCCESS) return false;
+    if(err) return false;
 
     return true;
 }
@@ -39,7 +39,7 @@ static bool cp_node_callback(fs_node_t node) {
     if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
     
     FS_ERR err = fs_copy_recursive(&node, &copy_current_dir, NULL, NULL);
-    if(err != ERR_FS_SUCCESS) return false;
+    if(err) return false;
 
     return true;
 }
@@ -138,7 +138,7 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
         err = fat32_remove_entry(node->parent_node, *node, false); // do not delete the node content
     else return ERR_FS_UNKNOWN_FS;
 
-    if(err != ERR_FS_SUCCESS) return err;
+    if(err) return err;
     *node = copied;
     return ERR_FS_SUCCESS;
 }
@@ -228,7 +228,7 @@ FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
             // the file may has some infomation before hand
             // so we need to "delete" them first
             FS_ERR err = fat32_cut_cluster_chain(file->node->fs, file->current_cluster);
-            if(err != ERR_FS_SUCCESS) return err;
+            if(err) return err;
             // reset size since position is 0
             file->node->size = 0;
         }
@@ -240,7 +240,7 @@ FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
         }
         FS_ERR err = fat32_write_file(file->node->fs,
                                       &(file->current_cluster), data, size, offset);
-        if(err != ERR_FS_SUCCESS) return err;
+        if(err) return err;
     }
     else return ERR_FS_UNKNOWN_FS;
 
@@ -270,7 +270,7 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
     }
     else return ERR_FS_UNKNOWN_FS;
 
-    if(err != ERR_FS_SUCCESS) return err;
+    if(err) return err;
     file->position += size;
     if(file->position > file->node->size) file->position = file->node->size;
     return ERR_FS_SUCCESS;

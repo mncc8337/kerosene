@@ -4,8 +4,8 @@
 #include "stdint.h"
 
 typedef enum {
-    ERR_ATA_PIO_UNKNOWN,
     ERR_ATA_PIO_SUCCESS,
+    ERR_ATA_PIO_UNKNOWN,
     ERR_ATA_PIO_NO_DEV,
     ERR_ATA_PIO_DRIVE_FAULT,
     ERR_ATA_PIO_ERR_BIT_SET,

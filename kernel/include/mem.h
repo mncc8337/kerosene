@@ -5,9 +5,10 @@
 #include "stdbool.h"
 
 typedef enum {
-    ERR_MEM_OOM,
     ERR_MEM_SUCCESS,
+    ERR_MEM_OOM,
     ERR_MEM_INVALID_DIR,
+    ERR_MEM_UNMAPPED
 } MEM_ERR;
 
 #define MMNGR_PAGE_SIZE 4096
@@ -19,7 +20,6 @@ typedef uint32_t virtual_addr_t;
 
 #define PAGE_DIRECTORY_INDEX(x) (((x) >> 22) & 0x3ff)
 #define PAGE_TABLE_INDEX(x) (((x) >> 12) & 0x3ff)
-// #define PAGE_GET_PHYSICAL_ADDRESS(x) (*(x) & ~0xfff)
 
 #define PTE_PRESENT       1
 #define PTE_WRITABLE      2
@@ -94,6 +94,7 @@ page_directory_t* vmmngr_get_directory();
 MEM_ERR vmmngr_alloc_page(pte_t* pte);
 void vmmngr_free_page(pte_t* pte);
 MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt, unsigned flags);
+MEM_ERR vmmngr_unmap_page(virtual_addr_t virt);
 physical_addr_t vmmngr_to_physical_addr(virtual_addr_t virt);
 MEM_ERR vmmngr_switch_pdirectory(page_directory_t* dir);
 void vmmngr_load_page_directory(physical_addr_t addr);
@@ -103,6 +104,6 @@ MEM_ERR vmmngr_init();
 // heap.c
 heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags);
 bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header);
-bool heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header);
+void heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header);
 void* heap_alloc(heap_t* heap, size_t size, bool page_align);
 void heap_free(heap_t* heap, void* addr);

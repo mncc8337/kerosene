@@ -46,7 +46,7 @@ bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header) {
     for(unsigned i = 0; i < page_count; i++)
         vmmngr_map_page(new_page + i * MMNGR_PAGE_SIZE, heap->end + i * MMNGR_PAGE_SIZE, flags);
 
-    // assume that the last_header is valid
+    // assume that last_header is valid
 
     if(last_header->magic == HEAP_FREE) {
         last_header->size += page_count * MMNGR_PAGE_SIZE;
@@ -64,21 +64,21 @@ bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header) {
     return false;
 }
 
-// contract heap, ensure that the last_header size is larger that page_count * MMNGR_PAGE_SIZE + MIN_REGION_SIZE
-bool heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header) {
+// contract heap, please ensure that the last_header size is larger that page_count * MMNGR_PAGE_SIZE + MIN_REGION_SIZE
+void heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header) {
+    // recalculate page_count if it is incorrect
     int remain_size = (heap->end - page_count * MMNGR_PAGE_SIZE) - heap->start;
-    if(remain_size < 0 || (unsigned)remain_size < heap->min_size) return true;
+    if(remain_size < 0 || (unsigned)remain_size < heap->min_size) {
+        page_count = (heap->end - heap->start) - heap->min_size;
+        page_count /= MMNGR_PAGE_SIZE;
+    }
 
     last_header->size -= page_count * MMNGR_PAGE_SIZE;
     while(page_count > 0) {
-
         heap->end -= MMNGR_PAGE_SIZE;
-        physical_addr_t phys = vmmngr_to_physical_addr((virtual_addr_t)heap->end);
-        pmmngr_free_block((void*)phys);
+        vmmngr_unmap_page(heap->end);
         page_count--;
     }
-
-    return false;
 }
 
 void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
@@ -109,9 +109,11 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
 
         // ensure that we have enough memory after expanding
         unsigned needed_size = 0;
-        if(final_header->magic == HEAP_USED) needed_size = size;
+        if(final_header->magic == HEAP_USED) needed_size = size + sizeof(heap_header_t);
         else needed_size = size - final_header->size;
-        needed_size += MMNGR_PAGE_SIZE - size % MMNGR_PAGE_SIZE;
+
+        if(needed_size % MMNGR_PAGE_SIZE > 0)
+            needed_size += MMNGR_PAGE_SIZE - needed_size % MMNGR_PAGE_SIZE;
 
         bool err = heap_expand(heap, needed_size / MMNGR_PAGE_SIZE, final_header);
         if(err) return 0;
@@ -172,8 +174,6 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
 
     return (void*)header + sizeof(heap_header_t);
 }
-
-#include "stdio.h"
 
 void heap_free(heap_t* heap, void* addr) {
     // the header is always behind the addr so this should work

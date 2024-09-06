@@ -13,8 +13,8 @@
 #define FILENAME_LIMIT 64
 
 typedef enum {
-    ERR_FS_FAILED,
     ERR_FS_SUCCESS,
+    ERR_FS_FAILED,
     ERR_FS_BAD_CLUSTER,
     ERR_FS_NOT_FOUND,
     ERR_FS_DIR_NOT_EMPTY,
