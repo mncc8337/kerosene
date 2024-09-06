@@ -19,10 +19,9 @@
 #include "kshell.h"
 
 #include "misc/elf.h"
+#include <stdint.h>
 
 uint32_t kernel_size;
-
-char freebuff[512];
 
 int FS_ID = 0;
 fs_t* fs = NULL;
@@ -32,8 +31,6 @@ unsigned video_width = 0;
 unsigned video_height = 0;
 unsigned video_pitch = 0;
 unsigned video_bpp = 0;
-
-heap_t* kheap;
 
 void mem_init(void* mmap_addr, uint32_t mmap_length) {
     // get memsize
@@ -127,7 +124,14 @@ void video_init(multiboot_info_t* mbd) {
 }
 
 void disk_init() {
-    ATA_PIO_ERR ata_err = ata_pio_init((uint16_t*)freebuff);
+    uint16_t* dump = kmalloc(256 * sizeof(uint16_t));
+    if(!dump) {
+        print_debug(LT_ER, "not enough memory to initialise disk\n");
+        return;
+    }
+
+    ATA_PIO_ERR ata_err = ata_pio_init(dump);
+    kfree(dump);
     if(ata_err) {
         print_debug(LT_WN, "failed to initialise ATA PIO mode. error code %d\n", ata_err);
         return;
@@ -171,19 +175,6 @@ void disk_init() {
     }
 }
 
-void print_kheap() {
-    puts("heap info:");
-    heap_header_t* hheader = (heap_header_t*)kheap->start;
-    while((uint32_t)hheader < kheap->end) {
-        printf("0x%x, 0x%x, 0x%x, 0x%x, %s\n",
-               hheader, (uint32_t)hheader + sizeof(heap_header_t), (uint32_t)hheader->size,
-               hheader->prev,
-               hheader->magic == HEAP_FREE ? "free" : "used");
-        hheader = HEAP_NEXT_HEADER(hheader);
-    }
-
-}
-
 extern char kernel_start;
 extern char kernel_end;
 void kmain(multiboot_info_t* mbd) {
@@ -214,17 +205,12 @@ void kmain(multiboot_info_t* mbd) {
 
     video_init(mbd);
 
-    kheap = heap_new(
-        KHEAP_START,
-        KHEAP_INITAL_SIZE,
-        KHEAP_MAX_SIZE,
-        HEAP_SUPERVISOR
-    );
-    if(!kheap) {
+    bool kheap_err = kheap_init();
+    if(kheap_err) {
         print_debug(LT_ER, "failed to initialise kernel heap. not enough memory\n");
         kernel_panic(NULL);
     }
-    print_debug(LT_OK, "initialised kernel heap\n");
+    print_debug(LT_OK, "kernel heap initialised\n");
 
     if(mbd->flags & MULTIBOOT_INFO_BOOT_LOADER_NAME)
         print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + VMBASE_KERNEL);
@@ -267,7 +253,8 @@ void kmain(multiboot_info_t* mbd) {
     isr_init();
     print_debug(LT_OK, "ISR initialised\n");
 
-    disk_init();
+    if(!fs_mngr_init()) disk_init();
+    else print_debug(LT_ER, "failed to initialise FS. not enough memory\n");
 
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
@@ -286,30 +273,12 @@ void kmain(multiboot_info_t* mbd) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    print_kheap();
-
-    void* ptr1 = heap_alloc(kheap, 4 * 1024 * 1024, false); 
-    printf("alloc 4MiB at addr: 0x%x\n", ptr1);
-    print_kheap();
-
-    void* ptr2 = heap_alloc(kheap, 4 * 1024 * 1024, false); 
-    printf("alloc 4MiB at addr: 0x%x\n", ptr2);
-    print_kheap();
-
-    void* ptr3 = heap_alloc(kheap, 4 * 1024 * 1024, false); 
-    printf("alloc 4MiB at addr: 0x%x\n", ptr3);
-    print_kheap();
-
-    heap_free(kheap, ptr3);
-    printf("free addr 0x%x\n", ptr3);
-    heap_free(kheap, ptr2);
-    printf("free addr 0x%x\n", ptr2);
-
-    print_kheap();
-
-    // only set if fs is available
-    if(fs) shell_set_root_node(fs->root_node);
-    shell_start();
+    if(!shell_init()) {
+        // only set if fs is available
+        if(fs) shell_set_root_node(fs->root_node);
+        shell_start();
+    }
+    else puts("not enough memory for kshell. quitting");
 
     puts("entering usermode ...");
 
@@ -374,10 +343,10 @@ void kmain(multiboot_info_t* mbd) {
     SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
 
     SYSCALL_0P(SYSCALL_TIME, ret);
-    itoa(ret, freebuff, 10);
-    int i = 0;
-    while(freebuff[i] != '\0')
-        SYSCALL_1P(SYSCALL_PUTCHAR, ret, freebuff[i++]);
+    char conv[64];
+    itoa(ret, conv, 10);
+    for(unsigned i = 0; i < 64 && conv[i] != '\0'; i++)
+        SYSCALL_1P(SYSCALL_PUTCHAR, ret, conv[i]);
 
     // hlt instruction should be illegal
     asm("hlt");

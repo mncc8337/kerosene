@@ -1,5 +1,6 @@
 #include "kshell.h"
 #include "system.h"
+#include "mem.h"
 #include "kbd.h"
 #include "timer.h"
 #include "video.h"
@@ -23,13 +24,13 @@ typedef enum {
 
 static bool shell_running = true;
 
-static char input[MAX_INPUT];
+static char* input;
 static unsigned input_len = 0;
 
-static char last_input[MAX_INPUT];
+static char* last_input;
 
 // a stack that contain the path of current dir
-static fs_node_t node_stack[NODE_STACK_MAX_LENGTH];
+static fs_node_t* node_stack;
 static unsigned node_stack_offset = 0;
 
 static fs_node_t* node_stack_top() {
@@ -975,6 +976,22 @@ static void print_prompt() {
     printf("]$ ");
 }
 
+bool shell_init() {
+    input = (char*)kmalloc(sizeof(char) * MAX_INPUT);
+    last_input = (char*)kmalloc(sizeof(char) * MAX_INPUT);
+    node_stack = (fs_node_t*)kmalloc(sizeof(fs_node_t) * NODE_STACK_MAX_LENGTH);
+
+    if(!input || !last_input || !node_stack) {
+        if(input) kfree(input);
+        if(last_input) kfree(last_input);
+        if(node_stack) kfree(node_stack);
+
+        return true;
+    }
+
+    return false;
+}
+
 void shell_set_root_node(fs_node_t node) {
     node_stack[0] = node;
     node_stack_offset = 0;
@@ -1026,4 +1043,8 @@ void shell_start() {
             print_prompt();
         }
     }
+
+    kfree(input);
+    kfree(last_input);
+    kfree(node_stack);
 }

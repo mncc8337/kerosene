@@ -12,22 +12,21 @@ heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags) 
     // map heap
     physical_addr_t phys = (physical_addr_t)pmmngr_alloc_multi_block(size / MMNGR_PAGE_SIZE);
     if(!phys) return 0;
-    int f = 0;
+    int f = PTE_PRESENT;
     if(!(flags & HEAP_SUPERVISOR)) f |= PTE_USER;
     if(!(flags & HEAP_READONLY)) f |= PTE_WRITABLE;
     for(unsigned i = 0; i < size; i += MMNGR_PAGE_SIZE)
         vmmngr_map_page(phys + i, start + i, f);
 
     heap_t* heap = (heap_t*)start;
-    heap->start = start + sizeof(heap_t);
     heap->end = start + size;
     heap->max_addr = start + max_size;
     heap->min_size = size;
     heap->flags = flags;
 
-    heap_header_t* header = (heap_header_t*)heap->start;
+    heap_header_t* header = HEAP_FIRST_HEADER(heap);
     header->magic = HEAP_FREE;
-    header->size = heap->end - heap->start - sizeof(heap_header_t);
+    header->size = heap->end - (uint32_t)header - sizeof(heap_header_t);
     header->prev = NULL;
 
     return heap;
@@ -35,12 +34,12 @@ heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags) 
 
 // expand the heap
 bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header) {
-    if(heap->end + page_count * MMNGR_PAGE_SIZE > heap->max_addr) return false;
+    if(heap->end + page_count * MMNGR_PAGE_SIZE > heap->max_addr) return true;
 
     physical_addr_t new_page = (physical_addr_t)pmmngr_alloc_multi_block(page_count);
     if(!new_page) return true;
 
-    int flags = 0;
+    int flags = PTE_PRESENT;
     if(!(heap->flags & HEAP_SUPERVISOR)) flags |= PTE_USER;
     if(!(heap->flags & HEAP_READONLY)) flags |= PTE_WRITABLE;
     for(unsigned i = 0; i < page_count; i++)
@@ -66,10 +65,10 @@ bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header) {
 
 // contract heap, please ensure that the last_header size is larger that page_count * MMNGR_PAGE_SIZE + MIN_REGION_SIZE
 void heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header) {
-    // recalculate page_count if it is incorrect
-    int remain_size = (heap->end - page_count * MMNGR_PAGE_SIZE) - heap->start;
+    // recalculate page_count if it is overshoot min_size
+    int remain_size = (heap->end - page_count * MMNGR_PAGE_SIZE) - (uint32_t)heap;
     if(remain_size < 0 || (unsigned)remain_size < heap->min_size) {
-        page_count = (heap->end - heap->start) - heap->min_size;
+        page_count = (heap->end - (uint32_t)heap) - heap->min_size;
         page_count /= MMNGR_PAGE_SIZE;
     }
 
@@ -82,7 +81,7 @@ void heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header) 
 }
 
 void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
-    heap_header_t* header = (heap_header_t*)heap->start;
+    heap_header_t* header = HEAP_FIRST_HEADER(heap);
 
     size_t reg_size = size + sizeof(heap_header_t);
     heap_header_t* final_header = 0;
@@ -218,8 +217,8 @@ void heap_free(heap_t* heap, void* addr) {
 
         // contract heap if freesize is larger than FREE_RATIO
         // also ensure that after contracting, the final region will have at least the size of MIN_REGION_SIZE
-        unsigned ideal_size = (heap->end - heap->start) * FREE_RATIO;
-        if((unsigned)final_reg + sizeof(heap_header_t) + MIN_REGION_SIZE <= heap->start + ideal_size)
+        unsigned ideal_size = (heap->end - (uint32_t)heap) * FREE_RATIO;
+        if((unsigned)final_reg + sizeof(heap_header_t) + MIN_REGION_SIZE <= (uint32_t)heap + ideal_size)
             heap_contract(heap, ideal_size / MMNGR_PAGE_SIZE, final_reg);
     }
 

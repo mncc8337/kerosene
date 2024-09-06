@@ -12,6 +12,8 @@
 // the limit is 256
 #define FILENAME_LIMIT 64
 
+#define MAX_DISK 5
+
 typedef enum {
     ERR_FS_SUCCESS,
     ERR_FS_FAILED,
@@ -73,14 +75,11 @@ typedef struct {
 //     uint16_t boot_signature; // should be 0xaa55
 // } __attribute__((packed)) modern_MBR_t; // 512 bytes
 
-typedef struct _fs_t fs_t;
-typedef struct _fs_node_t fs_node_t;
-
-struct _fs_node_t {
+typedef struct fs_node {
     char name[FILENAME_LIMIT];
     bool valid;
-    struct _fs_t* fs;
-    struct _fs_node_t* parent_node;
+    struct fs* fs;
+    struct fs_node* parent_node;
     uint32_t start_cluster;
     bool isdir;
     bool hidden;
@@ -93,21 +92,25 @@ struct _fs_node_t {
     // may change when i add support for other filesystem
     uint32_t parent_cluster;
     unsigned int parent_cluster_index;
-};
+} fs_node_t;
 
-struct _fs_t {
+typedef struct fs {
     fs_type_t type;
     partition_entry_t partition;
-    struct _fs_node_t root_node;
+    struct fs_node root_node;
 
     // type-depend field
     union {
+        struct {
+            uint8_t infotable1[512];
+            uint8_t infotable2[512];
+        } info;
         struct {
             fat32_bootrecord_t bootrec;
             fat32_fsinfo_t fsinfo;
         } fat32_info;
     };
-};
+} fs_t;
 
 typedef struct {
     fs_node_t* node;
@@ -123,6 +126,7 @@ bool mbr_load();
 partition_entry_t mbr_get_partition_entry(unsigned int id);
 
 // fsmngr.c
+bool fs_mngr_init();
 fs_type_t fs_detect(partition_entry_t part);
 fs_t* fs_get(int id);
 

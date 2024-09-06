@@ -1,9 +1,10 @@
 #include "filesystem.h"
 #include "ata.h"
+#include "mem.h"
 
 // TODO: implement vfs to remove this
 
-static fs_t FS[26]; // this is hella big, pls use mem mngr to allocate it
+static fs_t* FS;
 
 static bool is_field_fs_type(uint8_t* buff, int cnt) {
     for(int i = 0; i < cnt; i++) {
@@ -35,6 +36,12 @@ static bool fat32_check(uint8_t* sect) {
 // static bool ext2_check(uint8_t* sect) {
 //     return false;
 // }
+
+bool fs_mngr_init() {
+    FS = (fs_t*)kmalloc(sizeof(fs_t) * MAX_DISK);
+
+    return FS == 0;
+}
 
 fs_type_t fs_detect(partition_entry_t part) {
     uint8_t sect[512];

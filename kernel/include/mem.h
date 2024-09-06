@@ -58,9 +58,9 @@ typedef struct {
 #define HEAP_USED 0x7ea942ed
 
 #define HEAP_NEXT_HEADER(header) (heap_header_t*)((void*)(header) + sizeof(heap_header_t) + header->size)
+#define HEAP_FIRST_HEADER(heap) (heap_header_t*)((void*)(heap) + sizeof(heap_t))
 
 typedef struct {
-    uint32_t start;
     uint32_t end;
     uint32_t max_addr;
     uint32_t min_size;
@@ -107,3 +107,8 @@ bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header);
 void heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header);
 void* heap_alloc(heap_t* heap, size_t size, bool page_align);
 void heap_free(heap_t* heap, void* addr);
+
+// kheap.c
+bool kheap_init();
+void* kmalloc(size_t size);
+void kfree(void* addr);
