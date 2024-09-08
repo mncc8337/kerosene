@@ -69,10 +69,10 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [x] PIT
     - [x] generate ticks
     - [x] PC speaker (beep beep boop boop)
-- [ ] memory manager
-    - [x] physical memory manager
+- [x] memory manager
+    - [x] physical memory manager: bitmap allocator
     - [x] virtual memory manager
-    - [ ] the heap
+    - [x] the heap: first-fit allocator
 - [ ] ATA
     - [x] PIO mode
 - [x] CMOS and RTC: get datetime

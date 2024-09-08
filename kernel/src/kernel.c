@@ -19,7 +19,6 @@
 #include "kshell.h"
 
 #include "misc/elf.h"
-#include <stdint.h>
 
 uint32_t kernel_size;
 
