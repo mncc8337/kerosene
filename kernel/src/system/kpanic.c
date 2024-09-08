@@ -48,7 +48,7 @@ char* kernel_find_symbol(unsigned addr, int type) {
     uint32_t closest_addr = 0;
 
     for(unsigned i = 0; i < symtab_sh->size; i += symtab_sh->entry_size) {
-        elf_symbol_table_t* s = (elf_symbol_table_t*)(symtab_sh->addr + VMBASE_KERNEL + i);
+        elf_symbol_table_t* s = (elf_symbol_table_t*)(symtab_sh->addr + KERNEL_START + i);
         if(s->value > addr || s->value < closest_addr) continue;
         if(type > 0 && ELF_ST_TYPE(s->info) != type) continue;
 

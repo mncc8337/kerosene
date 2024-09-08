@@ -66,8 +66,7 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
 
     pmmngr_update_usage(); // always run this after init and deinit regions
 
-    MEM_ERR err = vmmngr_init();
-    if(err) kernel_panic(NULL);
+    vmmngr_init();
 }
 
 void video_init(multiboot_info_t* mbd) {
@@ -105,8 +104,8 @@ void video_init(multiboot_info_t* mbd) {
 
     // map video ptr
     for(unsigned i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
-        vmmngr_map_page(video_addr + i, VMBASE_VIDEO + i, PTE_WRITABLE);
-    video_addr = VMBASE_VIDEO;
+        vmmngr_map(NULL, video_addr + i, VIDEO_START + i, PTE_WRITABLE);
+    video_addr = VIDEO_START;
     if(using_framebuffer) {
         video_vesa_set_ptr(video_addr);
         video_vesa_init(
@@ -193,14 +192,14 @@ void kmain(multiboot_info_t* mbd) {
     // i think that GRUB will not give any address that are larger than 4 MiB
     // except the framebuffer
     // note that the ELF section also included in the kernel (which lies in the first 4MiB)
-    // so those physical address of ELF section headers need to offset to VMBASE_KERNEL too
-    mbd = (void*)mbd + VMBASE_KERNEL;
+    // so those physical address of ELF section headers need to offset to KERNEL_START too
+    mbd = (void*)mbd + KERNEL_START;
 
     // disable interrupts to set up things
     asm volatile("cli");
 
     if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) kernel_panic(NULL);
-    mem_init((void*)mbd->mmap_addr + VMBASE_KERNEL, mbd->mmap_length);
+    mem_init((void*)mbd->mmap_addr + KERNEL_START, mbd->mmap_length);
 
     video_init(mbd);
 
@@ -212,7 +211,7 @@ void kmain(multiboot_info_t* mbd) {
     print_debug(LT_OK, "kernel heap initialised\n");
 
     if(mbd->flags & MULTIBOOT_INFO_BOOT_LOADER_NAME)
-        print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + VMBASE_KERNEL);
+        print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + KERNEL_START);
 
     
     // if(mbd->flags & MULTIBOOT_INFO_AOUT_SYMS) {
@@ -226,13 +225,13 @@ void kmain(multiboot_info_t* mbd) {
     // so we dont need to check the flag
     multiboot_elf_section_header_table_t* elf_sec = &(mbd->u.elf_sec);
     elf_section_header_t* shstrtab_sh = (elf_section_header_t*)
-            (elf_sec->addr + VMBASE_KERNEL + elf_sec->shndx * elf_sec->size);
-    char* shstrtab = (char*)(shstrtab_sh->addr + VMBASE_KERNEL);
+            (elf_sec->addr + KERNEL_START + elf_sec->shndx * elf_sec->size);
+    char* shstrtab = (char*)(shstrtab_sh->addr + KERNEL_START);
 
     // find symtab and strtab
     for(unsigned i = 0; i < elf_sec->num; i++) {
         elf_section_header_t* sh = (elf_section_header_t*)
-            (elf_sec->addr + VMBASE_KERNEL + i * elf_sec->size);
+            (elf_sec->addr + KERNEL_START + i * elf_sec->size);
         char* sec_name = shstrtab + sh->name;
 
         if(strcmp(sec_name, ".symtab")) {
@@ -241,7 +240,7 @@ void kmain(multiboot_info_t* mbd) {
         }
         else if(strcmp(sec_name, ".strtab")) {
             print_debug(LT_IF, "found .strtab section\n");
-            kernel_set_strtab_ptr(sh->addr + VMBASE_KERNEL);
+            kernel_set_strtab_ptr(sh->addr + KERNEL_START);
         }
     }
 

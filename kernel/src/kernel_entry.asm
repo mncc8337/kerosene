@@ -35,8 +35,8 @@ kernel_stack_top:
 section .data
 multiboot_ptr: dd 0
 align 4096
-global page_directory
-page_directory:
+global kernel_page_directory
+kernel_page_directory:
     times 1024 dd 0x00000000
 page_table_4mib:
     times 1024 dd 0x00000000
@@ -48,7 +48,7 @@ global kernel_entry
 kernel_entry:
     cmp eax, 0x2BADB002 ; check multiboot magic
     jne hang ;  hang if invalid
-    mov [multiboot_ptr - VMBASE_KERNEL], ebx ; save multiboot ptr
+    mov [multiboot_ptr - KERNEL_START], ebx ; save multiboot ptr
     ; now eax and ebx are free to use
 
     ; add page tables to page directory
@@ -58,21 +58,21 @@ kernel_entry:
     ; the system will process the page directory as a page table
     ; thus mapping all the page table address for us
     ; isn't it genius?
-    mov eax, page_directory - VMBASE_KERNEL
+    mov eax, kernel_page_directory - KERNEL_START
     or eax, 0b011
-    mov [page_directory - VMBASE_KERNEL + 1023 * 4], eax
+    mov [kernel_page_directory - KERNEL_START + 1023 * 4], eax
 
-    mov eax, page_table_4mib - VMBASE_KERNEL
+    mov eax, page_table_4mib - KERNEL_START
     or eax, 0b011
-    mov [page_directory - VMBASE_KERNEL + phys_to_virt(0)], eax
+    mov [kernel_page_directory - KERNEL_START + phys_to_virt(0)], eax
 
-    mov eax, page_table_kernel1 - VMBASE_KERNEL
+    mov eax, page_table_kernel1 - KERNEL_START
     ; FIXME: kernel is temporary accessible to user (flag 0b111)
     or eax, 0b111
-    mov [page_directory - VMBASE_KERNEL + phys_to_virt(VMBASE_KERNEL)], eax
+    mov [kernel_page_directory - KERNEL_START + phys_to_virt(KERNEL_START)], eax
 
     ; map the first 4mb
-    mov edi, page_table_4mib - VMBASE_KERNEL
+    mov edi, page_table_4mib - KERNEL_START
     mov eax, 0x0
     or eax, 0b011
     mov ecx, 1024
@@ -83,7 +83,7 @@ kernel_entry:
     loop .loop_4mib
 
     ; map kernel to 0xc0000000
-    mov edi, page_table_kernel1 - VMBASE_KERNEL
+    mov edi, page_table_kernel1 - KERNEL_START
     mov eax, 0x0
     ; FIXME: kernel is temporary accessible to user (flag 0b111)
     or eax, 0b111
@@ -97,7 +97,7 @@ kernel_entry:
     loop .loop_kernel1
 
     ; load page directory
-    mov eax, page_directory - VMBASE_KERNEL
+    mov eax, kernel_page_directory - KERNEL_START
     mov cr3, eax
 
     ; enable paging
@@ -111,7 +111,7 @@ kernel_entry:
 
 higher_half:
     ; unmap the first 4MiB identity
-    mov dword [page_directory], 0x0
+    mov dword [kernel_page_directory], 0x0
     invlpg [0]
 
     mov esp, kernel_stack_top

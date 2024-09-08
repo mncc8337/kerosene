@@ -1,5 +1,5 @@
 # Kerosene
-A hobby x86 OS written in C  
+A hobby x86 monolithic OS written in C  
 This is an attempt of me to learn about osdev  
 ## Features
 - PS/2 keyboard driver
@@ -110,6 +110,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     - [ ] read file
     - [ ] write file
 - [ ] process manager
+- [ ] multitasking
 - [ ] load and run ELF file
 ## Known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found

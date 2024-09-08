@@ -16,7 +16,7 @@ heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags) 
     if(!(flags & HEAP_SUPERVISOR)) f |= PTE_USER;
     if(!(flags & HEAP_READONLY)) f |= PTE_WRITABLE;
     for(unsigned i = 0; i < size; i += MMNGR_PAGE_SIZE)
-        vmmngr_map_page(phys + i, start + i, f);
+        vmmngr_map(NULL, phys + i, start + i, f);
 
     heap_t* heap = (heap_t*)start;
     heap->end = start + size;
@@ -43,7 +43,7 @@ bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header) {
     if(!(heap->flags & HEAP_SUPERVISOR)) flags |= PTE_USER;
     if(!(heap->flags & HEAP_READONLY)) flags |= PTE_WRITABLE;
     for(unsigned i = 0; i < page_count; i++)
-        vmmngr_map_page(new_page + i * MMNGR_PAGE_SIZE, heap->end + i * MMNGR_PAGE_SIZE, flags);
+        vmmngr_map(NULL, new_page + i * MMNGR_PAGE_SIZE, heap->end + i * MMNGR_PAGE_SIZE, flags);
 
     // assume that last_header is valid
 
@@ -75,7 +75,7 @@ void heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header) 
     last_header->size -= page_count * MMNGR_PAGE_SIZE;
     while(page_count > 0) {
         heap->end -= MMNGR_PAGE_SIZE;
-        vmmngr_unmap_page(heap->end);
+        vmmngr_unmap(NULL, heap->end);
         page_count--;
     }
 }

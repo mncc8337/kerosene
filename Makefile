@@ -22,6 +22,7 @@ C_SRC = kernel/src/*.c \
 		kernel/src/driver/ata/*.c \
 		kernel/src/filesystem/*.c \
 		kernel/src/mem/*.c \
+		kernel/src/process/*.c \
 
 ASM_SRC = kernel/src/system/*.asm \
 
@@ -34,13 +35,24 @@ LIBC_OBJ = $(addprefix $(BIN), $(_LIBC_OBJ))
 LIBK_OBJ = $(addprefix $(BIN), $(_LIBK_OBJ))
 OBJ = $(addprefix $(BIN), $(_OBJ))
 
-DEFINES = -DVMBASE_KERNEL=0xc0000000 \
-		  -DVMBASE_VIDEO=0xcd000000 \
-		  -DTIMER_FREQUENCY=1000 \
-		  -DKHEAP_START=0xcf000000 \
-		  -DKHEAP_INITAL_SIZE=0x100000 \
-		  -DKHEAP_MAX_SIZE=0x1000000 \
-		  -D__is_libk \
+KERNEL_START      = 0xc0000000
+# address reserved for editing page directories
+VMMNGR_RESERVED   = 0xc03ff000
+VIDEO_START       = 0xc0400000
+# kernel heap config
+KHEAP_START       = 0xc0800000
+KHEAP_INITAL_SIZE = 0x100000
+KHEAP_MAX_SIZE    = 0x1000000
+# timer config
+TIMER_FREQUENCY   = 1000
+
+DEFINES = -DKERNEL_START=$(KERNEL_START) \
+		  -DVMMNGR_RESERVED=$(VMMNGR_RESERVED) \
+		  -DVIDEO_START=$(VIDEO_START) \
+		  -DKHEAP_START=$(KHEAP_START) \
+		  -DKHEAP_INITAL_SIZE=$(KHEAP_INITAL_SIZE) \
+		  -DKHEAP_MAX_SIZE=$(KHEAP_MAX_SIZE) \
+		  -DTIMER_FREQUENCY=$(TIMER_FREQUENCY) \
 
 C_INCLUDES = -I./kernel/src -I./kernel/include -I./libc/include
 
@@ -116,6 +128,8 @@ $(BIN)%.o: kernel/src/driver/ata/%.c
 $(BIN)%.o: kernel/src/filesystem/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)%.o: kernel/src/mem/%.c
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN)%.o: kernel/src/process/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
 $(BIN)%.asm.o: kernel/src/system/%.asm

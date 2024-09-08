@@ -18,9 +18,6 @@ typedef uint32_t pte_t;
 typedef uint32_t physical_addr_t;
 typedef uint32_t virtual_addr_t;
 
-#define PAGE_DIRECTORY_INDEX(x) (((x) >> 22) & 0x3ff)
-#define PAGE_TABLE_INDEX(x) (((x) >> 12) & 0x3ff)
-
 #define PTE_PRESENT       1
 #define PTE_WRITABLE      2
 #define PTE_USER          4
@@ -43,13 +40,10 @@ typedef uint32_t virtual_addr_t;
 #define PDE_CPU_GLOBAL 0x100
 #define PDE_LV4_GLOBAL 0x200
 
-typedef struct {
-    pte_t entry[1024] __attribute__((aligned(4096)));
-} __attribute__((packed)) page_table_t;
-
-typedef struct {
-    pde_t entry[1024] __attribute__((aligned(4096)));
-} __attribute__((packed)) page_directory_t;
+#define PAGE_DIRECTORY_INDEX(addr) (((addr) >> 22) & 0x3ff)
+#define PAGE_TABLE_INDEX(addr) (((addr) >> 12) & 0x3ff)
+#define PAGE_TABLE_LOOKUP(page, addr) (&(page)->entry[PAGE_TABLE_INDEX(addr)])
+#define PAGE_DIRECTORY_LOOKUP(page, addr) (&(page)->entry[PAGE_DIRECTORY_INDEX(addr)])
 
 #define HEAP_SUPERVISOR 0b01
 #define HEAP_READONLY   0b10
@@ -61,17 +55,24 @@ typedef struct {
 #define HEAP_FIRST_HEADER(heap) (heap_header_t*)((void*)(heap) + sizeof(heap_t))
 
 typedef struct {
+    pte_t entry[1024] __attribute__((aligned(4096)));
+} __attribute__((packed)) page_table_t;
+
+typedef struct {
+    pde_t entry[1024] __attribute__((aligned(4096)));
+} __attribute__((packed)) page_directory_t;
+
+typedef struct {
     uint32_t end;
     uint32_t max_addr;
     uint32_t min_size;
     uint8_t flags;
-} heap_t;
+} __attribute__((packed)) heap_t;
 
 typedef struct heap_header {
     uint32_t magic;
     uint32_t size;
     struct heap_header* prev;
-    // uint32_t caller;
 } __attribute__((packed)) heap_header_t;
 
 // pmmngr.c
@@ -88,18 +89,16 @@ void pmmngr_free_multi_block(void* base, size_t cnt);
 void pmmngr_init(size_t size);
 
 // vmmngr.c
-uint32_t* vmmngr_page_table_lookup_entry(page_table_t* p, virtual_addr_t addr);
-uint32_t* vmmngr_page_directory_lookup_entry(page_directory_t* p, virtual_addr_t addr);
 page_directory_t* vmmngr_get_directory();
+physical_addr_t vmmngr_to_physical_addr(page_directory_t* pd, virtual_addr_t virt);
+MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags);
+MEM_ERR vmmngr_unmap(page_directory_t* page_directory, virtual_addr_t virt);
 MEM_ERR vmmngr_alloc_page(pte_t* pte);
 void vmmngr_free_page(pte_t* pte);
-MEM_ERR vmmngr_map_page(physical_addr_t phys, virtual_addr_t virt, unsigned flags);
-MEM_ERR vmmngr_unmap_page(virtual_addr_t virt);
-physical_addr_t vmmngr_to_physical_addr(virtual_addr_t virt);
-MEM_ERR vmmngr_switch_pdirectory(page_directory_t* dir);
-void vmmngr_load_page_directory(physical_addr_t addr);
+page_directory_t* vmmngr_alloc_page_directory();
+MEM_ERR vmmngr_switch_page_directory(page_directory_t* dir, physical_addr_t pdbr);
 void vmmngr_flush_tlb_entry(virtual_addr_t addr);
-MEM_ERR vmmngr_init();
+void vmmngr_init();
 
 // heap.c
 heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags);
