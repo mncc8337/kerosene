@@ -1,5 +1,7 @@
 #include "mem.h"
 
+#include "string.h"
+
 #define PAGE_FRAME_BITS 0x7ffff000
 
 // our page table VIRTUAL address can be get by adding 0xffc00000 (4*1024*1024*1023)
@@ -20,6 +22,20 @@ static void page_entry_del_attrib(uint32_t* pe, uint16_t attrib) {
     *pe &= ~(attrib & 0xfff);
 }
 
+
+static page_directory_t* mapped_temporal_pd = 0;
+static void map_temporal_pd(page_directory_t* pd) {
+    if(pd == mapped_temporal_pd) return;
+    mapped_temporal_pd = pd;
+
+    vmmngr_map(NULL, (physical_addr_t)pd, VMMNGR_RESERVED, PTE_PRESENT | PTE_WRITABLE);
+}
+
+// default page directory
+// note that it is allocated within the kernel code
+// so it is always accessible because the kernel is always mapped to KERNEL_START
+extern void* kernel_page_directory;
+
 page_directory_t* vmmngr_get_directory() {
     return current_page_directory;
 }
@@ -36,8 +52,14 @@ physical_addr_t vmmngr_to_physical_addr(page_directory_t* pd, virtual_addr_t vir
 }
 
 MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags) {
-    if(page_directory == NULL) page_directory = current_page_directory;
-    pde_t* pde = PAGE_DIRECTORY_LOOKUP(page_directory, virt);
+    page_directory_t* virt_pd;
+    if(page_directory == NULL) virt_pd = (page_directory_t*)VMMNGR_PD;
+    else {
+        map_temporal_pd(page_directory);
+        virt_pd = (page_directory_t*)VMMNGR_RESERVED;
+    }
+
+    pde_t* pde = PAGE_DIRECTORY_LOOKUP(virt_pd, virt);
 
     bool new_table = false;
     // if the page table is not present then allocate it
@@ -55,7 +77,7 @@ MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtu
 
     // clear the table if we have just created it
     if(new_table)
-        for(unsigned i = 0; i < 1024; i++) table->entry[i] = 0x0;
+        memset(table, 0, sizeof(page_table_t));
 
     pte_t* pte = PAGE_TABLE_LOOKUP(table, virt);
     page_entry_add_attrib(pte, PTE_PRESENT | flags);
@@ -67,8 +89,14 @@ MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtu
 }
 
 MEM_ERR vmmngr_unmap(page_directory_t* page_directory, virtual_addr_t virt) {
-    if(page_directory == NULL) page_directory = current_page_directory;
-    pde_t* pde = PAGE_DIRECTORY_LOOKUP(current_page_directory, virt);
+    page_directory_t* virt_pd;
+    if(page_directory == NULL) virt_pd = (page_directory_t*)VMMNGR_PD;
+    else {
+        map_temporal_pd(page_directory);
+        virt_pd = (page_directory_t*)VMMNGR_RESERVED;
+    }
+
+    pde_t* pde = PAGE_DIRECTORY_LOOKUP(virt_pd, virt);
     if(!(*pde & PDE_PRESENT)) return ERR_MEM_UNMAPPED;
 
     page_table_t* table = PAGE_TABLE_ADDR(PAGE_DIRECTORY_INDEX((uint32_t)virt));
@@ -106,25 +134,31 @@ page_directory_t* vmmngr_alloc_page_directory() {
     page_directory_t* pd = (page_directory_t*)pmmngr_alloc_block();
     if(pd == NULL) return NULL;
 
-    vmmngr_map(NULL, (physical_addr_t)pd, VMMNGR_RESERVED, PTE_PRESENT | PTE_WRITABLE);
-    page_directory_t* pd_virt = (page_directory_t*)VMMNGR_RESERVED;
+    map_temporal_pd(pd);
+    page_directory_t* virt_pd = (page_directory_t*)VMMNGR_RESERVED;
 
-    // TODO: copy the kernel page directory instead of clearing
-    for(unsigned i = 0; i < 1024; i++) pd_virt->entry[i] = 0;
+    // copy from the default page directory
+    // which map the kernel to KERNEL_START
+    page_directory_t* kernel_pd = (page_directory_t*)(&kernel_page_directory);
+    memcpy(virt_pd, kernel_pd, sizeof(page_directory_t));
 
     // set final entry to itself for recursive paging
-    pde_t* pde = &pd_virt->entry[1023];
+    pde_t* pde = &virt_pd->entry[1023];
     page_entry_add_attrib(pde, PDE_PRESENT | PDE_WRITABLE);
     page_entry_set_frame(pde, (physical_addr_t)pd);
+
+    // map itself to VMMNGR_PD
+    vmmngr_map(pd, (physical_addr_t)pd, VMMNGR_PD, PDE_PRESENT | PDE_WRITABLE);
 
     return pd;
 }
 
-MEM_ERR vmmngr_switch_page_directory(page_directory_t* dir, physical_addr_t pdbr) {
+MEM_ERR vmmngr_switch_page_directory(page_directory_t* dir) {
     if(!dir) return ERR_MEM_INVALID_DIR;
 
     current_page_directory = dir;
-    asm volatile("mov %0, %%cr3" : : "r" (pdbr));
+    mapped_temporal_pd = 0;
+    asm volatile("mov %0, %%cr3" : : "r" (dir));
     return ERR_MEM_SUCCESS;
 }
 
@@ -132,8 +166,8 @@ void vmmngr_flush_tlb_entry(virtual_addr_t addr) {
 	asm volatile("invlpg (%0)" : : "b" ((void*)addr) : "memory");
 }
 
-extern void* kernel_page_directory;
 void vmmngr_init() {
     // reuse the page directory in kernel_entry.asm
-    current_page_directory = (page_directory_t*)(&kernel_page_directory);
+    // note that it must be the physical address
+    current_page_directory = (page_directory_t*)((unsigned)&kernel_page_directory - KERNEL_START);
 }

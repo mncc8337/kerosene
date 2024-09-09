@@ -1,6 +1,7 @@
 #include "multiboot.h"
 
 #include "system.h"
+#include "process.h"
 #include "syscall.h"
 #include "mem.h"
 
@@ -173,6 +174,84 @@ void disk_init() {
     }
 }
 
+void enter_usermode() {
+    puts("entering usermode ...");
+
+    // enter usermode
+    uint32_t esp = 0;
+    asm volatile("mov %%esp, %%eax" : "=a" (esp));
+    tss_set_stack(esp);
+    asm volatile(
+        "cli;"
+        "mov $0x23, %ax;"
+        "mov %ax, %dS;"
+        "mov %ax, %es;"
+        "mov %ax, %fs;"
+        "mov %ax, %gs;"
+
+        "mov %esp, %eax;"
+        "pushl $0x23;"
+        "pushl %eax;"
+        "pushf;"
+
+        // enabler IF flag in EFLAGS (which will enable interrupts after `iret`)
+        "pop %eax;"
+        "or $0x200, %eax;"
+        "push %eax;"
+
+        "pushl $0x1b;"
+        "push $1f;"
+        "iret;"
+        "1:"
+    );
+
+    // test syscall
+    int ret;
+    SYSCALL_0P(SYSCALL_TEST, ret);
+
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'h');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'o');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'u');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 's');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, '!');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, '\n');
+
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'c');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'u');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'n');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 't');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 't');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'i');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'm');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ':');
+    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
+
+    SYSCALL_0P(SYSCALL_TIME, ret);
+    char conv[64];
+    itoa(ret, conv, 10);
+    for(unsigned i = 0; i < 64 && conv[i] != '\0'; i++)
+        SYSCALL_1P(SYSCALL_PUTCHAR, ret, conv[i]);
+
+    // hlt instruction should be illegal
+    asm("hlt");
+}
+
+void test_process() {
+    puts("this is a process");
+    return;
+}
+
 extern char kernel_start;
 extern char kernel_end;
 void kmain(multiboot_info_t* mbd) {
@@ -251,11 +330,13 @@ void kmain(multiboot_info_t* mbd) {
     isr_init();
     print_debug(LT_OK, "ISR initialised\n");
 
-    if(!fs_mngr_init()) disk_init();
-    else print_debug(LT_ER, "failed to initialise FS. not enough memory\n");
+    process_init();
 
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
+
+    if(!fs_mngr_init()) disk_init();
+    else print_debug(LT_ER, "failed to initialise FS. not enough memory\n");
 
     locale_set_keyboard_layout(KBD_LAYOUT_US);
     print_debug(LT_IF, "set keyboard layout to US\n");
@@ -271,6 +352,10 @@ void kmain(multiboot_info_t* mbd) {
 
     print_debug(LT_IF, "done initialising\n");
 
+    page_directory_t* new_pd = vmmngr_alloc_page_directory();
+    int pid = process_new(new_pd, 0, (uint32_t)test_process);
+    process_exec(pid);
+
     if(!shell_init()) {
         // only set if fs is available
         if(fs) shell_set_root_node(fs->root_node);
@@ -278,76 +363,7 @@ void kmain(multiboot_info_t* mbd) {
     }
     else puts("not enough memory for kshell. quitting");
 
-    puts("entering usermode ...");
-
-    // enter usermode
-    uint32_t esp = 0;
-    asm volatile("mov %%esp, %%eax" : "=a" (esp));
-    tss_set_stack(esp);
-    asm volatile(
-        "cli;"
-        "mov $0x23, %ax;"
-        "mov %ax, %ds;"
-        "mov %ax, %es;"
-        "mov %ax, %fs;"
-        "mov %ax, %gs;"
-
-        "mov %esp, %eax;"
-        "pushl $0x23;"
-        "pushl %eax;"
-        "pushf;"
-
-        // enabler IF flag in EFLAGS (which will enable interrupts after `iret`)
-        "pop %eax;"
-        "or $0x200, %eax;"
-        "push %eax;"
-
-        "pushl $0x1b;"
-        "push $1f;"
-        "iret;"
-        "1:"
-    );
-
-    // test syscall
-    int ret;
-    SYSCALL_0P(SYSCALL_TEST, ret);
-
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'h');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'o');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'u');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 's');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, '!');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, '\n');
-
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'c');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'u');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'n');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 't');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 't');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'i');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'm');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ':');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
-
-    SYSCALL_0P(SYSCALL_TIME, ret);
-    char conv[64];
-    itoa(ret, conv, 10);
-    for(unsigned i = 0; i < 64 && conv[i] != '\0'; i++)
-        SYSCALL_1P(SYSCALL_PUTCHAR, ret, conv[i]);
-
-    // hlt instruction should be illegal
-    asm("hlt");
+    enter_usermode();
 
     while(true);
 }

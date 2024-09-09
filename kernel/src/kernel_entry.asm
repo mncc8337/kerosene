@@ -89,12 +89,19 @@ kernel_entry:
     or eax, 0b111
     ; NOTE: .text and .rodata are actually should only be readable
     ; but idk how to do it separately so just set them to read/write for now
-    mov ecx, 1024
+    mov ecx, 1023 ; reserve the final entry of page_table_kernel1
 .loop_kernel1:
     mov [edi], eax
     add edi, 4
     add eax, 4096
     loop .loop_kernel1
+
+    ; map kernel_page_directory using the final entry
+    ; this will be mapped to 0xc03ff000 (VMMNGR_PD)
+    mov eax, kernel_page_directory - KERNEL_START
+    ; FIXME: kernel is temporary accessible to user (flag 0b111)
+    or eax, 0b111
+    mov [edi], eax
 
     ; load page directory
     mov eax, kernel_page_directory - KERNEL_START

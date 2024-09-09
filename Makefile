@@ -8,6 +8,8 @@ ASM = nasm
 
 BIN = bin/
 
+# kernel defines
+
 LIBC_SRC = libc/src/stdio/*.c \
 		   libc/src/stdlib/*.c \
 		   libc/src/string/*.c \
@@ -35,24 +37,38 @@ LIBC_OBJ = $(addprefix $(BIN), $(_LIBC_OBJ))
 LIBK_OBJ = $(addprefix $(BIN), $(_LIBK_OBJ))
 OBJ = $(addprefix $(BIN), $(_OBJ))
 
+# user defines
+USER_C_SRC = userapp/*.c
+_USER_ELF = $(addsuffix .elf, $(basename $(notdir $(wildcard $(USER_C_SRC)))))
+_USER_BIN = $(addsuffix .bin, $(basename $(notdir $(wildcard $(USER_C_SRC)))))
+USER_ELF = $(addprefix fsfiles/, $(_USER_ELF))
+
+# kernel configs
+
 KERNEL_START      = 0xc0000000
 # address reserved for editing page directories
-VMMNGR_RESERVED   = 0xc03ff000
+VMMNGR_RESERVED   = 0xc03fe000
+# address for current page directory to be mapped in
+VMMNGR_PD         = 0xc03ff000
 VIDEO_START       = 0xc0400000
-# kernel heap config
+# kernel heap
 KHEAP_START       = 0xc0800000
 KHEAP_INITAL_SIZE = 0x100000
 KHEAP_MAX_SIZE    = 0x1000000
-# timer config
+# timer
 TIMER_FREQUENCY   = 1000
+# userspace
+USER_START = 0x0
 
 DEFINES = -DKERNEL_START=$(KERNEL_START) \
 		  -DVMMNGR_RESERVED=$(VMMNGR_RESERVED) \
+		  -DVMMNGR_PD=$(VMMNGR_PD) \
 		  -DVIDEO_START=$(VIDEO_START) \
 		  -DKHEAP_START=$(KHEAP_START) \
 		  -DKHEAP_INITAL_SIZE=$(KHEAP_INITAL_SIZE) \
 		  -DKHEAP_MAX_SIZE=$(KHEAP_MAX_SIZE) \
 		  -DTIMER_FREQUENCY=$(TIMER_FREQUENCY) \
+		  -DUSER_START=$(USER_START) \
 
 C_INCLUDES = -I./kernel/src -I./kernel/include -I./libc/include
 
@@ -73,9 +89,9 @@ ifdef NO_CROSS_COMPILER
 endif
 
 
-.PHONY: all libc libk kernel disk copyfs run run-debug clean clean-all
+.PHONY: all libc libk kernel disk userapp copyfs run run-debug clean clean-all
 
-all: $(BIN) $(BIN)kerosene.elf libk libc disk copyfs
+all: $(BIN) $(BIN)kerosene.elf libk libc disk userapp copyfs
 
 $(BIN):
 	mkdir $(BIN)
@@ -139,6 +155,10 @@ $(BIN)kerosene.elf: $(BIN)kernel_entry.o $(OBJ) $(BIN)libk.a
 	# use GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lk
 
+# userapp
+fsfiles/%.elf: userapp/%.c
+	$(CC) $(C_INCLUDES) -ffreestanding -nostdlib -Ttext 0x0 -lgcc -o $@ $< -L./bin -lc
+
 libc: $(BIN)libc.a
 
 libk: $(BIN)libk.a
@@ -147,6 +167,8 @@ kernel: $(BIN)kerosene.elf
 
 disk: kernel
 	./script/gendiskimage.sh 65536
+
+userapp: $(USER_ELF)
 
 copyfs: disk
 	./script/cpyfile.sh grub.cfg ./mnt/boot/grub/ # update grub config
