@@ -1,7 +1,11 @@
 #include "process.h"
+#include "system.h"
 #include "mem.h"
 
+#include "kshell.h"
+
 #include "string.h"
+#include "stdio.h"
 
 static process_t* current_process;
 static process_t* process_list;
@@ -17,8 +21,6 @@ int process_new(page_directory_t* pd, int priority, uint32_t eip) {
 
     thread_t* first_thread = new_process->thread_list;
     first_thread->parent = current_process;
-    first_thread->stack_size = 16 * 1024;
-    first_thread->stack = kmalloc(first_thread->stack_size) - first_thread->stack_size;
     first_thread->kernel_stack = 0;
     first_thread->priority = 0;
     first_thread->state = PROCESS_ACTIVE;
@@ -34,25 +36,95 @@ int process_new(page_directory_t* pd, int priority, uint32_t eip) {
 
 int process_fork() {}
 
-void process_exec(int pid) {
-    process_t* proc = process_list;
-    while(proc && proc ->pid != pid)
-        proc = proc->next;
+void process_exec() {
+    // process_t* proc = process_list;
+    // while(proc && proc->pid != pid)
+    //     proc = proc->next;
+    process_t* proc = current_process;
     if(!proc || !proc->page_directory) return;
-
-    proc->state = PROCESS_ACTIVE;
 
     thread_t* first_thread = proc->thread_list;
 
-    page_directory_t* saved_pd = vmmngr_get_directory();
-    uint32_t saved_esp; asm volatile("mov %%esp, %%eax" : "=a" (saved_esp));
+    uint32_t esp = 0;
+    asm("mov %%esp, %%eax" : "=a" (esp));
+    tss_set_stack(esp);
+
     vmmngr_switch_page_directory(proc->page_directory);
 
-    // asm("mov %0, %%esp" : : "r"(first_thread->stack));
-    asm("mov %0, %%eax; call %%eax" : : "r"(first_thread->frame.eip));
+    // create a heap for the process
+    heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
+    first_thread->stack_size = 16 * 1024;
+    first_thread->stack = heap_alloc(heap, first_thread->stack_size, false) - first_thread->stack_size;
 
-    vmmngr_switch_page_directory(saved_pd);
-    asm("mov %0, %%esp" : : "r"(saved_esp));
+    // enter user mode
+    asm(
+        "cli;"
+        "mov $0x23, %%ax;"
+        "mov %%ax, %%ds;"
+        "mov %%ax, %%es;"
+        "mov %%ax, %%fs;"
+        "mov %%ax, %%gs;"
+
+        "pushl $0x23;"
+        "pushl %0;" // esp
+        "pushf;"
+
+        "pop %%eax;"
+        "or $0x200, %%eax;"
+        "push %%eax;"
+
+        "pushl $0x1b;"
+        "push %1;" // eip
+        "iret;"
+        : : "r" (first_thread->stack), "r" (first_thread->frame.eip)
+    );
+}
+
+void process_terminate() {
+    // NOTE: WIP!
+
+    process_t* proc = current_process;
+    if(!proc || !proc->page_directory || proc->pid == 0) return;
+
+    // get back to kernel mode
+    asm(
+        "cli;"
+        "mov $0x10, %eax;"
+        "mov %ax, %ds;"
+        "mov %ax, %es;"
+        "mov %ax, %fs;"
+        "mov %ax, %gs;"
+        "sti;"
+    );
+
+    // free page tables
+    vmmngr_map_temporary_pd(proc->page_directory);
+    page_directory_t* virt_pd = (page_directory_t*)VMMNGR_RESERVED;
+    for(unsigned i = 0; i < 1024; i++)
+        if(virt_pd->entry[i] != 0)
+            pmmngr_free_block((void*)(virt_pd->entry[i] >> 12));
+    // now free the page directory
+    pmmngr_free_block((void*)proc->page_directory);
+
+    // store the pid and free memory
+    int pid = proc->pid;
+    kfree((void*)proc);
+
+    // find the previous process and set it to current process
+    process_t* prev_proc = 0;
+    proc = process_list;
+    while(proc && proc->pid != pid) {
+        prev_proc = proc;
+        proc = proc->next;
+    }
+    if(prev_proc == 0) return; // this will never happend
+    prev_proc->next = 0;
+    vmmngr_switch_page_directory(prev_proc->page_directory);
+    current_process = prev_proc;
+
+    // comeback to kshell
+    // TODO: it is better to continue the previous process lol
+    shell_start();
 }
 
 void process_switch() {}

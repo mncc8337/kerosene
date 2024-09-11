@@ -1,10 +1,11 @@
 #pragma once
 
-#define MAX_SYSCALL 3
+#define MAX_SYSCALL 4
 
-#define SYSCALL_TEST    0
-#define SYSCALL_PUTCHAR 1
-#define SYSCALL_TIME    2
+#define SYSCALL_TEST              0
+#define SYSCALL_PUTCHAR           1
+#define SYSCALL_TIME              2
+#define SYSCALL_PROCESS_TERMINATE 3
 
 #define SYSCALL_0P(id, ret) \
 asm volatile("int $0x80" : "=a" (ret) : "0" (id))

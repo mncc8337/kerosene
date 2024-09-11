@@ -58,7 +58,9 @@ KHEAP_MAX_SIZE    = 0x1000000
 # timer
 TIMER_FREQUENCY   = 1000
 # userspace
-USER_START = 0x0
+UHEAP_START       = 0x100000
+UHEAP_INITAL_SIZE = 0x100000
+UHEAP_MAX_SIZE    = 0x1000000
 
 DEFINES = -DKERNEL_START=$(KERNEL_START) \
 		  -DVMMNGR_RESERVED=$(VMMNGR_RESERVED) \
@@ -68,7 +70,9 @@ DEFINES = -DKERNEL_START=$(KERNEL_START) \
 		  -DKHEAP_INITAL_SIZE=$(KHEAP_INITAL_SIZE) \
 		  -DKHEAP_MAX_SIZE=$(KHEAP_MAX_SIZE) \
 		  -DTIMER_FREQUENCY=$(TIMER_FREQUENCY) \
-		  -DUSER_START=$(USER_START) \
+		  -DUHEAP_START=$(UHEAP_START) \
+		  -DUHEAP_INITIAL_SIZE=$(UHEAP_INITAL_SIZE) \
+		  -DUHEAP_MAX_SIZE=$(UHEAP_MAX_SIZE) \
 
 C_INCLUDES = -I./kernel/src -I./kernel/include -I./libc/include
 
@@ -157,7 +161,7 @@ $(BIN)kerosene.elf: $(BIN)kernel_entry.o $(OBJ) $(BIN)libk.a
 
 # userapp
 fsfiles/%.elf: userapp/%.c
-	$(CC) $(C_INCLUDES) -ffreestanding -nostdlib -Ttext 0x0 -lgcc -o $@ $< -L./bin -lc
+	$(CC) -I./libc/include -ffreestanding -nostdlib -Ttext 0x0 -lgcc -o $@ $< -L./bin -lc
 
 libc: $(BIN)libc.a
 

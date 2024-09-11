@@ -89,6 +89,7 @@ void pmmngr_free_multi_block(void* base, size_t cnt);
 void pmmngr_init(size_t size);
 
 // vmmngr.c
+void vmmngr_map_temporary_pd(page_directory_t* pd);
 page_directory_t* vmmngr_get_directory();
 physical_addr_t vmmngr_to_physical_addr(page_directory_t* pd, virtual_addr_t virt);
 MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags);

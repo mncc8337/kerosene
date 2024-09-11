@@ -1,5 +1,7 @@
 #include "syscall.h"
 #include "system.h"
+#include "process.h"
+
 #include "stdio.h"
 #include "time.h"
 
@@ -15,10 +17,15 @@ static unsigned syscall_time() {
     return time(NULL);
 }
 
+static void syscall_process_terminate() {
+    process_terminate();
+}
+
 static void* syscalls[MAX_SYSCALL] = {
     syscall_test,
     syscall_putchar,
-    syscall_time
+    syscall_time,
+    syscall_process_terminate,
 };
 
 static void syscall_dispatcher(regs_t* regs) {

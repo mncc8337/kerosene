@@ -39,6 +39,7 @@ typedef struct process {
 
 int process_new(page_directory_t* pd, int priority, uint32_t eip);
 int process_fork();
-void process_exec(int pid);
+void process_exec();
+void process_terminate();
 void process_switch();
 void process_init();

@@ -24,7 +24,7 @@ static void page_entry_del_attrib(uint32_t* pe, uint16_t attrib) {
 
 
 static page_directory_t* mapped_temporal_pd = 0;
-static void map_temporal_pd(page_directory_t* pd) {
+void vmmngr_map_temporary_pd(page_directory_t* pd) {
     if(pd == mapped_temporal_pd) return;
     mapped_temporal_pd = pd;
 
@@ -55,7 +55,7 @@ MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtu
     page_directory_t* virt_pd;
     if(page_directory == NULL) virt_pd = (page_directory_t*)VMMNGR_PD;
     else {
-        map_temporal_pd(page_directory);
+        vmmngr_map_temporary_pd(page_directory);
         virt_pd = (page_directory_t*)VMMNGR_RESERVED;
     }
 
@@ -92,7 +92,7 @@ MEM_ERR vmmngr_unmap(page_directory_t* page_directory, virtual_addr_t virt) {
     page_directory_t* virt_pd;
     if(page_directory == NULL) virt_pd = (page_directory_t*)VMMNGR_PD;
     else {
-        map_temporal_pd(page_directory);
+        vmmngr_map_temporary_pd(page_directory);
         virt_pd = (page_directory_t*)VMMNGR_RESERVED;
     }
 
@@ -134,12 +134,11 @@ page_directory_t* vmmngr_alloc_page_directory() {
     page_directory_t* pd = (page_directory_t*)pmmngr_alloc_block();
     if(pd == NULL) return NULL;
 
-    map_temporal_pd(pd);
+    vmmngr_map_temporary_pd(pd);
     page_directory_t* virt_pd = (page_directory_t*)VMMNGR_RESERVED;
 
-    // copy from the default page directory
-    // which map the kernel to KERNEL_START
-    page_directory_t* kernel_pd = (page_directory_t*)(&kernel_page_directory);
+    // copy the current page directory
+    page_directory_t* kernel_pd = (page_directory_t*)VMMNGR_PD;
     memcpy(virt_pd, kernel_pd, sizeof(page_directory_t));
 
     // set final entry to itself for recursive paging

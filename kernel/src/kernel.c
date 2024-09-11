@@ -184,7 +184,7 @@ void enter_usermode() {
     asm volatile(
         "cli;"
         "mov $0x23, %ax;"
-        "mov %ax, %dS;"
+        "mov %ax, %ds;"
         "mov %ax, %es;"
         "mov %ax, %fs;"
         "mov %ax, %gs;"
@@ -248,8 +248,26 @@ void enter_usermode() {
 }
 
 void test_process() {
-    puts("this is a process");
-    return;
+    int ret;
+    // FIXME: calling syscall with params will cause a page fault
+    // maybe it is sth to do with the "call *%6;" in syscall dispatcher
+
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'h');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'o');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'u');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 's');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, '!');
+    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, '\n');
+
+    SYSCALL_0P(SYSCALL_TEST, ret);
+    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+    while(true);
 }
 
 extern char kernel_start;
@@ -352,18 +370,20 @@ void kmain(multiboot_info_t* mbd) {
 
     print_debug(LT_IF, "done initialising\n");
 
-    page_directory_t* new_pd = vmmngr_alloc_page_directory();
-    int pid = process_new(new_pd, 0, (uint32_t)test_process);
-    process_exec(pid);
-
     if(!shell_init()) {
         // only set if fs is available
         if(fs) shell_set_root_node(fs->root_node);
-        shell_start();
     }
     else puts("not enough memory for kshell. quitting");
 
-    enter_usermode();
+    page_directory_t* new_pd = vmmngr_alloc_page_directory();
+    int pid = process_new(new_pd, 0, (uint32_t)test_process);
+    printf("executing process %d\n", pid);
+    process_exec();
+
+    shell_start();
+
+    puts("system hang");
 
     while(true);
 }
