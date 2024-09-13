@@ -20,9 +20,9 @@ asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2))
 asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3))
 
 #define SYSCALL_4P(id, ret, p1, p2, p3, p4) \
-asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "s" (p4))
+asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "S" (p4))
 
 #define SYSCALL_5P(id, ret, p1, p2, p3, p4, p5) \
-asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "s" (p4), "d" (p5))
+asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "S" (p4), "D" (p5))
 
 void syscall_init();

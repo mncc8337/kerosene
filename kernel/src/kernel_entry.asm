@@ -28,6 +28,8 @@ align 4
 
 section .bss
 ; kernel stack
+global kernel_stack_bottom
+global kernel_stack_top
 kernel_stack_bottom:
 resb 16384 ; 16 KiB
 kernel_stack_top:

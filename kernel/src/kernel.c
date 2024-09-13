@@ -247,32 +247,25 @@ void enter_usermode() {
     asm("hlt");
 }
 
+static void user_print(char* a) {
+    int ret;
+    while(a[0] != '\0') {
+        SYSCALL_1P(SYSCALL_PUTCHAR, ret, a[0]);
+        a++;
+    }
+}
 void test_process() {
     int ret;
-    // FIXME: calling syscall with params will cause a page fault
-    // maybe it is sth to do with the "call *%6;" in syscall dispatcher
-
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'h');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'o');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'u');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 's');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, '!');
-    // SYSCALL_1P(SYSCALL_PUTCHAR, ret, '\n');
+    // user_print("hello user!\n");
 
     SYSCALL_0P(SYSCALL_TEST, ret);
     SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
     while(true);
 }
 
-extern char kernel_start;
-extern char kernel_end;
 void kmain(multiboot_info_t* mbd) {
+    extern char kernel_start;
+    extern char kernel_end;
     kernel_size = &kernel_end - &kernel_start;
 
     // greeting msg to let us know we are in the kernel
@@ -348,7 +341,12 @@ void kmain(multiboot_info_t* mbd) {
     isr_init();
     print_debug(LT_OK, "ISR initialised\n");
 
-    process_init();
+    if(!process_init())
+        print_debug(LT_OK, "process manager initialised\n");
+    else {
+        print_debug(LT_CR, "failed to initialise process manager. not enough memory\n");
+        kernel_panic(NULL);
+    }
 
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
@@ -376,10 +374,9 @@ void kmain(multiboot_info_t* mbd) {
     }
     else puts("not enough memory for kshell. quitting");
 
-    page_directory_t* new_pd = vmmngr_alloc_page_directory();
-    int pid = process_new(new_pd, 0, (uint32_t)test_process);
+    int pid = process_new((uint32_t)test_process);
     printf("executing process %d\n", pid);
-    process_exec();
+    process_exec(pid);
 
     shell_start();
 

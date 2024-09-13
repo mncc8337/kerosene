@@ -26,7 +26,9 @@ C_SRC = kernel/src/*.c \
 		kernel/src/mem/*.c \
 		kernel/src/process/*.c \
 
-ASM_SRC = kernel/src/system/*.asm \
+ASM_SRC = kernel/src/*.asm \
+		  kernel/src/system/*.asm \
+		  kernel/src/process/*.asm \
 
 _LIBC_OBJ = $(addsuffix _libc.o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
 _LIBK_OBJ = $(addsuffix _libk.o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
@@ -128,9 +130,6 @@ $(BIN)libc.a: $(LIBC_OBJ)
 
 # kernel
 
-$(BIN)kernel_entry.o: kernel/src/kernel_entry.asm
-	$(ASM) $(NASMFLAGS) -o $@ $<
-
 $(BIN)%.o: kernel/src/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN)%.o: kernel/src/misc/%.c
@@ -152,10 +151,14 @@ $(BIN)%.o: kernel/src/mem/%.c
 $(BIN)%.o: kernel/src/process/%.c
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 
+$(BIN)%.asm.o: kernel/src/%.asm
+	$(ASM) $(NASMFLAGS) -o $@ $<
 $(BIN)%.asm.o: kernel/src/system/%.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
+$(BIN)%.asm.o: kernel/src/process/%.asm
+	$(ASM) $(NASMFLAGS) -o $@ $<
 
-$(BIN)kerosene.elf: $(BIN)kernel_entry.o $(OBJ) $(BIN)libk.a
+$(BIN)kerosene.elf: $(BIN)kernel_entry.asm.o $(OBJ) $(BIN)libk.a
 	# use GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lk
 
