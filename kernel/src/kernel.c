@@ -174,28 +174,26 @@ void disk_init() {
     }
 }
 
-static void user_print(char* a) {
+void user_print(char* a) {
     int ret;
     while(a[0] != '\0') {
         SYSCALL_1P(SYSCALL_PUTCHAR, ret, a[0]);
         a++;
     }
 }
-void test_process() {
+void user_process() {
     int ret;
     user_print("hello user!\n");
 
     SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
     while(true);
 }
-void create_proc() {
-    process_t* proc = process_new((uint32_t)test_process, true);
-    int pid = proc->pid;
-    printf("pid loc: %x\n", &pid);
-    printf("executing process %d\n", pid);
-    process_switch(proc);
-    printf("process %d exited\n", pid);
-    printf("pid loc: %x\n", &pid);
+void kernel_process() {
+    puts("hello kernel!\n");
+    shell_start();
+
+    process_terminate();
+    while(true);
 }
 
 void kmain(multiboot_info_t* mbd) {
@@ -309,13 +307,24 @@ void kmain(multiboot_info_t* mbd) {
     }
     else puts("not enough memory for kshell. quitting");
 
-    // shell_start();
+    process_t* proc = process_new((uint32_t)user_process, true);
+    int pid = proc->pid;
+    printf("pid loc: %x\n", &pid);
+    printf("executing process %d\n", pid);
+    process_switch(proc);
+    printf("process %d exited\n", pid);
+    printf("pid loc: %x\n", &pid);
 
-    create_proc();
-    create_proc();
-    create_proc();
-    create_proc();
-    create_proc();
+    puts("");
+
+    // FIXME: terminate kernel process will crash
+    // proc = process_new((uint32_t)kernel_process, false);
+    // pid = proc->pid;
+    // printf("pid loc: %x\n", &pid);
+    // printf("executing process %d\n", pid);
+    // process_switch(proc);
+    // printf("process %d exited\n", pid);
+    // printf("pid loc: %x\n", &pid);
 
     puts("no more process. system hang");
 

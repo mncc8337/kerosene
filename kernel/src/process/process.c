@@ -7,7 +7,9 @@
 
 #define KERNEL_PROC_PID 1
 
-static process_t* current_process;
+#define DEFAULT_EFLAGS 0x202
+
+static process_t* current_process = 0;
 static process_t* process_list;
 static process_t* process_list_tail;
 
@@ -33,6 +35,8 @@ process_t* process_get_current() {
 }
 
 process_t* process_new(uint32_t eip, bool is_user) {
+    if(!current_process) return 0;
+
     process_t* new_process = (process_t*)kmalloc(sizeof(process_t));
     if(!new_process) return 0;
     new_process->pid = process_list_tail->pid + 1;
@@ -49,12 +53,17 @@ process_t* process_new(uint32_t eip, bool is_user) {
     first_thread->parent = new_process;
     memset((void*)(&first_thread->frame), 0, sizeof(first_thread->frame));
 
+    page_directory_t* saved_pd = vmmngr_get_directory();
+    vmmngr_switch_page_directory(new_process->page_directory);
+
     heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
     first_thread->stack_size = 16 * 1024;
     first_thread->stack = heap_alloc(heap, first_thread->stack_size, false) + first_thread->stack_size;
     first_thread->frame.esp = (uint32_t)first_thread->stack;
 
-    first_thread->frame.flags = 0x200; // enable interrupts
+    vmmngr_switch_page_directory(saved_pd);
+
+    first_thread->frame.eflags = DEFAULT_EFLAGS;
     first_thread->frame.eip = eip;
     first_thread->next = 0;
 
@@ -64,6 +73,8 @@ process_t* process_new(uint32_t eip, bool is_user) {
 }
 
 void process_switch(process_t* proc) {
+    if(!proc) return;
+
     asm volatile("cli");
 
     // save current process state
@@ -138,7 +149,7 @@ void process_switch(process_t* proc) {
             // let's go
             "iret;"
             : :
-            "g" (fthread->frame.esp), "g" (fthread->frame.flags), "g" (fthread->frame.eip),
+            "g" (fthread->frame.esp), "g" (fthread->frame.eflags), "g" (fthread->frame.eip),
             "g" (fthread->frame.eax), "g" (fthread->frame.ebx), "g" (fthread->frame.ecx),
             "g" (fthread->frame.edx), "g" (fthread->frame.esi), "g" (fthread->frame.edi),
             "g" (fthread->frame.ebp)
@@ -174,7 +185,7 @@ void process_terminate() {
         return;
     }
 
-    // free the heap
+    // free the heap before switch to kernel page directory
     heap_t* heap = (heap_t*)UHEAP_START;
     for(virtual_addr_t i = (virtual_addr_t)heap; i < heap->end; i += MMNGR_PAGE_SIZE)
         pmmngr_free_block((void*)vmmngr_to_physical_addr(NULL, i));
@@ -230,7 +241,7 @@ bool process_init() {
     void* esp; asm volatile("mov %%esp, %%eax" : "=a"(esp));
     first_thread->stack = esp;
     memset((void*)(&first_thread->frame), 0, sizeof(first_thread->frame));
-    first_thread->frame.flags = 0x200; // enable interrupts
+    first_thread->frame.eflags = DEFAULT_EFLAGS;
     first_thread->next = 0;
 
     process_list = current_process;

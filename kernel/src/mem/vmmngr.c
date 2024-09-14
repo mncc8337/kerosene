@@ -40,8 +40,15 @@ page_directory_t* vmmngr_get_directory() {
     return current_page_directory;
 }
 
-physical_addr_t vmmngr_to_physical_addr(page_directory_t* pd, virtual_addr_t virt) {
-    pde_t* pde = PAGE_DIRECTORY_LOOKUP(pd, virt);
+physical_addr_t vmmngr_to_physical_addr(page_directory_t* page_directory, virtual_addr_t virt) {
+    page_directory_t* virt_pd;
+    if(page_directory == NULL) virt_pd = (page_directory_t*)VMMNGR_PD;
+    else {
+        vmmngr_map_temporary_pd(page_directory);
+        virt_pd = (page_directory_t*)VMMNGR_RESERVED;
+    }
+
+    pde_t* pde = PAGE_DIRECTORY_LOOKUP(virt_pd, virt);
     if(!(*pde & PDE_PRESENT)) return 0;
 
     page_table_t* table = PAGE_TABLE_ADDR(PAGE_DIRECTORY_INDEX((uint32_t)virt));
@@ -147,7 +154,7 @@ page_directory_t* vmmngr_alloc_page_directory() {
     page_entry_set_frame(pde, (physical_addr_t)pd);
 
     // map itself to VMMNGR_PD
-    vmmngr_map(pd, (physical_addr_t)pd, VMMNGR_PD, PDE_PRESENT | PDE_WRITABLE);
+    vmmngr_map(pd, (physical_addr_t)pd, VMMNGR_PD, PTE_PRESENT | PTE_WRITABLE);
 
     return pd;
 }
