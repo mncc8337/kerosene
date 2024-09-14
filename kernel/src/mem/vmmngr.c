@@ -69,7 +69,7 @@ MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtu
         new_table = true;
 
         // create a new entry
-        page_entry_add_attrib(pde, PDE_PRESENT);
+        page_entry_add_attrib(pde, flags | PDE_PRESENT); // the first few PDE and PTE flags are the same so we can do this
         page_entry_set_frame(pde, (physical_addr_t)table);
     }
 

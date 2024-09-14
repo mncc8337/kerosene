@@ -256,7 +256,7 @@ static void user_print(char* a) {
 }
 void test_process() {
     int ret;
-    // user_print("hello user!\n");
+    user_print("hello user!\n");
 
     SYSCALL_0P(SYSCALL_TEST, ret);
     SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);

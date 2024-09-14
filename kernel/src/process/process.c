@@ -77,10 +77,6 @@ void process_exec(int pid) {
 
     thread_t* first_thread = proc->thread_list;
 
-    // FIXME:
-    // somehow syscall with more than 1 param will cause a page fault when called
-    // may be related to the stack
-
     uint32_t esp = 0;
     asm("mov %%esp, %%eax" : "=a" (esp));
     tss_set_stack(esp);
@@ -90,7 +86,7 @@ void process_exec(int pid) {
     // create a heap for the process
     heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
     first_thread->stack_size = 16 * 1024;
-    first_thread->stack = heap_alloc(heap, first_thread->stack_size, false) - first_thread->stack_size;
+    first_thread->stack = heap_alloc(heap, first_thread->stack_size, false) + first_thread->stack_size;
 
     // enter user mode
     asm(
