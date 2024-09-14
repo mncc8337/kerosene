@@ -3,6 +3,9 @@
 #include "mem.h"
 
 #include "string.h"
+#include "stdio.h"
+
+#define KERNEL_PROC_PID 1
 
 static process_t* current_process;
 static process_t* process_list;
@@ -10,8 +13,6 @@ static process_t* process_list_tail;
 
 static process_t** process_stack;
 static unsigned process_stack_pos;
-
-extern uint32_t get_eip();
 
 static void process_stack_push(process_t* proc) {
     if(process_stack_pos < MAX_PROCESSES)
@@ -31,13 +32,14 @@ process_t* process_get_current() {
     return current_process;
 }
 
-int process_new(uint32_t eip) {
+process_t* process_new(uint32_t eip, bool is_user) {
     process_t* new_process = (process_t*)kmalloc(sizeof(process_t));
     if(!new_process) return 0;
     new_process->pid = process_list_tail->pid + 1;
     new_process->page_directory = vmmngr_alloc_page_directory();
     if(!new_process->page_directory) return 0;
-    new_process->state = PROCESS_STATE_SLEEP;
+    new_process->state = PROCESS_STATE_UNINITIALISED;
+    new_process->is_user = is_user;
     new_process->thread_list = (thread_t*)kmalloc(sizeof(thread_t));
     if(!new_process->thread_list) return 0;
     new_process->next = 0;
@@ -46,86 +48,130 @@ int process_new(uint32_t eip) {
     thread_t* first_thread = new_process->thread_list;
     first_thread->parent = new_process;
     memset((void*)(&first_thread->frame), 0, sizeof(first_thread->frame));
+    first_thread->frame.flags = 0x200; // enable interrupts
     first_thread->frame.eip = eip;
     first_thread->next = 0;
 
     process_list_tail->next = new_process;
     process_list_tail = new_process;
-    return new_process->pid;
+    return new_process;
 }
 
-void process_exec(int pid) {
+void process_switch(process_t* proc) {
+    asm volatile("cli");
+
     // save current process state
     if(current_process) {
-        int caller;
-        asm volatile("pop %%eax; push %%eax" : "=a"(caller));
-        current_process->thread_list->frame.eip = caller;
-        // TODO: save more things
+        // TODO: do this for all threads
+        // FIXME: load eax, ebx, .. do not work
+
+        thread_t* fthread = current_process->thread_list;
+        stackframe_t* stk;
+        asm volatile(
+            // "mov %%eax, %0;"
+            // "mov %%ebx, %1;"
+            // "mov %%ecx, %2;"
+            // "mov %%edx, %3;"
+            // "mov %%esi, %4;"
+            // "mov %%edi, %5;"
+            "mov %%esp, %6;"
+            "mov %%ebp, %7;"
+            :
+            "=g" (fthread->frame.eax), "=g" (fthread->frame.ebx), "=g" (fthread->frame.ecx),
+            "=g" (fthread->frame.edx), "=g" (fthread->frame.esi), "=g" (fthread->frame.edi),
+            "=g" (fthread->frame.esp), "=g" (stk)
+        );
+
+        // fix stack
+        fthread->frame.esp += 64; // idk if this really works
+
+        fthread->frame.ebp = (uint32_t)stk->ebp;
+        fthread->frame.eip = (uint32_t)stk->eip;
+
+        if(current_process->pid == KERNEL_PROC_PID)
+            tss_set_stack(fthread->frame.esp);
+
+        current_process->state = PROCESS_STATE_SLEEP;
     }
-
-    process_t* proc = process_list;
-    if(current_process->pid == pid) proc = current_process;
-    else {
-        while(proc->pid != pid && proc->next != 0) proc = proc->next;
-        if(proc->pid != pid || !proc->page_directory) return;
-    }
-
-    current_process->state = PROCESS_STATE_SLEEP;
-    process_stack_push(proc);
-    current_process = proc;
-    current_process->state = PROCESS_STATE_ACTIVE;
-
-    thread_t* first_thread = proc->thread_list;
-
-    uint32_t esp = 0;
-    asm("mov %%esp, %%eax" : "=a" (esp));
-    tss_set_stack(esp);
 
     vmmngr_switch_page_directory(proc->page_directory);
 
-    // create a heap for the process
-    heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
-    first_thread->stack_size = 16 * 1024;
-    first_thread->stack = heap_alloc(heap, first_thread->stack_size, false) + first_thread->stack_size;
+    thread_t* fthread = proc->thread_list;
 
-    // enter user mode
-    asm(
-        "cli;"
-        "mov $0x23, %%ax;"
-        "mov %%ax, %%ds;"
-        "mov %%ax, %%es;"
-        "mov %%ax, %%fs;"
-        "mov %%ax, %%gs;"
+    if(proc->state == PROCESS_STATE_UNINITIALISED) {
+        // create a heap for the thread
+        heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
+        fthread->stack_size = 16 * 1024;
+        fthread->stack = heap_alloc(heap, fthread->stack_size, false) + fthread->stack_size;
+        fthread->frame.esp = (uint32_t)fthread->stack;
+    }
 
-        "pushl $0x23;"
-        "pushl %0;" // esp
-        "pushf;"
+    proc->state = PROCESS_STATE_ACTIVE;
+    process_stack_push(proc);
+    current_process = proc;
 
-        "pop %%eax;"
-        "or $0x200, %%eax;"
-        "push %%eax;"
+    if(proc->is_user) {
+        asm volatile(
+            // enter user mode
+            "mov $0x23, %%ax;"
+            "mov %%ax, %%ds;"
+            "mov %%ax, %%es;"
+            "mov %%ax, %%fs;"
+            "mov %%ax, %%gs;"
 
-        "pushl $0x1b;"
-        "push %1;" // eip
-        "iret;"
-        : : "r" (first_thread->stack), "r" (first_thread->frame.eip)
-    );
+            "pushl $0x23;"
+            "pushl %0;" // esp
+
+            "push %1;" // eflags
+
+            "pushl $0x1b;"
+            "push %2;" // eip
+
+            // load saved state
+            // TODO: somehow do this for every threads
+            // "mov %3, %%eax;"
+            // "mov %4, %%ebx;"
+            // "mov %5, %%ecx;"
+            // "mov %6, %%edx;"
+            // "mov %7, %%esi;"
+            // "mov %8, %%edi;"
+            "mov %9, %%ebp;"
+
+            // let's go
+            "iret;"
+            : :
+            "g" (fthread->frame.esp), "g" (fthread->frame.flags), "g" (fthread->frame.eip),
+            "g" (fthread->frame.eax), "g" (fthread->frame.ebx), "g" (fthread->frame.ecx),
+            "g" (fthread->frame.edx), "g" (fthread->frame.esi), "g" (fthread->frame.edi),
+            "g" (fthread->frame.ebp)
+        );
+    }
+    else {
+        // we have already in kernel mode
+        asm volatile(
+            // load saved state
+            // TODO: somehow do this for every threads
+            // "mov %0, %%eax;"
+            // "mov %1, %%ebx;"
+            // "mov %2, %%ecx;"
+            // "mov %3, %%edx;"
+            // "mov %4, %%esi;"
+            // "mov %5, %%edi;"
+            "mov %6, %%ebp;"
+            "sti;"
+            "mov %7, %%esp;"
+            "jmp *%8;"
+            : :
+            "g" (fthread->frame.eax), "g" (fthread->frame.ebx), "g" (fthread->frame.ecx),
+            "g" (fthread->frame.edx), "g" (fthread->frame.esi), "g" (fthread->frame.edi),
+            "g" (fthread->frame.ebp), "g" (fthread->frame.esp), "g" (fthread->frame.eip)
+        );
+    }
 }
 
 void process_terminate() {
-    // get back to kernel mode
-    asm(
-        "cli;"
-        "mov $0x10, %eax;"
-        "mov %ax, %ds;"
-        "mov %ax, %es;"
-        "mov %ax, %fs;"
-        "mov %ax, %gs;"
-        "sti;"
-    );
-
     process_t* proc = current_process;
-    if(!proc || !proc->page_directory || proc->pid == 0) {
+    if(!proc || !proc->page_directory || proc->pid == KERNEL_PROC_PID) {
         process_stack_pop();
         return;
     }
@@ -148,19 +194,18 @@ void process_terminate() {
     kfree(proc);
 
     process_stack_pop();
-    current_process = process_stack_top();
-    // TODO: somehow run this process
+    current_process = 0;
+    process_switch(process_stack_top());
 }
-
-void process_switch() {}
 
 bool process_init() {
     // default process (kernel process)
     current_process = (process_t*)kmalloc(sizeof(process_t));
     if(!current_process) return true;
-    current_process->pid = 1;
+    current_process->pid = KERNEL_PROC_PID;
     current_process->page_directory = vmmngr_get_directory();
     current_process->state = PROCESS_STATE_ACTIVE;
+    current_process->is_user = false;
     current_process->thread_list = (thread_t*)kmalloc(sizeof(thread_t));
     if(!current_process->thread_list) return true;
     current_process->next = 0;
@@ -175,6 +220,7 @@ bool process_init() {
     void* esp; asm volatile("mov %%esp, %%eax" : "=a"(esp));
     first_thread->stack = esp;
     memset((void*)(&first_thread->frame), 0, sizeof(first_thread->frame));
+    first_thread->frame.flags = 0x200; // enable interrupts
     first_thread->next = 0;
 
     process_list = current_process;

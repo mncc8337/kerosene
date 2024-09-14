@@ -28,7 +28,6 @@ C_SRC = kernel/src/*.c \
 
 ASM_SRC = kernel/src/*.asm \
 		  kernel/src/system/*.asm \
-		  kernel/src/process/*.asm \
 
 _LIBC_OBJ = $(addsuffix _libc.o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
 _LIBK_OBJ = $(addsuffix _libk.o, $(basename $(notdir $(wildcard $(LIBC_SRC)))))
@@ -154,8 +153,6 @@ $(BIN)%.o: kernel/src/process/%.c
 $(BIN)%.asm.o: kernel/src/%.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 $(BIN)%.asm.o: kernel/src/system/%.asm
-	$(ASM) $(NASMFLAGS) -o $@ $<
-$(BIN)%.asm.o: kernel/src/process/%.asm
 	$(ASM) $(NASMFLAGS) -o $@ $<
 
 $(BIN)kerosene.elf: $(BIN)kernel_entry.asm.o $(OBJ) $(BIN)libk.a

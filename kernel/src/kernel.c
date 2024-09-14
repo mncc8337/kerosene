@@ -174,79 +174,6 @@ void disk_init() {
     }
 }
 
-void enter_usermode() {
-    puts("entering usermode ...");
-
-    // enter usermode
-    uint32_t esp = 0;
-    asm volatile("mov %%esp, %%eax" : "=a" (esp));
-    tss_set_stack(esp);
-    asm volatile(
-        "cli;"
-        "mov $0x23, %ax;"
-        "mov %ax, %ds;"
-        "mov %ax, %es;"
-        "mov %ax, %fs;"
-        "mov %ax, %gs;"
-
-        "mov %esp, %eax;"
-        "pushl $0x23;"
-        "pushl %eax;"
-        "pushf;"
-
-        // enabler IF flag in EFLAGS (which will enable interrupts after `iret`)
-        "pop %eax;"
-        "or $0x200, %eax;"
-        "push %eax;"
-
-        "pushl $0x1b;"
-        "push $1f;"
-        "iret;"
-        "1:"
-    );
-
-    // test syscall
-    int ret;
-    SYSCALL_0P(SYSCALL_TEST, ret);
-
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'h');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'l');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'o');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'u');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 's');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, '!');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, '\n');
-
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'c');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'u');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'r');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'n');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 't');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 't');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'i');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'm');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, 'e');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ':');
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, ' ');
-
-    SYSCALL_0P(SYSCALL_TIME, ret);
-    char conv[64];
-    itoa(ret, conv, 10);
-    for(unsigned i = 0; i < 64 && conv[i] != '\0'; i++)
-        SYSCALL_1P(SYSCALL_PUTCHAR, ret, conv[i]);
-
-    // hlt instruction should be illegal
-    asm("hlt");
-}
-
 static void user_print(char* a) {
     int ret;
     while(a[0] != '\0') {
@@ -258,9 +185,17 @@ void test_process() {
     int ret;
     user_print("hello user!\n");
 
-    SYSCALL_0P(SYSCALL_TEST, ret);
     SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
     while(true);
+}
+void create_proc() {
+    process_t* proc = process_new((uint32_t)test_process, true);
+    int pid = proc->pid;
+    printf("pid loc: %x\n", &pid);
+    printf("executing process %d\n", pid);
+    process_switch(proc);
+    printf("process %d exited\n", pid);
+    printf("pid loc: %x\n", &pid);
 }
 
 void kmain(multiboot_info_t* mbd) {
@@ -374,13 +309,15 @@ void kmain(multiboot_info_t* mbd) {
     }
     else puts("not enough memory for kshell. quitting");
 
-    int pid = process_new((uint32_t)test_process);
-    printf("executing process %d\n", pid);
-    process_exec(pid);
+    // shell_start();
 
-    shell_start();
+    create_proc();
+    create_proc();
+    create_proc();
+    create_proc();
+    create_proc();
 
-    puts("system hang");
+    puts("no more process. system hang");
 
     while(true);
 }

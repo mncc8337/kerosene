@@ -12,7 +12,7 @@ static elf_section_header_t* debug_line_sh = 0;
 
 static void stack_trace(stackframe_t* stk) {
     if(stk == NULL)
-        asm ("movl %%ebp, %0" : "=r"(stk));
+        asm("movl %%ebp, %0" : "=r"(stk));
 
     for(unsigned frame = 0; stk && frame < MAX_FRAMES; frame++) {
         uint32_t addr = stk->eip;
