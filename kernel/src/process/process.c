@@ -38,7 +38,7 @@ process_t* process_new(uint32_t eip, bool is_user) {
     new_process->pid = process_list_tail->pid + 1;
     new_process->page_directory = vmmngr_alloc_page_directory();
     if(!new_process->page_directory) return 0;
-    new_process->state = PROCESS_STATE_UNINITIALISED;
+    new_process->state = PROCESS_STATE_SLEEP;
     new_process->is_user = is_user;
     new_process->thread_list = (thread_t*)kmalloc(sizeof(thread_t));
     if(!new_process->thread_list) return 0;
@@ -48,6 +48,12 @@ process_t* process_new(uint32_t eip, bool is_user) {
     thread_t* first_thread = new_process->thread_list;
     first_thread->parent = new_process;
     memset((void*)(&first_thread->frame), 0, sizeof(first_thread->frame));
+
+    heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
+    first_thread->stack_size = 16 * 1024;
+    first_thread->stack = heap_alloc(heap, first_thread->stack_size, false) + first_thread->stack_size;
+    first_thread->frame.esp = (uint32_t)first_thread->stack;
+
     first_thread->frame.flags = 0x200; // enable interrupts
     first_thread->frame.eip = eip;
     first_thread->next = 0;
@@ -97,14 +103,6 @@ void process_switch(process_t* proc) {
     vmmngr_switch_page_directory(proc->page_directory);
 
     thread_t* fthread = proc->thread_list;
-
-    if(proc->state == PROCESS_STATE_UNINITIALISED) {
-        // create a heap for the thread
-        heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
-        fthread->stack_size = 16 * 1024;
-        fthread->stack = heap_alloc(heap, fthread->stack_size, false) + fthread->stack_size;
-        fthread->frame.esp = (uint32_t)fthread->stack;
-    }
 
     proc->state = PROCESS_STATE_ACTIVE;
     process_stack_push(proc);
@@ -172,9 +170,14 @@ void process_switch(process_t* proc) {
 void process_terminate() {
     process_t* proc = current_process;
     if(!proc || !proc->page_directory || proc->pid == KERNEL_PROC_PID) {
-        process_stack_pop();
+        if(proc->pid != KERNEL_PROC_PID) process_stack_pop();
         return;
     }
+
+    // free the heap
+    heap_t* heap = (heap_t*)UHEAP_START;
+    for(virtual_addr_t i = (virtual_addr_t)heap; i < heap->end; i += MMNGR_PAGE_SIZE)
+        pmmngr_free_block((void*)vmmngr_to_physical_addr(NULL, i));
 
     // load kernel page directory
     vmmngr_switch_page_directory(process_list->page_directory);
@@ -183,16 +186,23 @@ void process_terminate() {
     vmmngr_map_temporary_pd(proc->page_directory);
     page_directory_t* virt_pd = (page_directory_t*)VMMNGR_RESERVED;
     for(unsigned i = 0; i < 1024; i++)
-        if(virt_pd->entry[i] != 0)
-            pmmngr_free_block((void*)(virt_pd->entry[i] >> 12));
+        if(virt_pd->entry[i] != 0) pmmngr_free_block((void*)(virt_pd->entry[i] >> 12));
     // now free the page directory
     pmmngr_free_block((void*)proc->page_directory);
 
-    kfree(proc->thread_list);
+    // free all threads
+    thread_t* thread = proc->thread_list;
+    while(thread) {
+        thread_t* tmp = thread->next;
+        kfree(thread);
+        thread = tmp;
+    }
+
     // join process list
     if(proc->prev) proc->prev->next = proc->next;
     kfree(proc);
 
+    // resume last process
     process_stack_pop();
     current_process = 0;
     process_switch(process_stack_top());

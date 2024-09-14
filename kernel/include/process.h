@@ -5,9 +5,8 @@
 
 #define MAX_PROCESSES 256
 
-#define PROCESS_STATE_UNINITIALISED 0
-#define PROCESS_STATE_SLEEP         1
-#define PROCESS_STATE_ACTIVE        2
+#define PROCESS_STATE_SLEEP  0
+#define PROCESS_STATE_ACTIVE 1
 
 typedef struct process {
     int pid;
