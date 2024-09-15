@@ -997,6 +997,7 @@ void shell_set_root_node(fs_node_t node) {
     node_stack_offset = 0;
 }
 void shell_start() {
+    shell_running = true;
     puts("welcome to keroshell");
     puts("type `help` t show all command. `help <command>` to see all available argument.");
     puts("type `exit` to quit shell and continue to usermode");

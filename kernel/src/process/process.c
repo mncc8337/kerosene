@@ -75,12 +75,9 @@ process_t* process_new(uint32_t eip, bool is_user) {
 void process_switch(process_t* proc) {
     if(!proc) return;
 
-    asm volatile("cli");
-
-    // save current process state
     if(current_process) {
+        // save current process state
         // TODO: do this for all threads
-        // FIXME: load eax, ebx, .. do not work
 
         thread_t* fthread = current_process->thread_list;
         stackframe_t* stk;
@@ -100,7 +97,7 @@ void process_switch(process_t* proc) {
         );
 
         // fix stack
-        fthread->frame.esp += 64; // idk if this really works
+        fthread->frame.esp += 64;
 
         fthread->frame.ebp = (uint32_t)stk->ebp;
         fthread->frame.eip = (uint32_t)stk->eip;
@@ -109,6 +106,22 @@ void process_switch(process_t* proc) {
             tss_set_stack(fthread->frame.esp);
 
         current_process->state = PROCESS_STATE_SLEEP;
+    }
+    else {
+        // if current process is zero
+        // that mean the switch call is from the interrupts handler
+        // in that case we have to fix stack
+        // because we have do pusha, push ds, ... (60 bytes)
+        // but we havent pop them yet
+        // also we do not return control to the interrupts handler
+        // so that those value are still in the stack
+        // also trash value pushed by the interrupts hander (4*3 bytes)
+        // because we dont need them
+        asm volatile(
+            "mov %esp, %eax;"
+            "add $72, %eax;"
+            "mov %eax, %esp;"
+        );
     }
 
     vmmngr_switch_page_directory(proc->page_directory);
@@ -119,6 +132,7 @@ void process_switch(process_t* proc) {
     process_stack_push(proc);
     current_process = proc;
 
+    // FIXME: load eax, ebx, .. do not work
     if(proc->is_user) {
         asm volatile(
             // enter user mode
@@ -128,12 +142,12 @@ void process_switch(process_t* proc) {
             "mov %%ax, %%fs;"
             "mov %%ax, %%gs;"
 
-            "pushl $0x23;"
-            "pushl %0;" // esp
+            "push $0x23;"
+            "push %0;" // esp
 
             "push %1;" // eflags
 
-            "pushl $0x1b;"
+            "push $0x1b;"
             "push %2;" // eip
 
             // load saved state
@@ -156,8 +170,9 @@ void process_switch(process_t* proc) {
         );
     }
     else {
-        // we have already in kernel mode
         asm volatile(
+            // we have already in kernel mode
+
             // load saved state
             // TODO: somehow do this for every threads
             // "mov %0, %%eax;"
@@ -167,8 +182,8 @@ void process_switch(process_t* proc) {
             // "mov %4, %%esi;"
             // "mov %5, %%edi;"
             "mov %6, %%ebp;"
-            "sti;"
-            "mov %7, %%esp;"
+            // "mov %7, %%esp;" // something is wrong with this, uncomment this will crash
+
             "jmp *%8;"
             : :
             "g" (fthread->frame.eax), "g" (fthread->frame.ebx), "g" (fthread->frame.ecx),
@@ -179,6 +194,10 @@ void process_switch(process_t* proc) {
 }
 
 void process_terminate() {
+    // NOTE:
+    // this function is intended to be called upon an interrupt
+    // please do not call it as a normal function
+
     process_t* proc = current_process;
     if(!proc || !proc->page_directory || proc->pid == KERNEL_PROC_PID) {
         if(proc->pid != KERNEL_PROC_PID) process_stack_pop();

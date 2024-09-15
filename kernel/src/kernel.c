@@ -182,18 +182,34 @@ void user_print(char* a) {
     }
 }
 void user_process() {
-    int ret;
     user_print("hello user!\n");
-
+    int ret;
     SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
     while(true);
 }
 void kernel_process() {
-    puts("hello kernel!\n");
-    shell_start();
-
-    process_terminate();
+    puts("hello kernel!");
+    int ret;
+    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
     while(true);
+}
+
+void print_regs() {
+    uint32_t esp, ebp;
+
+    asm volatile(
+        "mov %%esp, %0;"
+        "mov %%ebp, %1;"
+        :
+        "=g" (esp), "=g" (ebp)
+    );
+
+    printf(
+        "ESP: %x\n"
+        "EBP: %x\n"
+        ,
+        esp, ebp
+    );
 }
 
 void kmain(multiboot_info_t* mbd) {
@@ -307,24 +323,48 @@ void kmain(multiboot_info_t* mbd) {
     }
     else puts("not enough memory for kshell. quitting");
 
-    process_t* proc = process_new((uint32_t)user_process, true);
-    int pid = proc->pid;
-    printf("pid loc: %x\n", &pid);
-    printf("executing process %d\n", pid);
+    // FIXME:
+    // address of pid is wrong after changing from userproc -> kernelproc
+    // maybe the stack address has changed
+    // at least it's working lol
+    process_t* proc;
+    int pid;
+    print_regs();
+
+    proc = process_new((uint32_t)user_process, true);
+    pid = proc->pid;
+    printf("executing process %d, %x\n", pid, &pid);
     process_switch(proc);
-    printf("process %d exited\n", pid);
-    printf("pid loc: %x\n", &pid);
+    printf("process %d exited, %x\n", pid, &pid);
+    print_regs();
 
-    puts("");
+    proc = process_new((uint32_t)kernel_process, false);
+    pid = proc->pid;
+    printf("executing process %d, %x\n", pid, &pid);
+    process_switch(proc);
+    printf("process %d exited, %x\n", pid, &pid);
+    print_regs();
 
-    // FIXME: terminate kernel process will crash
-    // proc = process_new((uint32_t)kernel_process, false);
-    // pid = proc->pid;
-    // printf("pid loc: %x\n", &pid);
-    // printf("executing process %d\n", pid);
-    // process_switch(proc);
-    // printf("process %d exited\n", pid);
-    // printf("pid loc: %x\n", &pid);
+    proc = process_new((uint32_t)kernel_process, false);
+    pid = proc->pid;
+    printf("executing process %d, %x\n", pid, &pid);
+    process_switch(proc);
+    printf("process %d exited, %x\n", pid, &pid);
+    print_regs();
+
+    proc = process_new((uint32_t)user_process, true);
+    pid = proc->pid;
+    printf("executing process %d, %x\n", pid, &pid);
+    process_switch(proc);
+    printf("process %d exited, %x\n", pid, &pid);
+    print_regs();
+
+    proc = process_new((uint32_t)kernel_process, false);
+    pid = proc->pid;
+    printf("executing process %d, %x\n", pid, &pid);
+    process_switch(proc);
+    printf("process %d exited, %x\n", pid, &pid);
+    print_regs();
 
     puts("no more process. system hang");
 
