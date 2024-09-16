@@ -174,42 +174,36 @@ void disk_init() {
     }
 }
 
-void user_print(char* a) {
-    int ret;
-    while(a[0] != '\0') {
-        SYSCALL_1P(SYSCALL_PUTCHAR, ret, a[0]);
-        a++;
-    }
-}
-void user_process() {
-    user_print("hello user!\n");
-    int ret;
-    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
-    while(true);
-}
+int curr_pid = 1;
+// void user_print(char* a) {
+//     int ret;
+//     while(a[0] != '\0') {
+//         SYSCALL_1P(SYSCALL_PUTCHAR, ret, a[0]);
+//         a++;
+//     }
+// }
+// void user_process() {
+//     user_print("hello user!\n");
+//     int ret;
+//     SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+//     while(true);
+// }
 void kernel_process() {
-    puts("hello kernel!");
+    int saved_pid = curr_pid;
+    curr_pid++;
+    printf("this is kernel process number %d\n", saved_pid);
+
+    for(int i = 0; i < 20; i++)
+        printf("%d: counting %d\n", saved_pid, i);
+
     int ret;
     SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
     while(true);
 }
-
-void print_regs() {
-    uint32_t esp, ebp;
-
-    asm volatile(
-        "mov %%esp, %0;"
-        "mov %%ebp, %1;"
-        :
-        "=g" (esp), "=g" (ebp)
-    );
-
-    printf(
-        "ESP: %x\n"
-        "EBP: %x\n"
-        ,
-        esp, ebp
-    );
+void new_kern_proc() {
+    process_t* proc = process_new((uint32_t)kernel_process, 0, false);
+    if(proc) scheduler_add_process(proc);
+    else puts("failed to create process");
 }
 
 void kmain(multiboot_info_t* mbd) {
@@ -290,13 +284,6 @@ void kmain(multiboot_info_t* mbd) {
     isr_init();
     print_debug(LT_OK, "ISR initialised\n");
 
-    if(!process_init())
-        print_debug(LT_OK, "process manager initialised\n");
-    else {
-        print_debug(LT_CR, "failed to initialise process manager. not enough memory\n");
-        kernel_panic(NULL);
-    }
-
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
 
@@ -323,50 +310,16 @@ void kmain(multiboot_info_t* mbd) {
     }
     else puts("not enough memory for kshell. quitting");
 
-    // FIXME:
-    // address of pid is wrong after changing from userproc -> kernelproc
-    // maybe the stack address has changed
-    // at least it's working lol
-    process_t* proc;
-    int pid;
-    print_regs();
+    new_kern_proc();
+    new_kern_proc();
+    new_kern_proc();
 
-    proc = process_new((uint32_t)user_process, true);
-    pid = proc->pid;
-    printf("executing process %d, %x\n", pid, &pid);
-    process_switch(proc);
-    printf("process %d exited, %x\n", pid, &pid);
-    print_regs();
+    // FIXME: for some reasom the process is not giving the control back
 
-    proc = process_new((uint32_t)kernel_process, false);
-    pid = proc->pid;
-    printf("executing process %d, %x\n", pid, &pid);
-    process_switch(proc);
-    printf("process %d exited, %x\n", pid, &pid);
-    print_regs();
+    puts("hello1");
+    puts("hello2");
 
-    proc = process_new((uint32_t)kernel_process, false);
-    pid = proc->pid;
-    printf("executing process %d, %x\n", pid, &pid);
-    process_switch(proc);
-    printf("process %d exited, %x\n", pid, &pid);
-    print_regs();
-
-    proc = process_new((uint32_t)user_process, true);
-    pid = proc->pid;
-    printf("executing process %d, %x\n", pid, &pid);
-    process_switch(proc);
-    printf("process %d exited, %x\n", pid, &pid);
-    print_regs();
-
-    proc = process_new((uint32_t)kernel_process, false);
-    pid = proc->pid;
-    printf("executing process %d, %x\n", pid, &pid);
-    process_switch(proc);
-    printf("process %d exited, %x\n", pid, &pid);
-    print_regs();
-
-    puts("no more process. system hang");
+    shell_start();
 
     while(true);
 }

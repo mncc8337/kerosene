@@ -34,10 +34,10 @@ typedef struct {
 } __attribute__((packed)) idtr_t;
 
 typedef struct {
-    unsigned gs, fs, es, ds;
-    unsigned edi, esi, ebp, esp, ebx, edx, ecx, eax;
-    unsigned int_no, err_code;
-    unsigned eip, cs, eflags, useresp, ss; 
+    uint32_t gs, fs, es, ds;
+    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
+    uint32_t int_no, err_code;
+    uint32_t eip, cs, eflags, useresp, ss; 
 } __attribute__((packed)) regs_t;
 
 typedef struct {

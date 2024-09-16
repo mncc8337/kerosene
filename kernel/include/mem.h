@@ -97,6 +97,7 @@ MEM_ERR vmmngr_unmap(page_directory_t* page_directory, virtual_addr_t virt);
 MEM_ERR vmmngr_alloc_page(pte_t* pte);
 void vmmngr_free_page(pte_t* pte);
 page_directory_t* vmmngr_alloc_page_directory();
+void vmmngr_free_page_directory(page_directory_t* page_directory);
 MEM_ERR vmmngr_switch_page_directory(page_directory_t* dir);
 void vmmngr_flush_tlb_entry(virtual_addr_t addr);
 void vmmngr_init();

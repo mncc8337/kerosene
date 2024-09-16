@@ -2,22 +2,21 @@
 #include "system.h"
 #include "pit.h"
 #include "rtc.h"
+#include "process.h"
 
 static volatile unsigned ticks = 0;
 static time_t start_timestamp;
 static volatile time_t seconds_since_start = 0;
-static void (*tick_listener)(unsigned) = 0;
 
 static void tick_handler(regs_t* r) {
-    (void)(r); // avoid unused arg
-
     ticks++;
-    if(tick_listener) tick_listener(ticks);
 
     if(ticks > 0 && ticks % TIMER_FREQUENCY == 0) {
         seconds_since_start++;
         ticks = 0;
     }
+
+    scheduler_switch(r);
 }
 
 time_t timer_get_start_time() {
@@ -34,13 +33,6 @@ time_t timer_get_seconds_since_start() {
 
 unsigned timer_get_current_ticks() {
     return ticks;
-}
-
-void install_tick_listener(void (*tlis)(unsigned)) {
-    tick_listener = tlis;
-}
-void uninstall_tick_listener() {
-    tick_listener = 0;
 }
 
 void timer_wait(unsigned ms) {

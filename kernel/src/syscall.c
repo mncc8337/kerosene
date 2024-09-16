@@ -18,7 +18,7 @@ static unsigned syscall_time() {
 }
 
 static void syscall_process_terminate() {
-    process_terminate();
+    scheduler_terminate_process();
 }
 
 static void* syscalls[MAX_SYSCALL] = {

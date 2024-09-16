@@ -93,7 +93,7 @@ isr_common_stub:
     pop es
     pop ds
     popa
-    add esp, 8
+    add esp, 8 ; error code and isr number
     iret
 
 global isr_table

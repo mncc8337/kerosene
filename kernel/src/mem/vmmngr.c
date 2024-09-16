@@ -8,7 +8,7 @@
 // with page directory index multiply by page size
 // we can do this because we have recursive paging (see kernel_entry.asm)
 // we need to use virtual address because accessing a physical address will result in a page fault
-#define PAGE_TABLE_ADDR(addr) (page_table_t*)(0xffc00000 + PAGE_DIRECTORY_INDEX(addr) * MMNGR_PAGE_SIZE)
+#define PAGE_TABLE_ADDR(idx) (page_table_t*)(0xffc00000 + idx * MMNGR_PAGE_SIZE)
 
 static page_directory_t* current_page_directory = 0;
 
@@ -71,16 +71,16 @@ MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtu
     bool new_table = false;
     // if the page table is not present then allocate it
     if(!(*pde & PDE_PRESENT)) {
-        page_table_t* table = (page_table_t*)pmmngr_alloc_block();
-        if(!table) return ERR_MEM_OOM;
+        physical_addr_t new_phys = (physical_addr_t)pmmngr_alloc_block();
+        if(!new_phys) return ERR_MEM_OOM;
         new_table = true;
 
         // create a new entry
         page_entry_add_attrib(pde, flags | PDE_PRESENT); // the first few PDE and PTE flags are the same so we can do this
-        page_entry_set_frame(pde, (physical_addr_t)table);
+        page_entry_set_frame(pde, new_phys);
     }
 
-    page_table_t* table = PAGE_TABLE_ADDR(virt);
+    page_table_t* table = PAGE_TABLE_ADDR(PAGE_DIRECTORY_INDEX((uint32_t)virt));
 
     // clear the table if we have just created it
     if(new_table)
@@ -157,6 +157,30 @@ page_directory_t* vmmngr_alloc_page_directory() {
     vmmngr_map(pd, (physical_addr_t)pd, VMMNGR_PD, PTE_PRESENT | PTE_WRITABLE);
 
     return pd;
+}
+
+// free all memory lower than KERNEL_START of page_directory and itself
+void vmmngr_free_page_directory(page_directory_t* page_directory) {
+    vmmngr_map_temporary_pd(page_directory);
+    page_directory_t* virt_pd = (page_directory_t*)VMMNGR_RESERVED;
+
+    for(unsigned i = 0; i < 1024; i++) {
+        // only free page table that map to address lower than KERNEL_START
+        if(i * MMNGR_PAGE_SIZE * 1024 >= KERNEL_START) break;
+
+        if(virt_pd->entry[i] == 0) continue;
+        physical_addr_t phys_table = (virt_pd->entry[i] & PAGE_FRAME_BITS);
+        page_table_t* virt_table = PAGE_TABLE_ADDR(i);
+
+        // free memory to map that page table
+        for(int j = 0; j < 1024; j++)
+            pmmngr_free_block((void*)virt_table->entry[i]);
+
+        // finally free the table
+        pmmngr_free_block((void*)phys_table);
+    }
+
+    pmmngr_free_block(page_directory);
 }
 
 MEM_ERR vmmngr_switch_page_directory(page_directory_t* dir) {

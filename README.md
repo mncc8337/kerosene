@@ -115,6 +115,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 ## Known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
 - `print_debug` gives gliberrish result if put in many formats
+- processes not giving control back properly
 ## Learning resources
 Note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
 ### Great tutorials
