@@ -28,6 +28,7 @@ typedef struct process {
     int state;
     uint32_t thread_count;
     thread_t* thread_list;
+    thread_t* current_thread;
     struct process* next;
     struct process* prev;
 } process_t;

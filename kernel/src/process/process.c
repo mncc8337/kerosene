@@ -34,6 +34,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
         kfree(proc);
         return NULL;
     }
+    proc->current_thread = proc->thread_list;
     proc->next = NULL;
     proc->prev = NULL;
 
@@ -43,6 +44,8 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     thread->next = NULL;
 
     regs_t* regs = &thread->regs;
+    regs->eip = eip;
+    regs->eflags = DEFAULT_EFLAGS;
     if(is_user) {
         // switch page directory to create user heap
         page_directory_t* saved_pd = vmmngr_get_directory();
@@ -50,27 +53,23 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
 
         heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
 
-        regs->eip = eip;
         regs->cs = 0x1b; // user code selector
         regs->ds = 0x23; // user data selector
         regs->es = regs->ds;
         regs->fs = regs->ds;
         regs->gs = regs->ds;
         regs->ss = regs->ds;
-        regs->eflags = DEFAULT_EFLAGS;
         regs->useresp = (uint32_t)heap_alloc(heap, DEFAULT_STACK_SIZE, false) + DEFAULT_STACK_SIZE;
 
         vmmngr_switch_page_directory(saved_pd);
     }
     else {
-        regs->eip = eip;
         regs->cs = 0x08; // kernel code selector
         regs->ds = 0x10; // kernel data selector
         regs->es = regs->ds;
         regs->fs = regs->ds;
         regs->gs = regs->ds;
         regs->ss = regs->ds;
-        regs->eflags = DEFAULT_EFLAGS;
         regs->useresp = (uint32_t)kmalloc(DEFAULT_STACK_SIZE) + DEFAULT_STACK_SIZE;
     }
 

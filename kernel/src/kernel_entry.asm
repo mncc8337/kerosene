@@ -124,10 +124,10 @@ higher_half:
     invlpg [0]
 
     mov esp, kernel_stack_top
-    extern kmain
     push dword [multiboot_ptr]
     xor ebp, ebp
-    call kmain
+    extern kinit
+    call kinit
 
 hang:
     cli

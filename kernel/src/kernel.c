@@ -32,6 +32,8 @@ unsigned video_height = 0;
 unsigned video_pitch = 0;
 unsigned video_bpp = 0;
 
+process_t* kernel_process = 0;
+
 void mem_init(void* mmap_addr, uint32_t mmap_length) {
     // get memsize
     size_t memsize = 0;
@@ -174,39 +176,8 @@ void disk_init() {
     }
 }
 
-int curr_pid = 1;
-// void user_print(char* a) {
-//     int ret;
-//     while(a[0] != '\0') {
-//         SYSCALL_1P(SYSCALL_PUTCHAR, ret, a[0]);
-//         a++;
-//     }
-// }
-// void user_process() {
-//     user_print("hello user!\n");
-//     int ret;
-//     SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
-//     while(true);
-// }
-void kernel_process() {
-    int saved_pid = curr_pid;
-    curr_pid++;
-    printf("this is kernel process number %d\n", saved_pid);
-
-    for(int i = 0; i < 20; i++)
-        printf("%d: counting %d\n", saved_pid, i);
-
-    int ret;
-    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
-    while(true);
-}
-void new_kern_proc() {
-    process_t* proc = process_new((uint32_t)kernel_process, 0, false);
-    if(proc) scheduler_add_process(proc);
-    else puts("failed to create process");
-}
-
-void kmain(multiboot_info_t* mbd) {
+void kmain();
+void kinit(multiboot_info_t* mbd) {
     extern char kernel_start;
     extern char kernel_end;
     kernel_size = &kernel_end - &kernel_start;
@@ -299,10 +270,52 @@ void kmain(multiboot_info_t* mbd) {
     timer_init();
     print_debug(LT_OK, "timer initialised\n");
 
+    // add kernel process
+    kernel_process = process_new((uint32_t)kmain, 0, false);
+    if(!kernel_process) {
+        print_debug(LT_CR, "failed to initialise kernel process. not enough memory\n");
+        kernel_panic(NULL);
+    }
+    print_debug(LT_OK, "created kernel main process\n");
+    scheduler_add_process(kernel_process);
+
     // start interrupts again after setting up everything
     asm volatile("sti");
 
-    print_debug(LT_IF, "done initialising\n");
+    // wait for process switch
+    while(true);
+}
+
+void user_print(char* a) {
+    int ret;
+    while(a[0] != '\0') {
+        SYSCALL_1P(SYSCALL_PUTCHAR, ret, a[0]);
+        a++;
+    }
+}
+void user_test_process() {
+    user_print("hello from user!\n");
+    int ret;
+    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+    while(true);
+}
+void kernel_test_process() {
+    puts("hello from kernel!");
+    int ret;
+    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+    while(true);
+}
+void new_kern_proc(void* eip) {
+    process_t* proc = process_new((uint32_t)eip, 0, false);
+    if(proc) {
+        printf("created process %d\n", proc->pid);
+        scheduler_add_process(proc);
+    }
+    else printf("failed to create process at entry %x\n", eip);
+}
+
+void kmain() {
+    print_debug(LT_OK, "done initialising\n");
 
     if(!shell_init()) {
         // only set if fs is available
@@ -310,16 +323,11 @@ void kmain(multiboot_info_t* mbd) {
     }
     else puts("not enough memory for kshell. quitting");
 
-    new_kern_proc();
-    new_kern_proc();
-    new_kern_proc();
-
-    // FIXME: for some reasom the process is not giving the control back
-
-    puts("hello1");
-    puts("hello2");
-
-    shell_start();
+    asm("cli");
+    new_kern_proc(shell_start);
+    new_kern_proc(kernel_test_process);
+    new_kern_proc(user_test_process);
+    asm("sti");
 
     while(true);
 }
