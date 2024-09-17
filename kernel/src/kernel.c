@@ -250,10 +250,16 @@ void kinit(multiboot_info_t* mbd) {
 
     gdt_init();
     print_debug(LT_OK, "GDT initialised\n");
+
     idt_init();
     print_debug(LT_OK, "IDT initialised\n");
+
     isr_init();
     print_debug(LT_OK, "ISR initialised\n");
+
+    uint32_t esp = 0; asm volatile("mov %%esp, %%eax" : "=a" (esp));
+    tss_set_stack(esp);
+    print_debug(LT_OK, "TSS installed\n");
 
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
@@ -295,33 +301,20 @@ void user_print(char* a) {
     }
 }
 void user_test_process() {
-    user_print("hello from user!\n");
+    user_print("hello user!\n");
 
-    // FIXME: terminate it will cause a page fault so just hang
-    // int ret;
-    // SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+    int ret;
+    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+    while(true);
+}
+void kernel_test_process() {
+    printf("hello kernel!\n");
+
+    int ret;
+    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
     while(true);
 }
 
-volatile unsigned cnt1 = 0;
-volatile unsigned cnt2 = 0;
-unsigned goal = 100000000;
-void kernel_test_process1() {
-    for(unsigned i = 0; i < goal; i++)
-        cnt1 += 1;
-
-    // int ret;
-    // SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
-    while(true);
-}
-void kernel_test_process2() {
-    for(unsigned i = 0; i < goal; i++)
-        cnt2 += 1;
-
-    // int ret;
-    // SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
-    while(true);
-}
 void new_proc(void* eip, bool is_user) {
     process_t* proc = process_new((uint32_t)eip, 0, is_user);
     if(proc) {
@@ -340,16 +333,10 @@ void kmain() {
     else puts("not enough memory for kshell.");
 
     asm("cli");
-    // new_proc(shell_start, false);
-    new_proc(kernel_test_process1, false);
-    new_proc(kernel_test_process2, false);
-    // new_proc(user_test_process, true);
+    new_proc(shell_start, false);
+    new_proc(kernel_test_process, false);
+    new_proc(user_test_process, true);
     asm("sti");
-
-    while(cnt1 < goal || cnt2 < goal)
-        printf("%d, %d\n", cnt1, cnt2);
-
-    printf("%d, %d\n", cnt1, cnt2);
 
     while(true);
 }

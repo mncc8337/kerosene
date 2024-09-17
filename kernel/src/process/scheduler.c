@@ -21,8 +21,6 @@ static void to_next_process(regs_t* regs) {
     else current_process = process_list;
     current_process->state = PROCESS_STATE_ACTIVE;
 
-    vmmngr_switch_page_directory(current_process->page_directory);
-
     process_switched = true;
 }
 
@@ -43,6 +41,10 @@ static void to_next_thread(regs_t* regs) {
     current_process->current_thread = current_thread;
 
     memcpy(regs, &current_thread->regs, sizeof(regs_t));
+}
+
+process_t* scheduler_get_process_list() {
+    return process_list;
 }
 
 void scheduler_add_process(process_t* proc) {
@@ -81,7 +83,9 @@ void scheduler_terminate_process() {
     process_t* saved = current_process;
     // we will delete the process afterward so there is no need to save registers
     to_next_process(NULL);
-    process_delete(saved);
+    // process_switched flag will not turn on if we only have 1 process left
+    // in that case do not delete the process
+    if(process_switched) process_delete(saved);
 }
 
 void scheduler_switch(regs_t* regs) {
@@ -92,7 +96,10 @@ void scheduler_switch(regs_t* regs) {
     current_process->alive_ticks++;
 
     if(!process_switched) to_next_thread(regs);
-    else memcpy(regs, &current_process->current_thread->regs, sizeof(regs_t));
+    else {
+        vmmngr_switch_page_directory(current_process->page_directory);
+        memcpy(regs, &current_process->current_thread->regs, sizeof(regs_t));
+    }
 
     process_switched = false;
 }

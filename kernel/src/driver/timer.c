@@ -41,9 +41,7 @@ void timer_wait(unsigned ms) {
     eticks -= eseconds * TIMER_FREQUENCY;
     eseconds += seconds_since_start;
 
-    while(eseconds > (unsigned)seconds_since_start || eticks > ticks)
-        asm volatile("sti; hlt; cli");
-    asm volatile("sti");
+    while(eseconds > (unsigned)seconds_since_start || eticks > ticks);
 }
 
 void timer_init() {

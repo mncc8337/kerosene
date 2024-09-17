@@ -155,7 +155,4 @@ bool kbd_is_capslock_on();
 bool kbd_is_scrolllock_on();
 bool kbd_is_numlock_on();
 
-void kbd_install_key_listener(void (*klis)(key_t));
-void kbd_uninstall_key_listener();
-
 void kbd_init();

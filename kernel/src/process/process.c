@@ -36,7 +36,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     proc->prev = NULL;
 
     thread_t* thread = proc->thread_list;
-    // thread->priority;
+    thread->priority = 0;
     thread->state = PROCESS_STATE_ACTIVE;
     thread->next = NULL;
 

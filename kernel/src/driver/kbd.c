@@ -222,7 +222,6 @@ static bool scrolllock_on = false;
 static bool numlock_on = false;
 
 static key_t current_key;
-static void (*key_listener)(key_t) = 0;
 
 static void set_scancode_set() {
     unsigned tries = 0;
@@ -293,7 +292,8 @@ static void kbd_handler(regs_t* r) {
         current_key.keycode = keycode_extended_byte[0x6f];
         current_key.mapped = 0;
         current_key.released = false;
-        goto call_key_listener;
+        extended_byte = false;
+        return;
     }
 
     if(extended_byte &&
@@ -306,7 +306,8 @@ static void kbd_handler(regs_t* r) {
         current_key.keycode = keycode_extended_byte[0x6e];
         current_key.mapped = 0;
         current_key.released = (scancode == KBD_PRINTSCREEN_RELEASED_SCANCODE_2ND);
-        goto call_key_listener;
+        extended_byte = false;
+        return;
     }
 
     bool released = (scancode & 0x80) == 0x80;
@@ -354,9 +355,6 @@ static void kbd_handler(regs_t* r) {
     current_key.released = released;
     lastest_key_handled = false;
     
-call_key_listener:
-    if(key_listener) key_listener(current_key);
-
     // reset extended_byte status
     extended_byte = false;
 }
@@ -395,9 +393,7 @@ try_again:
 void kbd_wait_key(key_t* k) {
     lastest_key_handled = true; // make sure to get a new key
     // wait until get a new key (unhandled)
-    while(lastest_key_handled)
-        asm volatile("sti; hlt; cli");
-    asm volatile("sti");
+    while(lastest_key_handled);
     lastest_key_handled = true;
     if(k) *k = current_key;
 }
@@ -409,13 +405,6 @@ bool kbd_is_key_pressed(uint8_t keycode) {
 bool kbd_is_capslock_on() { return capslock_on; }
 bool kbd_is_scrolllock_on() { return scrolllock_on; }
 bool kbd_is_numlock_on() { return numlock_on; }
-
-void kbd_install_key_listener(void (*klis)(key_t)) {
-    key_listener = klis;
-}
-void kbd_uninstall_key_listener() {
-    key_listener = 0;
-}
 
 void kbd_init() {
     // make sure data port is empty

@@ -7,6 +7,7 @@
 #include "video.h"
 #include "filesystem.h"
 #include "pit.h"
+#include "process.h"
 
 #include "string.h"
 #include "stdio.h"
@@ -107,7 +108,7 @@ static void process_prompt(char* prompts, unsigned prompts_len);
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic exit");
+        puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic catproc exit");
     }
     else {
         arg = strtok(arg, " ");
@@ -148,6 +149,7 @@ static void help(char* arg) {
             );
         }
         else if(strcmp(arg, "panic")) puts("causes the kernel to panic\npanic <no-args>");
+        else if(strcmp(arg, "catproc")) puts("print all processes and their info\ncatproc <no-args>");
         else if(strcmp(arg, "exit")) puts("quit shell and continue to usermode\nexit <no-arg>");
     }
 }
@@ -914,6 +916,27 @@ static void panic(char* arg) {
    kernel_panic(NULL);
 }
 
+static void catproc(char* arg) {
+    (void)(arg);
+
+    // print all processes
+    process_t* proc = scheduler_get_process_list();
+    while(proc) {
+        printf(
+            "process %d:\n"
+            "    alive ticks: %d\n"
+            "    priority: %d\n"
+            "    state: %s\n"
+            "    thread count: %d\n"
+            ,
+            proc->pid, proc->alive_ticks, proc->priority,
+            proc->state == PROCESS_STATE_ACTIVE ? "active" : "sleep",
+            proc->thread_count
+        );
+        proc = proc->next;
+    }
+}
+
 static void exit(char* arg) {
     (void)(arg);
 
@@ -950,6 +973,7 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
         else if(strcmp(cmd_name, "beep")) beep(remain_arg);
         else if(strcmp(cmd_name, "draw")) draw(remain_arg);
         else if(strcmp(cmd_name, "panic")) panic(remain_arg);
+        else if(strcmp(cmd_name, "catproc")) catproc(remain_arg);
         else if(strcmp(cmd_name, "exit")) exit(remain_arg);
         else if(prompt_len == 0); // just skip
         else printf("unknow command '%s'\n", prompt);

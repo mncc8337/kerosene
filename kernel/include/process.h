@@ -37,6 +37,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user);
 void process_delete(process_t* proc);
 
 // scheduler.c
+process_t* scheduler_get_process_list();
 void scheduler_add_process(process_t* proc);
 void scheduler_terminate_process();
 void scheduler_switch(regs_t* regs);
