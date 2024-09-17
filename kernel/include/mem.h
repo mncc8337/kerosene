@@ -7,16 +7,15 @@
 typedef enum {
     ERR_MEM_SUCCESS,
     ERR_MEM_OOM,
-    ERR_MEM_INVALID_DIR,
     ERR_MEM_UNMAPPED
 } MEM_ERR;
-
-#define MMNGR_PAGE_SIZE 4096
 
 typedef uint32_t pde_t;
 typedef uint32_t pte_t;
 typedef uint32_t physical_addr_t;
 typedef uint32_t virtual_addr_t;
+
+#define MMNGR_PAGE_SIZE 4096
 
 #define PTE_PRESENT       1
 #define PTE_WRITABLE      2
@@ -89,16 +88,16 @@ void pmmngr_free_multi_block(void* base, size_t cnt);
 void pmmngr_init(size_t size);
 
 // vmmngr.c
-void vmmngr_map_temporary_pd(page_directory_t* pd);
-page_directory_t* vmmngr_get_directory();
+page_directory_t* vmmngr_get_page_directory();
+page_directory_t* vmmngr_get_kernel_page_directory();
 physical_addr_t vmmngr_to_physical_addr(page_directory_t* page_directory, virtual_addr_t virt);
 MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags);
-MEM_ERR vmmngr_unmap(page_directory_t* page_directory, virtual_addr_t virt);
+void vmmngr_unmap(page_directory_t* page_directory, virtual_addr_t virt);
 MEM_ERR vmmngr_alloc_page(pte_t* pte);
 void vmmngr_free_page(pte_t* pte);
 page_directory_t* vmmngr_alloc_page_directory();
 void vmmngr_free_page_directory(page_directory_t* page_directory);
-MEM_ERR vmmngr_switch_page_directory(page_directory_t* dir);
+void vmmngr_switch_page_directory(page_directory_t* dir);
 void vmmngr_flush_tlb_entry(virtual_addr_t addr);
 void vmmngr_init();
 

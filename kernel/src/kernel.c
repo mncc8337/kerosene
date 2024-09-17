@@ -271,6 +271,7 @@ void kinit(multiboot_info_t* mbd) {
     print_debug(LT_OK, "timer initialised\n");
 
     // add kernel process
+    // there must be at least one process in the scheduler
     kernel_process = process_new((uint32_t)kmain, 0, false);
     if(!kernel_process) {
         print_debug(LT_CR, "failed to initialise kernel process. not enough memory\n");
@@ -295,18 +296,34 @@ void user_print(char* a) {
 }
 void user_test_process() {
     user_print("hello from user!\n");
-    int ret;
-    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+
+    // FIXME: terminate it will cause a page fault so just hang
+    // int ret;
+    // SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
     while(true);
 }
-void kernel_test_process() {
-    puts("hello from kernel!");
-    int ret;
-    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+
+volatile unsigned cnt1 = 0;
+volatile unsigned cnt2 = 0;
+unsigned goal = 100000000;
+void kernel_test_process1() {
+    for(unsigned i = 0; i < goal; i++)
+        cnt1 += 1;
+
+    // int ret;
+    // SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
     while(true);
 }
-void new_kern_proc(void* eip) {
-    process_t* proc = process_new((uint32_t)eip, 0, false);
+void kernel_test_process2() {
+    for(unsigned i = 0; i < goal; i++)
+        cnt2 += 1;
+
+    // int ret;
+    // SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+    while(true);
+}
+void new_proc(void* eip, bool is_user) {
+    process_t* proc = process_new((uint32_t)eip, 0, is_user);
     if(proc) {
         printf("created process %d\n", proc->pid);
         scheduler_add_process(proc);
@@ -318,16 +335,21 @@ void kmain() {
     print_debug(LT_OK, "done initialising\n");
 
     if(!shell_init()) {
-        // only set if fs is available
         if(fs) shell_set_root_node(fs->root_node);
     }
-    else puts("not enough memory for kshell. quitting");
+    else puts("not enough memory for kshell.");
 
     asm("cli");
-    new_kern_proc(shell_start);
-    new_kern_proc(kernel_test_process);
-    new_kern_proc(user_test_process);
+    // new_proc(shell_start, false);
+    new_proc(kernel_test_process1, false);
+    new_proc(kernel_test_process2, false);
+    // new_proc(user_test_process, true);
     asm("sti");
+
+    while(cnt1 < goal || cnt2 < goal)
+        printf("%d, %d\n", cnt1, cnt2);
+
+    printf("%d, %d\n", cnt1, cnt2);
 
     while(true);
 }

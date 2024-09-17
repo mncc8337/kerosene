@@ -14,11 +14,9 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     proc->pid = ++process_count;
     proc->alive_ticks = 1;
     proc->priority = priority;
-    if(process_count == 1) {
-        // then we are creating the main kernel process
-        proc->page_directory = vmmngr_get_directory();
-    }
+    if(!is_user) proc->page_directory = vmmngr_get_kernel_page_directory();
     else {
+        // only users need to have a separate page directory
         proc->page_directory = vmmngr_alloc_page_directory();
         if(!proc->page_directory) {
             kfree(proc);
@@ -27,7 +25,6 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     }
     proc->state = PROCESS_STATE_SLEEP;
     proc->thread_count = 1;
-    // FIXME: thread should be allocated in proccess heap
     proc->thread_list = (thread_t*)kmalloc(sizeof(thread_t));
     if(!proc->thread_list) {
         vmmngr_free_page_directory(proc->page_directory);
@@ -48,7 +45,6 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     regs->eflags = DEFAULT_EFLAGS;
     if(is_user) {
         // switch page directory to create user heap
-        page_directory_t* saved_pd = vmmngr_get_directory();
         vmmngr_switch_page_directory(proc->page_directory);
 
         heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
@@ -61,7 +57,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
         regs->ss = regs->ds;
         regs->useresp = (uint32_t)heap_alloc(heap, DEFAULT_STACK_SIZE, false) + DEFAULT_STACK_SIZE;
 
-        vmmngr_switch_page_directory(saved_pd);
+        vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
     }
     else {
         regs->cs = 0x08; // kernel code selector
@@ -77,7 +73,8 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
 }
 
 void process_delete(process_t* proc) {
-    vmmngr_free_page_directory(proc->page_directory);
+    if(proc->page_directory != vmmngr_get_kernel_page_directory())
+        vmmngr_free_page_directory(proc->page_directory);
 
     // free all threads
     thread_t* thread = proc->thread_list;

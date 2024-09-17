@@ -1,5 +1,6 @@
 #include "kshell.h"
 #include "system.h"
+#include "syscall.h"
 #include "mem.h"
 #include "kbd.h"
 #include "timer.h"
@@ -1048,4 +1049,8 @@ void shell_start() {
     kfree(input);
     kfree(last_input);
     kfree(node_stack);
+
+    int ret;
+    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+    while(true);
 }

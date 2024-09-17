@@ -37,8 +37,8 @@ kernel_stack_top:
 section .data
 multiboot_ptr: dd 0
 align 4096
-global kernel_page_directory
-kernel_page_directory:
+global kernel_pd_virt
+kernel_pd_virt:
     times 1024 dd 0x00000000
 page_table_4mib:
     times 1024 dd 0x00000000
@@ -60,18 +60,18 @@ kernel_entry:
     ; the system will process the page directory as a page table
     ; thus mapping all the page table address for us
     ; isn't it genius?
-    mov eax, kernel_page_directory - KERNEL_START
+    mov eax, kernel_pd_virt - KERNEL_START
     or eax, 0b011
-    mov [kernel_page_directory - KERNEL_START + 1023 * 4], eax
+    mov [kernel_pd_virt - KERNEL_START + 1023 * 4], eax
 
     mov eax, page_table_4mib - KERNEL_START
     or eax, 0b011
-    mov [kernel_page_directory - KERNEL_START + phys_to_virt(0)], eax
+    mov [kernel_pd_virt - KERNEL_START + phys_to_virt(0)], eax
 
     mov eax, page_table_kernel1 - KERNEL_START
     ; FIXME: kernel is temporary accessible to user (flag 0b111)
     or eax, 0b111
-    mov [kernel_page_directory - KERNEL_START + phys_to_virt(KERNEL_START)], eax
+    mov [kernel_pd_virt - KERNEL_START + phys_to_virt(KERNEL_START)], eax
 
     ; map the first 4mb
     mov edi, page_table_4mib - KERNEL_START
@@ -98,15 +98,15 @@ kernel_entry:
     add eax, 4096
     loop .loop_kernel1
 
-    ; map kernel_page_directory using the final entry
+    ; map kernel_pd_virt using the final entry
     ; this will be mapped to 0xc03ff000 (VMMNGR_PD)
-    mov eax, kernel_page_directory - KERNEL_START
+    mov eax, kernel_pd_virt - KERNEL_START
     ; FIXME: kernel is temporary accessible to user (flag 0b111)
     or eax, 0b111
     mov [edi], eax
 
     ; load page directory
-    mov eax, kernel_page_directory - KERNEL_START
+    mov eax, kernel_pd_virt - KERNEL_START
     mov cr3, eax
 
     ; enable paging
@@ -120,7 +120,7 @@ kernel_entry:
 
 higher_half:
     ; unmap the first 4MiB identity
-    mov dword [kernel_page_directory], 0x0
+    mov dword [kernel_pd_virt], 0x0
     invlpg [0]
 
     mov esp, kernel_stack_top
