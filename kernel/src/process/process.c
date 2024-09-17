@@ -11,9 +11,10 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
 
-    proc->pid = ++process_count;
-    proc->alive_ticks = 1;
+    proc->id = ++process_count;
     proc->priority = priority;
+    proc->state = PROCESS_STATE_SLEEP;
+    proc->alive_ticks = 1;
     if(!is_user) proc->page_directory = vmmngr_get_kernel_page_directory();
     else {
         // only users need to have a separate page directory
@@ -23,7 +24,6 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
             return NULL;
         }
     }
-    proc->state = PROCESS_STATE_SLEEP;
     proc->thread_count = 1;
     proc->thread_list = (thread_t*)kmalloc(sizeof(thread_t));
     if(!proc->thread_list) {
@@ -36,6 +36,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     proc->prev = NULL;
 
     thread_t* thread = proc->thread_list;
+    thread->id = 1;
     thread->priority = 0;
     thread->state = PROCESS_STATE_ACTIVE;
     thread->next = NULL;
@@ -85,4 +86,51 @@ void process_delete(process_t* proc) {
     }
 
     kfree(proc);
+}
+
+bool process_add_thread(process_t* proc, uint32_t eip, int priority) {
+    bool is_user = (proc->page_directory != vmmngr_get_kernel_page_directory());
+
+    thread_t* new = (thread_t*)kmalloc(sizeof(thread_t));
+    if(!new) return true;
+
+    new->id = ++proc->thread_count;
+    new->priority = priority;
+    new->state = PROCESS_STATE_SLEEP;
+    new->next = NULL;
+
+    regs_t* regs = &new->regs;
+    regs->eip = eip;
+    regs->eflags = DEFAULT_EFLAGS;
+    if(is_user) {
+        vmmngr_switch_page_directory(proc->page_directory);
+        heap_t* heap = (heap_t*)UHEAP_START;
+        regs->cs = 0x1b; // user code selector
+        regs->ds = 0x23; // user data selector
+        regs->es = regs->ds;
+        regs->fs = regs->ds;
+        regs->gs = regs->ds;
+        regs->ss = regs->ds;
+        regs->useresp = (uint32_t)heap_alloc(heap, DEFAULT_STACK_SIZE, false) + DEFAULT_STACK_SIZE;
+        vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+    }
+    else {
+        regs->cs = 0x08; // kernel code selector
+        regs->ds = 0x10; // kernel data selector
+        regs->es = regs->ds;
+        regs->fs = regs->ds;
+        regs->gs = regs->ds;
+        regs->ss = regs->ds;
+        regs->useresp = (uint32_t)kmalloc(DEFAULT_STACK_SIZE) + DEFAULT_STACK_SIZE;
+    }
+    if(!regs->useresp) {
+        kfree(new);
+        return true;
+    }
+
+    thread_t* t = proc->thread_list;
+    while(t->next) t = t->next;
+    t->next = new;
+
+    return false;
 }

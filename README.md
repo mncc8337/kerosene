@@ -61,6 +61,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [x] load kernel with ELF binary instead of flat binary
 - [x] support multiboot
 - [x] higher half kernel
+- [ ] multiprocessor support
 ### Hardware drivers
 - [ ] PS/2 keyboard driver
     + [x] get key scancode
@@ -107,10 +108,18 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [ ] syscall
     - [x] putchar
     - [x] current time
+    - [x] terminate process
     - [ ] read file
     - [ ] write file
 - [ ] process manager
-- [ ] multitasking
+    - [x] load process
+    - [x] load and save thread state
+    - [x] process terminate
+    - [x] basic process scheduling
+    - [x] multithreading
+    - [ ] thread terminate
+    - [ ] spinlock
+    - [ ] semaphore
 - [ ] load and run ELF file
 ## Known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found

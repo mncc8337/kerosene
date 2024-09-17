@@ -293,35 +293,22 @@ void kinit(multiboot_info_t* mbd) {
     while(true);
 }
 
-void user_print(char* a) {
-    int ret;
-    while(a[0] != '\0') {
-        SYSCALL_1P(SYSCALL_PUTCHAR, ret, a[0]);
-        a++;
-    }
-}
-void user_test_process() {
-    user_print("hello user!\n");
+volatile unsigned cnt = 0;
+unsigned goal = 10000000;
+volatile bool thread1_end = false;
+volatile bool thread2_end = false;
+void kernel_thread1() {
+    while(cnt < goal) cnt++;
+    thread1_end = true;
 
-    int ret;
-    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+    // thread terminate is not implemented so just hang
     while(true);
 }
-void kernel_test_process() {
-    printf("hello kernel!\n");
+void kernel_thread2() {
+    while(!thread1_end) printf("%d\n", cnt);
+    thread2_end = true;
 
-    int ret;
-    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
     while(true);
-}
-
-void new_proc(void* eip, bool is_user) {
-    process_t* proc = process_new((uint32_t)eip, 0, is_user);
-    if(proc) {
-        printf("created process %d\n", proc->pid);
-        scheduler_add_process(proc);
-    }
-    else printf("failed to create process at entry %x\n", eip);
 }
 
 void kmain() {
@@ -332,11 +319,12 @@ void kmain() {
     }
     else puts("not enough memory for kshell.");
 
-    asm("cli");
-    new_proc(shell_start, false);
-    new_proc(kernel_test_process, false);
-    new_proc(user_test_process, true);
-    asm("sti");
+    process_add_thread(kernel_process, (uint32_t)kernel_thread1, 0);
+    process_add_thread(kernel_process, (uint32_t)kernel_thread2, 0);
+
+    // start shell after both threads are ended
+    while(!thread1_end || !thread2_end);
+    process_add_thread(kernel_process, (uint32_t)shell_start, 0);
 
     while(true);
 }

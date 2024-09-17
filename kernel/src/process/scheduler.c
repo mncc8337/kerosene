@@ -47,6 +47,10 @@ process_t* scheduler_get_process_list() {
     return process_list;
 }
 
+process_t* scheduler_get_current_process() {
+    return current_process;
+}
+
 void scheduler_add_process(process_t* proc) {
     if(!process_list) {
         // add the first process
