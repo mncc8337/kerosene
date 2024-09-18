@@ -117,7 +117,8 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     - [x] process terminate
     - [x] basic process scheduling
     - [x] multithreading
-    - [ ] thread terminate
+    - [x] thread terminate
+    - [ ] sleep()
     - [ ] spinlock
     - [ ] semaphore
 - [ ] load and run ELF file

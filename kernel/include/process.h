@@ -12,11 +12,13 @@
 
 #define PROCESS_STATE_SLEEP  0
 #define PROCESS_STATE_ACTIVE 1
+#define PROCESS_STATE_DEAD   2
 
 typedef struct thread {
     int id;
     int priority;
     int state;
+    uint32_t stack_addr;
     regs_t regs;
     struct thread* next;
     struct thread* prev;
@@ -37,11 +39,13 @@ typedef struct process {
 
 process_t* process_new(uint32_t eip, int priority, bool is_user);
 void process_delete(process_t* proc);
-bool process_add_thread(process_t* proc, uint32_t eip, int priority);
+thread_t* process_add_thread(process_t* proc, uint32_t eip, int priority);
+void process_delete_thread(process_t* proc, thread_t* thread);
 
 // scheduler.c
 process_t* scheduler_get_process_list();
 process_t* scheduler_get_current_process();
 void scheduler_add_process(process_t* proc);
-void scheduler_terminate_process();
+void scheduler_kill_process();
+void scheduler_kill_thread();
 void scheduler_switch(regs_t* regs);

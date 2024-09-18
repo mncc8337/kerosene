@@ -1,13 +1,17 @@
 #include "process.h"
 
 #include "string.h"
-#include "stdio.h"
 
 static process_t* current_process = 0;
 static process_t* process_list;
 
-// should be turned on after switch to another process
 static bool process_switched = false;
+
+static process_t* get_next_process() {
+    // TODO: accounting for priority
+    if(current_process->next) return current_process->next;
+    return process_list;
+}
 
 static void to_next_process(regs_t* regs) {
     // if it is the only process
@@ -15,31 +19,43 @@ static void to_next_process(regs_t* regs) {
 
     if(regs) memcpy(&current_process->current_thread->regs, regs, sizeof(regs_t));
 
-    // TODO: accounting for priority
     current_process->state = PROCESS_STATE_SLEEP;
-    if(current_process->next) current_process = current_process->next;
-    else current_process = process_list;
+    current_process = get_next_process();
     current_process->state = PROCESS_STATE_ACTIVE;
 
     process_switched = true;
 }
 
-static void to_next_thread(regs_t* regs) {
-    if(current_process->thread_count == 1) return;
+static thread_t* get_next_thread() {
     // TODO: accounting for priority
+    if(current_process->current_thread->next)
+        return current_process->current_thread->next;
+    return current_process->thread_list;
+}
+
+static void to_next_thread(regs_t* regs) {
+    if(current_process->thread_count < 2) return;
 
     thread_t* current_thread = current_process->current_thread;
+    thread_t* next_thread = get_next_thread();
 
-    // save registers
-    memcpy(&current_thread->regs, regs, sizeof(regs_t));
-    current_thread->state = PROCESS_STATE_SLEEP;
+    bool thread_del = current_thread->state == PROCESS_STATE_DEAD;
+    while(current_thread->state == PROCESS_STATE_DEAD) {
+        process_delete_thread(current_process, current_thread);
+        current_thread = next_thread;
+        next_thread = get_next_thread();
+    }
+    if(!thread_del) {
+        // save registers
+        memcpy(&current_thread->regs, regs, sizeof(regs_t));
+        current_thread->state = PROCESS_STATE_SLEEP;
+    }
 
-    if(current_thread->next)
-        current_thread = current_thread->next;
-    else current_thread = current_process->thread_list;
+    current_thread = next_thread;
     current_thread->state = PROCESS_STATE_ACTIVE;
     current_process->current_thread = current_thread;
 
+    // load saved registers
     memcpy(regs, &current_thread->regs, sizeof(regs_t));
 }
 
@@ -73,8 +89,8 @@ void scheduler_add_process(process_t* proc) {
     process_list->next = proc;
 }
 
-// terminate current process
-void scheduler_terminate_process() {
+// kill current process
+void scheduler_kill_process() {
     // do not terminate the first process
     if(current_process == process_list) return;
 
@@ -92,14 +108,23 @@ void scheduler_terminate_process() {
     if(process_switched) process_delete(saved);
 }
 
+void scheduler_kill_thread() {
+    // mark current thread as dead
+    // it will be deleted upon process switch or thread switch
+    current_process->current_thread->state = PROCESS_STATE_DEAD;
+}
+
 void scheduler_switch(regs_t* regs) {
+    // recently discovered that this scheduler is called round robin
+
     // switch to other process if exceeded max runtime
-    if(current_process->alive_ticks % PROCESS_ALIVE_TICKS == 0)
-        to_next_process(regs);
+    if(current_process->alive_ticks % PROCESS_ALIVE_TICKS == 0) to_next_process(regs);
+    else if(current_process->thread_count == 0) scheduler_kill_process();
 
     current_process->alive_ticks++;
 
-    if(!process_switched) to_next_thread(regs);
+    if(!process_switched)
+        to_next_thread(regs);
     else {
         vmmngr_switch_page_directory(current_process->page_directory);
         memcpy(regs, &current_process->current_thread->regs, sizeof(regs_t));

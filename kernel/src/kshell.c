@@ -1087,6 +1087,6 @@ void shell_start() {
     kfree(node_stack);
 
     int ret;
-    SYSCALL_0P(SYSCALL_PROCESS_TERMINATE, ret);
+    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
     while(true);
 }

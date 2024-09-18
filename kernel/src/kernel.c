@@ -301,13 +301,16 @@ void kernel_thread1() {
     while(cnt < goal) cnt++;
     thread1_end = true;
 
-    // thread terminate is not implemented so just hang
+    int ret;
+    SYSCALL_0P(SYSCALL_KILL_THREAD, ret);
     while(true);
 }
 void kernel_thread2() {
     while(!thread1_end) printf("%d\n", cnt);
     thread2_end = true;
 
+    int ret;
+    SYSCALL_0P(SYSCALL_KILL_THREAD, ret);
     while(true);
 }
 
@@ -319,7 +322,7 @@ void kmain() {
     }
     else puts("not enough memory for kshell.");
 
-    process_add_thread(kernel_process, (uint32_t)kernel_thread1, 0);
+    process_add_thread(kernel_process, (uint32_t)kernel_thread1, 0); 
     process_add_thread(kernel_process, (uint32_t)kernel_thread2, 0);
 
     // start shell after both threads are ended
