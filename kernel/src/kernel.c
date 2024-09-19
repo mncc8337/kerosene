@@ -322,12 +322,12 @@ void kmain() {
     }
     else puts("not enough memory for kshell.");
 
-    process_add_thread(kernel_process, (uint32_t)kernel_thread1, 0); 
-    process_add_thread(kernel_process, (uint32_t)kernel_thread2, 0);
+    process_add_thread(kernel_process, (uint32_t)kernel_thread1); 
+    process_add_thread(kernel_process, (uint32_t)kernel_thread2);
 
     // start shell after both threads are ended
     while(!thread1_end || !thread2_end);
-    process_add_thread(kernel_process, (uint32_t)shell_start, 0);
+    process_add_thread(kernel_process, (uint32_t)shell_start);
 
     while(true);
 }

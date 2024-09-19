@@ -8,11 +8,11 @@
 #define ADD_SYSCALL(id, func) \
 syscalls[id] = func
 
+static void* syscalls[MAX_SYSCALL];
+
 static void test_syscall() {
     puts("this is a syscall!");
 }
-
-static void* syscalls[MAX_SYSCALL];
 
 static void syscall_dispatcher(regs_t* regs) {
     if(regs->eax >= MAX_SYSCALL) return;

@@ -18,7 +18,6 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     proc->id = process_count + 1;
     proc->priority = priority;
     proc->state = PROCESS_STATE_SLEEP;
-    proc->alive_ticks = 1;
     if(!is_user) proc->page_directory = vmmngr_get_kernel_page_directory();
     else {
         // only users need to have a separate page directory
@@ -41,8 +40,8 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
 
     thread_t* thread = proc->thread_list;
     thread->id = 1;
-    thread->priority = 0;
     thread->state = PROCESS_STATE_ACTIVE;
+    thread->alive_ticks = 1;
     thread->next = NULL;
 
     regs_t* regs = &thread->regs;
@@ -109,7 +108,7 @@ void process_delete(process_t* proc) {
     kfree(proc);
 }
 
-thread_t* process_add_thread(process_t* proc, uint32_t eip, int priority) {
+thread_t* process_add_thread(process_t* proc, uint32_t eip) {
     thread_t* new = (thread_t*)kmalloc(sizeof(thread_t));
     if(!new) return NULL;
 
@@ -124,8 +123,8 @@ thread_t* process_add_thread(process_t* proc, uint32_t eip, int priority) {
     }
 
     new->id = new_id;
-    new->priority = priority;
     new->state = PROCESS_STATE_SLEEP;
+    new->alive_ticks = 1;
     new->next = NULL;
     new->prev = NULL;
 

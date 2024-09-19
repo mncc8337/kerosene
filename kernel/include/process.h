@@ -7,17 +7,18 @@
 
 #define MAX_PROCESSES 256
 
-// how many ticks a process will run before got switch to others
-#define PROCESS_ALIVE_TICKS 32
+// how many ticks a thread will run before got switch to others
+#define THREAD_ALIVE_TICKS 32
 
+// TODO: use other name than PROCESS_*
 #define PROCESS_STATE_SLEEP  0
 #define PROCESS_STATE_ACTIVE 1
-#define PROCESS_STATE_DEAD   2
 
 typedef struct thread {
+    // all threads will have equally priority
     int id;
-    int priority;
     int state;
+    uint32_t alive_ticks;
     uint32_t stack_addr;
     regs_t regs;
     struct thread* next;
@@ -28,7 +29,6 @@ typedef struct process {
     int id;
     int priority;
     int state;
-    uint32_t alive_ticks;
     page_directory_t* page_directory;
     uint32_t thread_count;
     thread_t* thread_list;
@@ -39,7 +39,7 @@ typedef struct process {
 
 process_t* process_new(uint32_t eip, int priority, bool is_user);
 void process_delete(process_t* proc);
-thread_t* process_add_thread(process_t* proc, uint32_t eip, int priority);
+thread_t* process_add_thread(process_t* proc, uint32_t eip);
 void process_delete_thread(process_t* proc, thread_t* thread);
 
 // scheduler.c

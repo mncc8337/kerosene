@@ -924,12 +924,11 @@ static void catproc(char* arg) {
     while(proc) {
         printf(
             "process %d:\n"
-            "    alive ticks: %d\n"
             "    priority: %d\n"
             "    state: %s\n"
             "    thread count: %d\n"
             ,
-            proc->id, proc->alive_ticks, proc->priority,
+            proc->id, proc->priority,
             proc->state == PROCESS_STATE_ACTIVE ? "active" : "sleep",
             proc->thread_count
         );
@@ -937,10 +936,10 @@ static void catproc(char* arg) {
         while(thread) {
             printf(
                 "    - thread %d\n"
-                "        priority: %d\n"
+                "        alive ticks: %d\n"
                 "        state: %s\n"
                 ,
-                thread->id, thread->priority,
+                thread->id, thread->alive_ticks,
                 thread->state == PROCESS_STATE_SLEEP ? "sleep" : "active"
             );
             thread = thread->next;

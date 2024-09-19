@@ -183,6 +183,8 @@ void vmmngr_free_page_directory(page_directory_t* page_directory) {
 }
 
 void vmmngr_switch_page_directory(page_directory_t* dir) {
+    if(current_page_directory == dir) return;
+
     current_page_directory = dir;
     mapped_temporal_pd = 0;
     asm volatile("mov %0, %%cr3" : : "r" (dir));
