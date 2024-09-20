@@ -109,16 +109,14 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     - [x] putchar
     - [x] current time
     - [x] terminate process
+    - [ ] sleep()
     - [ ] read file
     - [ ] write file
 - [ ] process manager
     - [x] load process
-    - [x] load and save thread state
-    - [x] process terminate
+    - [x] load and save process state
     - [x] basic process scheduling
-    - [x] multithreading
-    - [x] thread terminate
-    - [ ] sleep()
+    - [x] process terminate
     - [ ] spinlock
     - [ ] semaphore
 - [ ] load and run ELF file
