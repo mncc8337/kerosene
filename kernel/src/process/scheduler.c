@@ -1,8 +1,6 @@
 #include "process.h"
 
 #include "string.h"
-#include "stdio.h"
-#include "system.h"
 
 static process_t* current_process = NULL;
 static process_t* process_list_tail = NULL;
@@ -32,20 +30,9 @@ process_t* scheduler_get_current_process() {
 }
 
 void scheduler_add_process(process_t* proc) {
-    if(!current_process) {
-        // add the first process
-        // this must be the kernel process
-        process_list_tail = proc;
-        current_process = proc;
-        current_process->state = PROCESS_STATE_READY;
-        current_process->next = NULL;
-        process_switched = true;
-        // note that we do not switch page directory
-        // because kernel page directory is preloaded
-        return;
-    }
-
     proc->next = NULL;
+    proc->state = PROCESS_STATE_READY;
+
     process_list_tail->next = proc;
     process_list_tail = proc;
 }
@@ -60,6 +47,7 @@ void scheduler_kill_process() {
     // dont save registers and dont add the process back to the queue
     to_next_process(NULL, false);
     // process_switched should be set because there are at least 2 elements on the queue
+    // so that it is safe to delete the process
     process_delete(saved);
 }
 
@@ -76,4 +64,21 @@ void scheduler_switch(regs_t* regs) {
     }
 
     process_switched = false;
+}
+
+void scheduler_init(process_t* proc) {
+    // add the first process
+    // this must be the kernel process
+
+    proc->id = 1;
+    proc->state = PROCESS_STATE_ACTIVE;
+    proc->next = NULL;
+
+    process_list_tail = proc;
+    current_process = proc;
+
+    // note that we do not switch page directory
+    // because kernel page directory is preloaded
+
+    process_switched = true;
 }

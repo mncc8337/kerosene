@@ -1,8 +1,9 @@
 #pragma once
 
+#include "stdbool.h"
 #include "stdint.h"
 
-#define PSF2_HAS_UNICODE_TABLE 0x1
+#define PSF_FONT_MAGIC 0x864ab572
 
 typedef struct {
     uint32_t magic;
@@ -15,6 +16,6 @@ typedef struct {
     uint32_t width;
 } PSF_font_t;
 
-void psf_load(char* font_data);
+bool psf_load(char* font_data);
 void psf_get_font_geometry(int* width, int* height, int* bpg);
 char* psf_get_glyph(char chr);

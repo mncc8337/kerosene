@@ -158,10 +158,10 @@ void disk_init() {
             case FS_FAT32:
                 err = fat32_init(part, FS_ID);
                 if(err) {
-                    print_debug(LT_ER, "failed to initialize FAT32 filesystem in partition %d. error code %d\n", i+1, err);
+                    print_debug(LT_ER, "failed to initialize FAT32 filesystem on partition %d. error code %d\n", i+1, err);
                     break;
                 }
-                print_debug(LT_OK, "initialised FAT32 filesystem in partition %d\n", i+1);
+                print_debug(LT_OK, "initialised FAT32 filesystem on partition %d\n", i+1);
                 fs = fs_get(FS_ID);
                 break;
             case FS_EXT2:
@@ -283,10 +283,12 @@ void kinit(multiboot_info_t* mbd) {
         print_debug(LT_CR, "failed to initialise kernel process. not enough memory\n");
         kernel_panic(NULL);
     }
-    print_debug(LT_OK, "created kernel main process\n");
-    scheduler_add_process(kernel_process);
+    print_debug(LT_IF, "created kernel main process\n");
+    scheduler_init(kernel_process);
+    print_debug(LT_OK, "scheduler initialised\n");
 
     // start interrupts again after setting up everything
+    // this will also start the scheduler and cause a process switch to kmain
     asm volatile("sti");
 
     // wait for process switch

@@ -63,6 +63,7 @@ void video_vesa_get_size(int* w, int* h);
 void video_vesa_set_size(int pitch, int bpp, int w, int h);
 void video_vesa_set_font_size(int cw, int ch, int bpg);
 void video_vesa_get_font_size(int* w, int* h);
+bool video_vesa_set_font(char* font_data);
 void video_vesa_get_rowcol(int* c, int* r);
 void video_vesa_plot_pixel(unsigned x, unsigned y, int color);
 int video_vesa_get_pixel(unsigned x, unsigned y);

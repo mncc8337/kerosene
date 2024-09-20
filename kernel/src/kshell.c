@@ -31,6 +31,8 @@ static unsigned input_len = 0;
 
 static char* last_input;
 
+static char* current_font = NULL;
+
 // a stack that contain the path of current dir
 static fs_node_t* node_stack;
 static unsigned node_stack_offset = 0;
@@ -150,6 +152,7 @@ static void help(char* arg) {
         }
         else if(strcmp(arg, "panic")) puts("causes the kernel to panic\npanic <no-args>");
         else if(strcmp(arg, "catproc")) puts("print all processes and their info\ncatproc <no-args>");
+        else if(strcmp(arg, "loadfont")) puts("load new font\nloadfont <psf-file>");
         else if(strcmp(arg, "exit")) puts("quit shell and continue to usermode\nexit <no-arg>");
     }
 }
@@ -929,11 +932,66 @@ static void catproc(char* arg) {
             "    alive ticks: %d\n"
             ,
             proc->id, proc->priority,
-            proc->state == PROCESS_STATE_ACTIVE ? "active" : "sleep",
+            proc->state == PROCESS_STATE_ACTIVE ? "active" : 
+            proc->state == PROCESS_STATE_READY ? "ready" : "sleep",
             proc->alive_ticks
         );
         proc = proc->next;
     }
+}
+
+static void loadfont(char* path) {
+    if(!video_using_framebuffer()) {
+        puts("not supported in current video mode");
+        return;
+    }
+
+    fs_node_t* current_node = node_stack_top();
+    if(!current_node->valid) {
+        puts("no fs installed");
+        return;
+    }
+
+    if(path == NULL) {
+        puts("no file input");
+        return;
+    }
+
+    path = strtok(path, " ");
+
+    fs_node_t node_parent;
+    fs_node_t node;
+    SHELL_ERR err = path_find_last_node(path, &node_parent, &node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", node.name);
+        return;
+    }
+    if(err == ERR_SHELL_TARGET_NOT_FOUND || node.isdir) {
+        printf("no such file '%s'\n", node.name);
+        return;
+    }
+
+    char* new_font = kmalloc(node.size);
+    if(!new_font) {
+        puts("not enough memory to load the font");
+        return;
+    }
+
+    FILE f = file_open(&node, FILE_READ);
+    file_read(&f, (uint8_t*)new_font, node.size);
+    file_close(&f);
+
+    bool font_err = video_vesa_set_font(new_font);
+    if(font_err) {
+        printf("failed to load font %s\n", node.name);
+        kfree(new_font);
+        return;
+    }
+
+    printf("loaded new font %s\n", node.name);
+
+    if(current_font) kfree(current_font);
+    current_font = new_font;
 }
 
 static void exit(char* arg) {
@@ -973,6 +1031,7 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
         else if(strcmp(cmd_name, "draw")) draw(remain_arg);
         else if(strcmp(cmd_name, "panic")) panic(remain_arg);
         else if(strcmp(cmd_name, "catproc")) catproc(remain_arg);
+        else if(strcmp(cmd_name, "loadfont")) loadfont(remain_arg);
         else if(strcmp(cmd_name, "exit")) exit(remain_arg);
         else if(prompt_len == 0); // just skip
         else printf("unknow command '%s'\n", prompt);

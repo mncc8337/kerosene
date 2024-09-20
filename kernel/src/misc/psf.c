@@ -5,8 +5,14 @@
 
 PSF_font_t* font = (PSF_font_t*)font_h_data;
 
-void psf_load(char* font_data) {
-    font = (PSF_font_t*)font_data;
+bool psf_load(char* font_data) {
+    PSF_font_t* temp = (PSF_font_t*)font_data;
+
+    if(temp->magic != PSF_FONT_MAGIC)
+        return true;
+
+    font = temp;
+    return false;
 }
 
 void psf_get_font_geometry(int* width, int* height, int* bpg) {

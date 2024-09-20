@@ -18,7 +18,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     proc->id = process_count + 1;
     proc->priority = priority;
     proc->state = PROCESS_STATE_READY;
-    proc->alive_ticks = 1;
+    proc->alive_ticks = 0;
     if(!is_user) proc->page_directory = vmmngr_get_kernel_page_directory();
     else {
         // only users need to have a separate page directory

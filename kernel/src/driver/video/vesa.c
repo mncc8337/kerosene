@@ -62,6 +62,17 @@ void video_vesa_get_font_size(int* w, int* h) {
     *h = font_height;
 }
 
+bool video_vesa_set_font(char* font_data) {
+    bool res = psf_load(font_data);
+    if(res) return true;
+
+    int font_width, font_height, font_bpg;
+    psf_get_font_geometry(&font_width, &font_height, &font_bpg);
+    video_vesa_set_font_size(font_width, font_height, font_bpg);
+
+    return false;
+}
+
 void video_vesa_get_rowcol(int* c, int* r) {
     *c = text_cols;
     *r = text_rows;

@@ -6,9 +6,8 @@
 #include "stdint.h"
 
 // how many ticks a process will run before got switch to others
-#define PROCESS_ALIVE_TICKS 32
+#define PROCESS_ALIVE_TICKS 4
 
-// TODO: use other name than PROCESS_*
 enum PROCESS_STATE {
     PROCESS_STATE_READY,
     PROCESS_STATE_ACTIVE,
@@ -34,3 +33,4 @@ process_t* scheduler_get_current_process();
 void scheduler_add_process(process_t* proc);
 void scheduler_kill_process();
 void scheduler_switch(regs_t* regs);
+void scheduler_init(process_t* proc);
