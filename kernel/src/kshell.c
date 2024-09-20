@@ -920,30 +920,18 @@ static void catproc(char* arg) {
     (void)(arg);
 
     // print all processes
-    process_t* proc = scheduler_get_process_list();
+    process_t* proc = scheduler_get_current_process();
     while(proc) {
         printf(
             "process %d:\n"
             "    priority: %d\n"
             "    state: %s\n"
-            "    thread count: %d\n"
+            "    alive ticks: %d\n"
             ,
             proc->id, proc->priority,
             proc->state == PROCESS_STATE_ACTIVE ? "active" : "sleep",
-            proc->thread_count
+            proc->alive_ticks
         );
-        thread_t* thread = proc->thread_list;
-        while(thread) {
-            printf(
-                "    - thread %d\n"
-                "        alive ticks: %d\n"
-                "        state: %s\n"
-                ,
-                thread->id, thread->alive_ticks,
-                thread->state == PROCESS_STATE_SLEEP ? "sleep" : "active"
-            );
-            thread = thread->next;
-        }
         proc = proc->next;
     }
 }
