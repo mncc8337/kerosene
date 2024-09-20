@@ -70,6 +70,9 @@ bool video_vesa_set_font(char* font_data) {
     psf_get_font_geometry(&font_width, &font_height, &font_bpg);
     video_vesa_set_font_size(font_width, font_height, font_bpg);
 
+    cursor_posx = 0;
+    cursor_posy = 0;
+
     return false;
 }
 
