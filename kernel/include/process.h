@@ -19,6 +19,7 @@ typedef struct process {
     int priority;
     int state;
     uint32_t alive_ticks;
+    uint32_t sleep_ticks;
     page_directory_t* page_directory;
     uint32_t stack_addr;
     regs_t regs;
@@ -28,6 +29,7 @@ typedef struct process {
 typedef struct {
     process_t* top;
     process_t* bottom;
+    uint32_t size;
 } process_queue_t;
 
 // process.c
@@ -37,12 +39,13 @@ void process_delete(process_t* proc);
 // process_queue.c
 void process_queue_push(process_queue_t* procqueue, process_t* proc);
 process_t* process_queue_pop(process_queue_t* procqueue);
-bool process_queue_empty(process_queue_t* procqueue);
 
 // scheduler.c
 process_t* scheduler_get_current_process();
 process_t* scheduler_get_ready_processes();
+process_t* scheduler_get_sleep_processes();
 void scheduler_add_process(process_t* proc);
-void scheduler_kill_process();
+void scheduler_kill_process(regs_t* regs);
+void scheduler_set_sleep(regs_t* regs, unsigned ticks);
 void scheduler_switch(regs_t* regs);
 void scheduler_init(process_t* proc);

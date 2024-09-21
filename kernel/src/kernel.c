@@ -296,24 +296,30 @@ void kinit(multiboot_info_t* mbd) {
 }
 
 volatile unsigned cnt = 0;
-unsigned goal = 10000000;
-volatile bool thread1_end = false;
-volatile bool thread2_end = false;
+unsigned goal = 3;
+volatile bool proc1_end = false;
 void kernel_proc1() {
-    while(cnt < goal) cnt++;
-    thread1_end = true;
-
     int ret;
+
+    while(cnt < goal) {
+        printf("cnt: %d, ", cnt);
+        int tm1 = time(NULL);
+        SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
+        printf("sleept for %d sec\n", time(NULL) - tm1);
+        cnt++;
+    }
+    proc1_end = true;
+
     SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
-    while(true);
 }
-void kernel_proc2() {
-    while(!thread1_end) printf("%d\n", cnt);
-    thread2_end = true;
 
+unsigned tm_cnt = 0;
+void bg_proc() {
     int ret;
-    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
-    while(true);
+    while(true) {
+        SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
+        tm_cnt++;
+    }
 }
 
 void kmain() {
@@ -325,14 +331,14 @@ void kmain() {
     else puts("not enough memory for kshell.");
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
-    process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
-    process_t* proc3 = process_new((uint32_t)shell_start, 0, false);
+    process_t* proc2 = process_new((uint32_t)shell_start, 0, false);
+    process_t* proc3 = process_new((uint32_t)bg_proc, 0, false);
 
     if(proc1) scheduler_add_process(proc1);
-    if(proc2) scheduler_add_process(proc2);
 
     // start shell after both threads are ended
-    while(!thread1_end || !thread2_end);
+    while(!proc1_end);
+    if(proc2) scheduler_add_process(proc2);
     if(proc3) scheduler_add_process(proc3);
 
     while(true);

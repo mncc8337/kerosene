@@ -35,15 +35,6 @@ unsigned timer_get_current_ticks() {
     return ticks;
 }
 
-void timer_wait(unsigned ms) {
-    unsigned eticks = ticks + ms * TIMER_FREQUENCY / 1000;
-    unsigned eseconds = eticks / TIMER_FREQUENCY;
-    eticks -= eseconds * TIMER_FREQUENCY;
-    eseconds += seconds_since_start;
-
-    while(eseconds > (unsigned)seconds_since_start || eticks > ticks);
-}
-
 void timer_init() {
     struct tm t = rtc_get_current_time();
     start_timestamp = mktime(&t);

@@ -7,6 +7,4 @@ time_t timer_get_current_time();
 time_t timer_get_seconds_since_start();
 unsigned timer_get_current_ticks();
 
-void timer_wait(unsigned ms);
-
 void timer_init();

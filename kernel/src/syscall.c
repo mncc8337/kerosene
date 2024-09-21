@@ -10,8 +10,18 @@ syscalls[id] = func
 
 static void* syscalls[MAX_SYSCALL];
 
+static regs_t* current_regs;
+
 static void test_syscall() {
     puts("this is a syscall!");
+}
+
+static void proc_kill() {
+    scheduler_kill_process(current_regs);
+}
+
+static void proc_sleep(unsigned ticks) {
+    scheduler_set_sleep(current_regs, ticks);
 }
 
 static void syscall_dispatcher(regs_t* regs) {
@@ -19,6 +29,8 @@ static void syscall_dispatcher(regs_t* regs) {
 
     void* fn = syscalls[regs->eax];
     if(!fn) return;
+
+    current_regs = regs;
 
     int ret;
     asm volatile (
@@ -46,7 +58,8 @@ void syscall_init() {
     ADD_SYSCALL(SYSCALL_TEST, test_syscall);
     ADD_SYSCALL(SYSCALL_PUTCHAR, putchar);
     ADD_SYSCALL(SYSCALL_TIME, time);
-    ADD_SYSCALL(SYSCALL_KILL_PROCESS, scheduler_kill_process);
+    ADD_SYSCALL(SYSCALL_KILL_PROCESS, proc_kill);
+    ADD_SYSCALL(SYSCALL_SLEEP, proc_sleep);
 
     isr_new_interrupt(0x80, syscall_dispatcher, 0xee);
 }

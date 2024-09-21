@@ -3,7 +3,6 @@
 #include "syscall.h"
 #include "mem.h"
 #include "kbd.h"
-#include "timer.h"
 #include "video.h"
 #include "filesystem.h"
 #include "pit.h"
@@ -110,7 +109,7 @@ static void process_prompt(char* prompts, unsigned prompts_len);
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic catproc exit");
+        puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic catproc sleep exit");
     }
     else {
         arg = strtok(arg, " ");
@@ -152,6 +151,7 @@ static void help(char* arg) {
         }
         else if(strcmp(arg, "panic")) puts("causes the kernel to panic\npanic <no-args>");
         else if(strcmp(arg, "catproc")) puts("print all processes and their info\ncatproc <no-args>");
+        else if(strcmp(arg, "sleep")) puts("halt for an ammount of time\nsleep <ticks>");
         else if(strcmp(arg, "loadfont")) puts("load new font\nloadfont <psf-file>");
         else if(strcmp(arg, "exit")) puts("quit shell and continue to usermode\nexit <no-arg>");
     }
@@ -741,7 +741,7 @@ static void beep(char* arg) {
 
     pit_beep_start();
     pit_beep(frq);
-    timer_wait(dur);
+    SYSCALL_1P(SYSCALL_SLEEP, frq_str, dur * TIMER_FREQUENCY / 1000);
     pit_beep_stop();
 }
 
@@ -931,6 +931,9 @@ static void print_proc(process_t* proc) {
         proc->state == PROCESS_STATE_READY ? "ready" : "sleep",
         proc->alive_ticks
     );
+
+    if(proc->state == PROCESS_STATE_SLEEP)
+        printf("    sleep ticks left: %d\n", proc->sleep_ticks);
 }
 static void catproc(char* arg) {
     (void)(arg);
@@ -944,6 +947,23 @@ static void catproc(char* arg) {
         print_proc(proc);
         proc = proc->next;
     }
+
+    proc = scheduler_get_sleep_processes();
+    while(proc) {
+        print_proc(proc);
+        proc = proc->next;
+    }
+}
+
+static void sleep(char* arg) {
+    char* ticks_str = strtok(arg, " ");
+    if(!ticks_str) {
+        puts("no duration provided");
+        return;
+    }
+
+    unsigned ticks = atoi(ticks_str);
+    SYSCALL_1P(SYSCALL_SLEEP, ticks_str, ticks);
 }
 
 static void loadfont(char* path) {
@@ -1038,6 +1058,7 @@ static void process_prompt(char* prompts, unsigned prompts_len) {
         else if(strcmp(cmd_name, "panic")) panic(remain_arg);
         else if(strcmp(cmd_name, "catproc")) catproc(remain_arg);
         else if(strcmp(cmd_name, "loadfont")) loadfont(remain_arg);
+        else if(strcmp(cmd_name, "sleep")) sleep(remain_arg);
         else if(strcmp(cmd_name, "exit")) exit(remain_arg);
         else if(prompt_len == 0); // just skip
         else printf("unknow command '%s'\n", prompt);
@@ -1140,5 +1161,4 @@ void shell_start() {
 
     int ret;
     SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
-    while(true);
 }

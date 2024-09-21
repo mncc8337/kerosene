@@ -109,7 +109,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     - [x] putchar
     - [x] current time
     - [x] terminate process
-    - [ ] sleep()
+    - [x] sleep()
     - [ ] read file
     - [ ] write file
 - [ ] process manager
