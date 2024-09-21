@@ -919,23 +919,29 @@ static void panic(char* arg) {
    kernel_panic(NULL);
 }
 
+static void print_proc(process_t* proc) {
+    printf(
+        "process %d:\n"
+        "    priority: %d\n"
+        "    state: %s\n"
+        "    alive ticks: %d\n"
+        ,
+        proc->id, proc->priority,
+        proc->state == PROCESS_STATE_ACTIVE ? "active" : 
+        proc->state == PROCESS_STATE_READY ? "ready" : "sleep",
+        proc->alive_ticks
+    );
+}
 static void catproc(char* arg) {
     (void)(arg);
 
     // print all processes
-    process_t* proc = scheduler_get_current_process();
+
+    print_proc(scheduler_get_current_process());
+
+    process_t* proc = scheduler_get_ready_processes();
     while(proc) {
-        printf(
-            "process %d:\n"
-            "    priority: %d\n"
-            "    state: %s\n"
-            "    alive ticks: %d\n"
-            ,
-            proc->id, proc->priority,
-            proc->state == PROCESS_STATE_ACTIVE ? "active" : 
-            proc->state == PROCESS_STATE_READY ? "ready" : "sleep",
-            proc->alive_ticks
-        );
+        print_proc(proc);
         proc = proc->next;
     }
 }

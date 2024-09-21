@@ -2,24 +2,22 @@
 
 #include "string.h"
 
+static process_queue_t ready_queue = {NULL, NULL};
 static process_t* current_process = NULL;
-static process_t* process_list_tail = NULL;
 
 static bool process_switched = false;
 
 static void to_next_process(regs_t* regs, bool add_back) {
-    if(current_process == process_list_tail) return;
+    if(process_queue_empty(&ready_queue)) return;
 
     // save registers
     if(regs) memcpy(&current_process->regs, regs, sizeof(regs_t));
     
-    // scheduler_add_process will set current_process-next to NULL
-    // so we need to save it
-    process_t* next_proc = current_process->next;
-    if(add_back) scheduler_add_process(current_process);
-
     current_process->state = PROCESS_STATE_READY;
-    current_process = next_proc;
+
+    if(add_back) process_queue_push(&ready_queue, current_process);
+
+    current_process = process_queue_pop(&ready_queue);
     current_process->state = PROCESS_STATE_ACTIVE;
 
     process_switched = true;
@@ -29,26 +27,24 @@ process_t* scheduler_get_current_process() {
     return current_process;
 }
 
-void scheduler_add_process(process_t* proc) {
-    proc->next = NULL;
-    proc->state = PROCESS_STATE_READY;
+process_t* scheduler_get_ready_processes() {
+    return ready_queue.top;
+}
 
-    process_list_tail->next = proc;
-    process_list_tail = proc;
+void scheduler_add_process(process_t* proc) {
+    proc->state = PROCESS_STATE_READY;
+    process_queue_push(&ready_queue, proc);
 }
 
 // kill current process
 void scheduler_kill_process() {
     // prevent killing the kernel process
-    // this also ensure that the process queue always contains at least 2 elements
     if(current_process->id == 1) return;
 
     process_t* saved = current_process;
     // dont save registers and dont add the process back to the queue
     to_next_process(NULL, false);
-    // process_switched should be set because there are at least 2 elements on the queue
-    // so that it is safe to delete the process
-    process_delete(saved);
+    if(process_switched) process_delete(saved);
 }
 
 void scheduler_switch(regs_t* regs) {
@@ -59,6 +55,7 @@ void scheduler_switch(regs_t* regs) {
     current_process->alive_ticks++;
 
     if(process_switched) {
+        // load saved registers
         memcpy(regs, &current_process->regs, sizeof(regs_t));
         vmmngr_switch_page_directory(current_process->page_directory);
     }
@@ -72,9 +69,6 @@ void scheduler_init(process_t* proc) {
 
     proc->id = 1;
     proc->state = PROCESS_STATE_ACTIVE;
-    proc->next = NULL;
-
-    process_list_tail = proc;
     current_process = proc;
 
     // note that we do not switch page directory
