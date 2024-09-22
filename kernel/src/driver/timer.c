@@ -4,14 +4,14 @@
 #include "rtc.h"
 #include "process.h"
 
-static volatile unsigned ticks = 0;
+static unsigned ticks = 0;
 static time_t start_timestamp;
-static volatile time_t seconds_since_start = 0;
+static time_t seconds_since_start = 0;
 
 static void tick_handler(regs_t* r) {
     ticks++;
 
-    if(ticks > 0 && ticks % TIMER_FREQUENCY == 0) {
+    if(ticks % TIMER_FREQUENCY == 0) {
         seconds_since_start++;
         ticks = 0;
     }

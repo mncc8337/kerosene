@@ -1,8 +1,8 @@
 #!/bin/sh
 
 # load backup if available
-if [ -f "disk-backup.img" ]; then
-    cp disk-backup.img disk.img
+if [ -f "${BIN_DIR}disk-backup.img" ]; then
+    cp ${BIN_DIR}disk-backup.img ${BIN_DIR}disk.img
     echo "backup loaded"
     exit
 fi
@@ -12,7 +12,7 @@ sudo umount ./mnt
 sudo losetup -d /dev/loop0
 sudo losetup -d /dev/loop1
 
-rm disk.img
+rm ${BIN_DIR}disk.img
 mkdir -p mnt
 
 set -e
@@ -26,9 +26,9 @@ fi
 echo making disk image
 echo ------------------------------------------------------
 
-dd if=/dev/zero of=disk.img bs=1024 count=$disksize_KiB
+dd if=/dev/zero of=${BIN_DIR}disk.img bs=1024 count=$disksize_KiB
 
-fdisk disk.img << EOF
+fdisk ${BIN_DIR}disk.img << EOF
 n
 p
 1
@@ -41,8 +41,8 @@ EOF
 echo installing grub
 echo ------------------------------------------------------
 
-sudo losetup /dev/loop0 disk.img
-sudo losetup /dev/loop1 disk.img -o 1048576 # 1024^2
+sudo losetup /dev/loop0 ${BIN_DIR}disk.img
+sudo losetup /dev/loop1 ${BIN_DIR}disk.img -o 1048576 # 1024^2
 sudo mkdosfs -F32 -f 2 /dev/loop1
 sudo mount --onlyonce /dev/loop1 ./mnt
 
@@ -55,8 +55,8 @@ sudo umount ./mnt
 sudo losetup -d /dev/loop0
 sudo losetup -d /dev/loop1
 
-cp disk.img disk-backup.img
+cp ${BIN_DIR}disk.img ${BIN_DIR}disk-backup.img
 
 sync
 
-echo "generated disk.img"
+echo "generated ${BIN_DIR}disk.img"

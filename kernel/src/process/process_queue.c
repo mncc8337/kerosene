@@ -16,21 +16,27 @@ void process_queue_push(process_queue_t* procqueue, process_t* proc) {
 }
 
 void process_queue_sorted_push(process_queue_t* procqueue, process_t* proc, bool (*cmp)(process_t*, process_t*)) {
-    process_t* prev = procqueue->top;
-    if(!prev) {
+    if(!procqueue->top) {
         proc->next = NULL;
         procqueue->top = proc;
         procqueue->bottom = proc;
-    }
-    else {
-        while(prev->next && cmp(prev->next, proc)) prev = prev->next;
-
-        if(!prev->next) procqueue->bottom = proc;
-
-        proc->next = prev->next;
-        prev->next = proc;
+        goto done;
     }
 
+    if(!cmp(procqueue->top, proc)) {
+        proc->next = procqueue->top;
+        procqueue->top = proc;
+        goto done;
+    }
+
+    process_t* prev = procqueue->top;
+    if(!prev->next) procqueue->bottom = proc;
+    else while(prev->next && cmp(prev->next, proc)) prev = prev->next;
+
+    proc->next = prev->next;
+    prev->next = proc;
+
+    done:
     procqueue->size++;
 }
 

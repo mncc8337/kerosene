@@ -3,8 +3,13 @@
 #include "string.h"
 
 static process_queue_t ready_queue = {NULL, NULL, 0};
+
+// this is a linked list sorted by sleep_ticks
+// TODO: use a priority queue instead
 static process_queue_t sleep_queue = {NULL, NULL, 0};
+
 static process_t* current_process = NULL;
+
 static uint64_t global_sleep_ticks = 0;
 
 static bool process_switched = false;
@@ -80,12 +85,17 @@ void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
 void scheduler_switch(regs_t* regs) {
     if(sleep_queue.size) {
         global_sleep_ticks++;
-        while(sleep_queue.top && sleep_queue.top->sleep_ticks == global_sleep_ticks) {
+        while(sleep_queue.top && sleep_queue.top->sleep_ticks <= global_sleep_ticks) {
             process_t* proc = process_queue_pop(&sleep_queue);
             proc->state = PROCESS_STATE_READY;
             process_queue_push(&ready_queue, proc);
         }
 
+        // avoid overflow
+        // i mean this solution is suck because if you sleep() for a very long time
+        // then global_sleep_ticks will overflow, causing all process in the queue to wake up
+        // or did not sleep at all
+        // separate ticks into hours/minutes/seconds structure maybe the solution
         if(sleep_queue.size == 0) global_sleep_ticks = 0;
     }
 

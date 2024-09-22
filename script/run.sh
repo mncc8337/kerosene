@@ -10,7 +10,7 @@ QEMUFLAGS="-m 128M \
           -usb"
 
 if [ "$1" == "debug" ]; then
-    qemu-system-i386 -hda disk.img $QEMUFLAGS -s -S &
+    qemu-system-i386 -drive format=raw,file=${BIN_DIR}disk.img $QEMUFLAGS -s -S &
     gdb bin/kerosene.elf \
         -ex 'target remote localhost:1234' \
         -ex 'layout src' \
@@ -18,5 +18,5 @@ if [ "$1" == "debug" ]; then
         -ex 'break kmain' \
         -ex 'continue'
 else
-    qemu-system-i386 -drive format=raw,file=disk.img $QEMUFLAGS
+    qemu-system-i386 -drive format=raw,file=${BIN_DIR}disk.img $QEMUFLAGS
 fi

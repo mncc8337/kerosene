@@ -1,17 +1,19 @@
 # cross compiler dir
-cross
+cross/
 
 # dir use to put files onto the image
-mnt
+mnt/
 
 # lsp
 compile_commands.json
 
 # dotfiles
 .*
+!.env
 
 # various bins
-bin
+bin/
+obj/
 *.o
 *.a
 *.d
