@@ -1,5 +1,9 @@
 #include "process.h"
 
+bool process_sort_by_sleep_ticks(process_t* a, process_t* b) {
+    return a->sleep_ticks < b->sleep_ticks;
+}
+
 void process_queue_push(process_queue_t* procqueue, process_t* proc) {
     proc->next = NULL;
 
@@ -7,6 +11,25 @@ void process_queue_push(process_queue_t* procqueue, process_t* proc) {
     else procqueue->bottom->next = proc;
 
     procqueue->bottom = proc;
+
+    procqueue->size++;
+}
+
+void process_queue_sorted_push(process_queue_t* procqueue, process_t* proc, bool (*cmp)(process_t*, process_t*)) {
+    process_t* prev = procqueue->top;
+    if(!prev) {
+        proc->next = NULL;
+        procqueue->top = proc;
+        procqueue->bottom = proc;
+    }
+    else {
+        while(prev->next && cmp(prev->next, proc)) prev = prev->next;
+
+        if(!prev->next) procqueue->bottom = proc;
+
+        proc->next = prev->next;
+        prev->next = proc;
+    }
 
     procqueue->size++;
 }

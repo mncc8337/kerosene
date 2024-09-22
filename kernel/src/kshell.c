@@ -933,7 +933,7 @@ static void print_proc(process_t* proc) {
     );
 
     if(proc->state == PROCESS_STATE_SLEEP)
-        printf("    sleep ticks left: %d\n", proc->sleep_ticks);
+        printf("    sleep ticks: %d\n", proc->sleep_ticks);
 }
 static void catproc(char* arg) {
     (void)(arg);

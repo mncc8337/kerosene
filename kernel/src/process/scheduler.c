@@ -5,6 +5,7 @@
 static process_queue_t ready_queue = {NULL, NULL, 0};
 static process_queue_t sleep_queue = {NULL, NULL, 0};
 static process_t* current_process = NULL;
+static uint64_t global_sleep_ticks = 0;
 
 static bool process_switched = false;
 
@@ -66,10 +67,10 @@ void scheduler_kill_process(regs_t* regs) {
 
 void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
     // set sleep target
-    current_process->sleep_ticks = ticks;
+    current_process->sleep_ticks = ticks + global_sleep_ticks;
 
     current_process->state = PROCESS_STATE_SLEEP;
-    process_queue_push(&sleep_queue, current_process);
+    process_queue_sorted_push(&sleep_queue, current_process, process_sort_by_sleep_ticks);
     // save registers, dont add process back to ready queue
     to_next_process(regs, false);
 
@@ -77,19 +78,16 @@ void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
 }
 
 void scheduler_switch(regs_t* regs) {
-    unsigned sleep_cnt = sleep_queue.size;
-    process_t* sleep_proc = process_queue_pop(&sleep_queue);
-    while(sleep_cnt--) {
-        sleep_proc->sleep_ticks--;
-        if(sleep_proc->sleep_ticks) process_queue_push(&sleep_queue, sleep_proc);
-        else {
-            sleep_proc->state = PROCESS_STATE_READY;
-            process_queue_push(&ready_queue, sleep_proc);
+    if(sleep_queue.size) {
+        global_sleep_ticks++;
+        while(sleep_queue.top && sleep_queue.top->sleep_ticks == global_sleep_ticks) {
+            process_t* proc = process_queue_pop(&sleep_queue);
+            proc->state = PROCESS_STATE_READY;
+            process_queue_push(&ready_queue, proc);
         }
 
-        sleep_proc = process_queue_pop(&sleep_queue);
+        if(sleep_queue.size == 0) global_sleep_ticks = 0;
     }
-    if(sleep_proc) process_queue_push(&sleep_queue, sleep_proc);
 
     // switch to other thread if exceeded max runtime
     if(!process_switched && current_process->alive_ticks % PROCESS_ALIVE_TICKS == 0)

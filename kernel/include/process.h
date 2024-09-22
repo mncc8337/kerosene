@@ -18,8 +18,8 @@ typedef struct process {
     int id;
     int priority;
     int state;
-    uint32_t alive_ticks;
-    uint32_t sleep_ticks;
+    uint64_t alive_ticks;
+    uint64_t sleep_ticks;
     page_directory_t* page_directory;
     uint32_t stack_addr;
     regs_t regs;
@@ -37,7 +37,9 @@ process_t* process_new(uint32_t eip, int priority, bool is_user);
 void process_delete(process_t* proc);
 
 // process_queue.c
+bool process_sort_by_sleep_ticks(process_t* a, process_t* b);
 void process_queue_push(process_queue_t* procqueue, process_t* proc);
+void process_queue_sorted_push(process_queue_t* procqueue, process_t* proc, bool (*cmp)(process_t*, process_t*));
 process_t* process_queue_pop(process_queue_t* procqueue);
 
 // scheduler.c
