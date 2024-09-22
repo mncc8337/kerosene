@@ -17,7 +17,7 @@ mkdir -p mnt
 
 set -e
 
-disksize_KiB=65536
+disksize_KiB=$DISK_IMAGE_SIZE
 
 if [ -n "$1" ]; then
     disksize_KiB=$1
