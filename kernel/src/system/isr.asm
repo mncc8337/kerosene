@@ -2,14 +2,12 @@
 
 %macro isr_err_stub 1
 isr_stub_%1:
-    cli
     push %1
     jmp isr_common_stub
 %endmacro
 
 %macro isr_no_err_stub 1
 isr_stub_%1:
-    cli
     push byte 0
     push %1
     jmp isr_common_stub

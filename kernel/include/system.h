@@ -1,7 +1,8 @@
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
+#include "stdint.h"
+#include "stdbool.h"
+#include "stdatomic.h"
 
 #define GDT_MAX_DESCRIPTORS 6
 #define IDT_MAX_DESCRIPTORS 256
@@ -106,3 +107,7 @@ void irq_install_handler(int irq, void (*handler)(regs_t*));
 void irq_uninstall_handler(int irq);
 void isr_new_interrupt(int isr, void (*handler)(regs_t*), uint8_t flags);
 void isr_init();
+
+// spinlock.c
+void spinlock_acquire(atomic_flag* lock);
+void spinlock_release(atomic_flag* lock);

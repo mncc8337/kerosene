@@ -389,7 +389,7 @@ try_again:
     }
 }
 
-// wait until key event occure
+// wait until key event occur
 void kbd_wait_key(key_t* k) {
     lastest_key_handled = true; // make sure to get a new key
     // wait until get a new key (unhandled)

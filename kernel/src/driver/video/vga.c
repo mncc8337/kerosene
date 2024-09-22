@@ -175,7 +175,7 @@ void video_vga_cls(int bg) {
     video_vga_set_cursor(0);
 }
 
-void video_vga_scroll_screen(unsigned ammount) {
+static void scroll_screen(unsigned ammount) {
     int end = video_vga_get_cursor();
 
     int start = end - text_cols * ammount;
@@ -224,6 +224,6 @@ void video_vga_print_char(char chr, int offset, int fg, int bg, bool move) {
 
     if(move) {
         video_vga_set_cursor(offset);
-        if(offset > text_rows * text_cols - 1) video_vga_scroll_screen(1);
+        if(offset > text_rows * text_cols - 1) scroll_screen(1);
     }
 }

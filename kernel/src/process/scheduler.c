@@ -57,6 +57,8 @@ void scheduler_add_process(process_t* proc) {
 
 // kill current process
 void scheduler_kill_process(regs_t* regs) {
+    asm("cli");
+
     // prevent killing the kernel process
     if(current_process->id == 1) return;
 
@@ -68,9 +70,13 @@ void scheduler_kill_process(regs_t* regs) {
         process_delete(saved);
         context_switch(regs);
     }
+
+    asm("sti");
 }
 
 void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
+    asm("cli");
+
     // set sleep target
     current_process->sleep_ticks = ticks + global_sleep_ticks;
 
@@ -80,9 +86,13 @@ void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
     to_next_process(regs, false);
 
     if(process_switched) context_switch(regs);
+
+    asm("sti");
 }
 
 void scheduler_switch(regs_t* regs) {
+    asm("cli");
+
     if(sleep_queue.size) {
         global_sleep_ticks++;
         while(sleep_queue.top && sleep_queue.top->sleep_ticks <= global_sleep_ticks) {
@@ -106,6 +116,8 @@ void scheduler_switch(regs_t* regs) {
     current_process->alive_ticks++;
 
     if(process_switched) context_switch(regs);
+
+    asm("sti");
 }
 
 void scheduler_init(process_t* proc) {

@@ -3,6 +3,7 @@
 #include "stdint.h"
 #include "stdbool.h"
 #include "stddef.h"
+#include "stdatomic.h"
 
 #include "time.h"
 
@@ -26,6 +27,7 @@ typedef enum {
     ERR_FS_NOT_FILE,
     ERR_FS_NOT_DIR,
     ERR_FS_UNKNOWN_FS,
+    ERR_FS_IN_USE,
     ERR_FS_EOF
 } FS_ERR;
 

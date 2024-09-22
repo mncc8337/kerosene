@@ -22,7 +22,6 @@ void video_preinit_cls(int color) {
     (void)(color);
     preinit_buffer_len = 0;
 }
-void video_preinit_scroll_screen(unsigned ammount) {(void)(ammount);}
 void video_preinit_print_char(char chr, int offset, int fg, int bg, bool move) {
     (void)(fg); (void)(bg);
     if(offset < 0) offset = preinit_cursor;
@@ -39,7 +38,6 @@ int (*video_rgb)(int r, int g, int b) = video_preinit_rgb;
 int (*video_get_cursor)() = video_preinit_get_cursor;
 void (*video_set_cursor)(int offset) = video_preinit_set_cursor;
 void (*video_cls)(int color) = video_preinit_cls;
-void (*video_scroll_screen)(unsigned ammount) = video_preinit_scroll_screen;
 void (*video_print_char)(char chr, int offset, int fg, int bg, bool move) = video_preinit_print_char;
 
 void video_vga_init(uint8_t cols, uint8_t rows) {
@@ -52,7 +50,6 @@ void video_vga_init(uint8_t cols, uint8_t rows) {
     video_set_cursor    = video_vga_set_cursor;
     video_cls           = video_vga_cls;
     video_print_char    = video_vga_print_char;
-    video_scroll_screen = video_vga_scroll_screen;
 
     video_vga_set_size(cols, rows);
 
@@ -71,7 +68,6 @@ void video_vesa_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bp
     video_set_cursor    = video_vesa_set_cursor;
     video_cls           = video_vesa_cls;
     video_print_char    = video_vesa_print_char;
-    video_scroll_screen = video_vesa_scroll_screen;
 
     video_vesa_set_size(pitch, bpp, width, height);
 

@@ -28,6 +28,35 @@ static int cursor_buffer[512];
 static int cursor_buffer_posx = 0;
 static int cursor_buffer_posy = 0;
 
+static void scroll_screen(unsigned ammount) {
+    if(cursor_posy == 0) return;
+
+    // interrupting at this part (especially the memcpy part)
+    // will cause a pagefault
+    // wtf?
+    asm("cli");
+
+    cursor_posy -= ammount;
+    cursor_buffer_posy -= ammount;
+    if(cursor_posy < 0) {
+        ammount += cursor_posy;
+        cursor_posy = 0;
+        cursor_buffer_posy = 0;
+    }
+
+    memcpy(
+        framebuffer,
+        framebuffer + ammount * font_height * fb_pitch,
+        cursor_posy * font_height * fb_pitch
+    );
+    memset(
+        framebuffer + cursor_posy * font_height * fb_pitch,
+        0, ammount * font_height * fb_pitch
+    );
+
+    asm("sti");
+}
+
 void video_vesa_set_ptr(int ptr) {
     framebuffer = (uint8_t*)ptr;
 }
@@ -301,28 +330,6 @@ void video_vesa_cls(int bg) {
     video_vesa_fill_rectangle(0, 0, fb_width-1, fb_height-1, bg);
 }
 
-void video_vesa_scroll_screen(unsigned ammount) {
-    if(cursor_posy == 0) return;
-
-    cursor_posy -= ammount;
-    cursor_buffer_posy -= ammount;
-    if(cursor_posy < 0) {
-        ammount += cursor_posy;
-        cursor_posy = 0;
-        cursor_buffer_posy = 0;
-    }
-
-    memcpy(
-        framebuffer,
-        framebuffer + ammount * font_height * fb_pitch,
-        cursor_posy * font_height * fb_pitch
-    );
-    memset(
-        framebuffer + cursor_posy * font_height * fb_pitch,
-        0, ammount * font_height * fb_pitch
-    );
-}
-
 void video_vesa_print_char(char chr, int offset, int fg, int bg, bool move) {
     if(chr == 0) return;
 
@@ -398,8 +405,7 @@ void video_vesa_print_char(char chr, int offset, int fg, int bg, bool move) {
     if(move) {
         cursor_posx = _cursor_posx;
         cursor_posy = _cursor_posy;
-        if(cursor_posy == text_rows)
-            video_vesa_scroll_screen(1);
+        if(cursor_posy == text_rows) scroll_screen(1);
     }
 
     draw_cursor(load_cursor_buffer);

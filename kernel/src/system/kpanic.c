@@ -1,10 +1,10 @@
 #include "system.h"
+#include "mem.h"
 #include "misc/elf.h"
 #include "stdio.h"
 #include "video.h"
 
 #define MAX_FRAMES 30
-#define NULL ((void *)0)
 
 static char* string_table = 0;
 static elf_section_header_t* symtab_sh = 0;
@@ -15,6 +15,11 @@ static void stack_trace(stackframe_t* stk) {
         asm("movl %%ebp, %0" : "=r"(stk));
 
     for(unsigned frame = 0; stk && frame < MAX_FRAMES; frame++) {
+        if(!vmmngr_to_physical_addr(NULL, (virtual_addr_t)stk)) {
+            printf("unmapped EBP address: 0x%x\n", stk);
+            return;
+        }
+
         uint32_t addr = stk->eip;
         printf("[0x%x] ", addr);
 

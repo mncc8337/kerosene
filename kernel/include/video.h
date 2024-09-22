@@ -53,7 +53,6 @@ int video_vga_rgb(int r, int g, int b);
 int video_vga_get_cursor();
 void video_vga_set_cursor(int offset);
 void video_vga_cls(int bg);
-void video_vga_scroll_screen(unsigned ammount);
 void video_vga_print_char(char chr, int offset, int fg, int bg, bool move);
 
 // vesa.c
@@ -74,7 +73,6 @@ int video_vesa_rgb(int r, int g, int b);
 int video_vesa_get_cursor();
 void video_vesa_set_cursor(int offset);
 void video_vesa_cls(int bg);
-void video_vesa_scroll_screen(unsigned ammount);
 void video_vesa_print_char(char chr, int offset, int fg, int bg, bool move);
 
 // function pointers that are set to either text mode or linear graphics version of it
@@ -85,7 +83,6 @@ extern int (*video_rgb)(int r, int g, int b);
 extern int (*video_get_cursor)();
 extern void (*video_set_cursor)(int offset);
 extern void (*video_cls)(int bg);
-extern void (*video_scroll_screen)(unsigned ammount);
 extern void (*video_print_char)(char chr, int offset, int fg, int bg, bool move);
 
 // video_init.c
@@ -95,7 +92,6 @@ int  video_preinit_rgb(int r, int g, int b);
 int  video_preinit_get_cursor();
 void video_preinit_set_cursor(int offset);
 void video_preinit_cls(int color);
-void video_preinit_scroll_screen(unsigned ammount);
 void video_preinit_print_char(char chr, int offset, int fg, int bg, bool move);
 void video_vga_init(uint8_t cols, uint8_t rows);
 void video_vesa_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bpp);
