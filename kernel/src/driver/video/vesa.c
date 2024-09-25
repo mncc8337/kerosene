@@ -31,11 +31,6 @@ static int cursor_buffer_posy = 0;
 static void scroll_screen(unsigned ammount) {
     if(cursor_posy == 0) return;
 
-    // interrupting at this part (especially the memcpy part)
-    // will cause a pagefault
-    // wtf?
-    asm("cli");
-
     cursor_posy -= ammount;
     cursor_buffer_posy -= ammount;
     if(cursor_posy < 0) {
@@ -53,8 +48,6 @@ static void scroll_screen(unsigned ammount) {
         framebuffer + cursor_posy * font_height * fb_pitch,
         0, ammount * font_height * fb_pitch
     );
-
-    asm("sti");
 }
 
 void video_vesa_set_ptr(int ptr) {
@@ -366,13 +359,13 @@ void video_vesa_print_char(char chr, int offset, int fg, int bg, bool move) {
                     0x0
                 );
     }
-    else if(chr == '\t') {
-        video_vesa_print_char(
-            ' ', _cursor_posy * text_cols + _cursor_posx,
-            0x0, 0x0, true
-        );
-        _cursor_posx++;
-    }
+    // else if(chr == '\t') {
+    //     video_vesa_print_char(
+    //         ' ', _cursor_posy * text_cols + _cursor_posx,
+    //         0x0, 0x0, true
+    //     );
+    //     _cursor_posx++;
+    // }
     else {
         char* glyph = psf_get_glyph(chr);
 

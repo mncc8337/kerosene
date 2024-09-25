@@ -7,7 +7,6 @@ QEMUFLAGS="-m 128M \
           -audiodev pa,id=speaker \
           -machine pcspk-audiodev=speaker \
           -accel tcg,thread=single \
-          -d int \
           -usb"
 
 if [ "$1" == "debug" ]; then

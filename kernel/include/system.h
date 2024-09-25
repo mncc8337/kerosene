@@ -76,6 +76,11 @@ typedef struct stackframe {
   uint32_t eip;
 } stackframe_t;
 
+typedef struct {
+    atomic_flag flag;
+    uint8_t rank;
+} spinlock_t;
+
 // port_io.c
 uint8_t port_inb(uint16_t port);
 void port_outb(uint16_t port, uint8_t data);
@@ -84,9 +89,10 @@ void port_outw(uint16_t port, uint16_t data);
 void io_wait();
 
 // kpanic.c
+void stack_trace(stackframe_t* stk);
 void kernel_set_strtab_ptr(uint32_t ptr);
 void kernel_set_symtab_sh_ptr(uint32_t ptr);
-char* kernel_find_symbol(unsigned addr, int type);
+char* kernel_find_symbol(unsigned addr, int type, unsigned* ret_addr);
 void kernel_panic(stackframe_t* stk);
 
 // tss.c
@@ -109,5 +115,5 @@ void isr_new_interrupt(int isr, void (*handler)(regs_t*), uint8_t flags);
 void isr_init();
 
 // spinlock.c
-void spinlock_acquire(atomic_flag* lock);
-void spinlock_release(atomic_flag* lock);
+void spinlock_acquire(spinlock_t* lock);
+void spinlock_release(spinlock_t* lock);

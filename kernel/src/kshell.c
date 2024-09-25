@@ -105,8 +105,6 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
     return ERR_SHELL_SUCCESS;
 }
 
-static void process_prompt(char* prompts, unsigned prompts_len);
-
 static void help(char* arg) {
     if(arg == NULL) {
         puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic catproc sleep exit");
@@ -199,14 +197,14 @@ static void run_sh(char* args) {
             input[input_len++] = chr;
         else {
             input[input_len] = '\0';
-            process_prompt(input, input_len);
+            shell_process_prompt(input, input_len);
             input_len = 0;
             input[0] = '\0';
         }
     }
     if(input_len > 0 && input[0] != '\0') {
         input[input_len] = '\0';
-        process_prompt(input, input_len);
+        shell_process_prompt(input, input_len);
     }
 
     file_close(&f);
@@ -1026,7 +1024,7 @@ static void exit(char* arg) {
     shell_running = false;
 }
 
-static void process_prompt(char* prompts, unsigned prompts_len) {
+void shell_process_prompt(char* prompts, unsigned prompts_len) {
     char* prompt = strtok(prompts, ";\n");
     unsigned tot_len = 0;
     while(prompt != NULL && tot_len < prompts_len) {
@@ -1110,7 +1108,7 @@ void shell_start() {
     shell_running = true;
     puts("welcome to keroshell");
     puts("type `help` t show all command. `help <command>` to see all available argument.");
-    puts("type `exit` to quit shell and continue to usermode");
+    puts("type `exit` to quit shell");
     print_prompt();
 
     key_t current_key;
@@ -1148,7 +1146,7 @@ void shell_start() {
             input[input_len] = '\0';
             memcpy(last_input, input, input_len+1);
 
-            process_prompt(input, input_len);
+            shell_process_prompt(input, input_len);
             input[0] = '\0';
             input_len = 0;
             print_prompt();

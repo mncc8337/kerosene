@@ -15,10 +15,14 @@ static uint64_t global_sleep_ticks = 0;
 static bool process_switched = false;
 
 static void context_switch(regs_t* regs) {
+    asm("cli");
+
     memcpy(regs, &current_process->regs, sizeof(regs_t));
     vmmngr_switch_page_directory(current_process->page_directory);
 
     process_switched = false;
+
+    asm("sti");
 }
 
 static void to_next_process(regs_t* regs, bool add_back) {
@@ -57,11 +61,6 @@ void scheduler_add_process(process_t* proc) {
 
 // kill current process
 void scheduler_kill_process(regs_t* regs) {
-    asm("cli");
-
-    // prevent killing the kernel process
-    if(current_process->id == 1) return;
-
     process_t* saved = current_process;
     // dont save registers, dont add process back to ready queue
     to_next_process(NULL, false);
@@ -70,13 +69,9 @@ void scheduler_kill_process(regs_t* regs) {
         process_delete(saved);
         context_switch(regs);
     }
-
-    asm("sti");
 }
 
 void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
-    asm("cli");
-
     // set sleep target
     current_process->sleep_ticks = ticks + global_sleep_ticks;
 
@@ -86,13 +81,9 @@ void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
     to_next_process(regs, false);
 
     if(process_switched) context_switch(regs);
-
-    asm("sti");
 }
 
 void scheduler_switch(regs_t* regs) {
-    asm("cli");
-
     if(sleep_queue.size) {
         global_sleep_ticks++;
         while(sleep_queue.top && sleep_queue.top->sleep_ticks <= global_sleep_ticks) {
@@ -116,15 +107,11 @@ void scheduler_switch(regs_t* regs) {
     current_process->alive_ticks++;
 
     if(process_switched) context_switch(regs);
-
-    asm("sti");
 }
 
 void scheduler_init(process_t* proc) {
     // add the first process
-    // this must be the kernel process
 
-    proc->id = 1;
     proc->state = PROCESS_STATE_ACTIVE;
     current_process = proc;
 

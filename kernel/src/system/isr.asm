@@ -63,13 +63,12 @@ isr_no_err_stub 44
 isr_no_err_stub 45
 isr_no_err_stub 46
 isr_no_err_stub 47
-; empty stubs from 48 to 256, reserved for future
+; empty stubs from 48 to 255, reserved for future
 %assign i 48
 %rep (256 - 48)
     isr_no_err_stub i
 %assign i i+1
 %endrep
-
 
 extern isr_handler
 isr_common_stub:

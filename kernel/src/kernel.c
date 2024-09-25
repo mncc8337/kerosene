@@ -20,7 +20,6 @@
 #include "kshell.h"
 
 #include "misc/elf.h"
-#include <stdatomic.h>
 
 uint32_t kernel_size;
 
@@ -296,46 +295,53 @@ void kinit(multiboot_info_t* mbd) {
     while(true);
 }
 
-atomic_flag print_lock = ATOMIC_FLAG_INIT;
+spinlock_t lock = {ATOMIC_FLAG_INIT, 0};
+uint64_t cnt = 0;
 
 void kernel_proc1() {
     int ret;
-    int cnt = 0;
     while(true) {
-        SYSCALL_1P(SYSCALL_SLEEP, ret, 500);
-        spinlock_acquire(&print_lock);
-        printf("dumb1 %d\n", cnt);
+        SYSCALL_1P(SYSCALL_SLEEP, ret, 10);
+        asm("cli"); // disable task switch to avoid deadlock
+        // TODO: fix deadlock
+        spinlock_acquire(&lock);
+        video_vesa_fill_rectangle(20, 0, 40, 20, video_vesa_rgb(VIDEO_GREEN));
+        printf("user: 1 %d\n", cnt);
         cnt++;
-        spinlock_release(&print_lock);
+        spinlock_release(&lock);
+        asm("sti");
     }
 }
 void kernel_proc2() {
     int ret;
-    int cnt = 0;
     while(true) {
-        SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
-        spinlock_acquire(&print_lock);
-        printf("dumb2 %d\n", cnt);
+        SYSCALL_1P(SYSCALL_SLEEP, ret, 10);
+        asm("cli");
+        spinlock_acquire(&lock);
+        video_vesa_fill_rectangle(20, 0, 40, 20, video_vesa_rgb(VIDEO_RED));
+        printf("user: 2 %d\n", cnt);
         cnt++;
-        spinlock_release(&print_lock);
+        spinlock_release(&lock);
+        asm("sti");
     }
 }
 
 void kmain() {
     print_debug(LT_OK, "done initialising\n");
-
+    
     if(!shell_init()) {
         if(fs) shell_set_root_node(fs->root_node);
     }
     else puts("not enough memory for kshell.");
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
-    // process_t* proc2 = process_new((uint32_t)shell_start, 0, false);
-    process_t* proc3 = process_new((uint32_t)kernel_proc2, 0, false);
+    process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
+    // process_t* proc3 = process_new((uint32_t)shell_start, 0, false);
 
     if(proc1) scheduler_add_process(proc1);
-    // if(proc2) scheduler_add_process(proc2);
-    if(proc3) scheduler_add_process(proc3);
+    if(proc2) scheduler_add_process(proc2);
+    // if(proc3) scheduler_add_process(proc3);
 
+    // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
     while(true);
 }

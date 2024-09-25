@@ -35,6 +35,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     regs_t* regs = &proc->regs;
     regs->eip = eip;
     regs->eflags = DEFAULT_EFLAGS;
+    regs->ebp = 0;
     if(is_user) {
         // switch page directory to create user heap
         vmmngr_switch_page_directory(proc->page_directory);
