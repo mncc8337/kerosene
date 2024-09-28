@@ -1,6 +1,8 @@
 #include "process.h"
+#include "system.h"
 
 #include "string.h"
+#include "stdio.h"
 
 static process_queue_t ready_queue = {NULL, NULL, 0};
 
@@ -14,15 +16,13 @@ static uint64_t global_sleep_ticks = 0;
 
 static bool process_switched = false;
 
-static void context_switch(regs_t* regs) {
-    asm("cli");
+static atomic_flag lock = ATOMIC_FLAG_INIT;
 
+static void context_switch(regs_t* regs) {
     memcpy(regs, &current_process->regs, sizeof(regs_t));
     vmmngr_switch_page_directory(current_process->page_directory);
 
     process_switched = false;
-
-    asm("sti");
 }
 
 static void to_next_process(regs_t* regs, bool add_back) {
@@ -55,12 +55,18 @@ process_t* scheduler_get_sleep_processes() {
 }
 
 void scheduler_add_process(process_t* proc) {
+    spinlock_acquire(&lock);
+
     proc->state = PROCESS_STATE_READY;
     process_queue_push(&ready_queue, proc);
+
+    spinlock_release(&lock);
 }
 
 // kill current process
 void scheduler_kill_process(regs_t* regs) {
+    spinlock_acquire(&lock);
+
     process_t* saved = current_process;
     // dont save registers, dont add process back to ready queue
     to_next_process(NULL, false);
@@ -69,9 +75,13 @@ void scheduler_kill_process(regs_t* regs) {
         process_delete(saved);
         context_switch(regs);
     }
+
+    spinlock_release(&lock);
 }
 
 void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
+    spinlock_acquire(&lock);
+
     // set sleep target
     current_process->sleep_ticks = ticks + global_sleep_ticks;
 
@@ -81,9 +91,13 @@ void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
     to_next_process(regs, false);
 
     if(process_switched) context_switch(regs);
+
+    spinlock_release(&lock);
 }
 
 void scheduler_switch(regs_t* regs) {
+    spinlock_acquire(&lock);
+
     if(sleep_queue.size) {
         global_sleep_ticks++;
         while(sleep_queue.top && sleep_queue.top->sleep_ticks <= global_sleep_ticks) {
@@ -107,6 +121,8 @@ void scheduler_switch(regs_t* regs) {
     current_process->alive_ticks++;
 
     if(process_switched) context_switch(regs);
+
+    spinlock_release(&lock);
 }
 
 void scheduler_init(process_t* proc) {

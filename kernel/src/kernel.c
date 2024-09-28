@@ -199,6 +199,9 @@ void kinit(multiboot_info_t* mbd) {
     // so those physical address of ELF section headers need to offset to KERNEL_START too
     mbd = (void*)mbd + KERNEL_START;
 
+    if(mbd->flags & MULTIBOOT_INFO_BOOT_LOADER_NAME)
+        print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + KERNEL_START);
+
     // disable interrupts to set up things
     asm volatile("cli");
 
@@ -207,17 +210,12 @@ void kinit(multiboot_info_t* mbd) {
 
     video_init(mbd);
 
-    bool kheap_err = kheap_init();
-    if(kheap_err) {
+    if(kheap_init()) {
         print_debug(LT_ER, "failed to initialise kernel heap. not enough memory\n");
         kernel_panic(NULL);
     }
     print_debug(LT_OK, "kernel heap initialised\n");
 
-    if(mbd->flags & MULTIBOOT_INFO_BOOT_LOADER_NAME)
-        print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + KERNEL_START);
-
-    
     // if(mbd->flags & MULTIBOOT_INFO_AOUT_SYMS) {
     //     aout_sym = mbd->u.aout_sym;
     // }
@@ -295,34 +293,22 @@ void kinit(multiboot_info_t* mbd) {
     while(true);
 }
 
-spinlock_t lock = {ATOMIC_FLAG_INIT, 0};
 uint64_t cnt = 0;
 
 void kernel_proc1() {
     int ret;
     while(true) {
-        SYSCALL_1P(SYSCALL_SLEEP, ret, 10);
-        asm("cli"); // disable task switch to avoid deadlock
-        // TODO: fix deadlock
-        spinlock_acquire(&lock);
-        video_vesa_fill_rectangle(20, 0, 40, 20, video_vesa_rgb(VIDEO_GREEN));
-        printf("user: 1 %d\n", cnt);
+        SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
+        video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_GREEN));
         cnt++;
-        spinlock_release(&lock);
-        asm("sti");
     }
 }
 void kernel_proc2() {
     int ret;
     while(true) {
-        SYSCALL_1P(SYSCALL_SLEEP, ret, 10);
-        asm("cli");
-        spinlock_acquire(&lock);
-        video_vesa_fill_rectangle(20, 0, 40, 20, video_vesa_rgb(VIDEO_RED));
-        printf("user: 2 %d\n", cnt);
+        SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
+        video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_RED));
         cnt++;
-        spinlock_release(&lock);
-        asm("sti");
     }
 }
 
@@ -336,11 +322,11 @@ void kmain() {
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
     process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
-    // process_t* proc3 = process_new((uint32_t)shell_start, 0, false);
+    process_t* proc3 = process_new((uint32_t)shell_start, 0, false);
 
     if(proc1) scheduler_add_process(proc1);
     if(proc2) scheduler_add_process(proc2);
-    // if(proc3) scheduler_add_process(proc3);
+    if(proc3) scheduler_add_process(proc3);
 
     // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
     while(true);

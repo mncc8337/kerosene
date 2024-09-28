@@ -30,8 +30,8 @@ void process_queue_sorted_push(process_queue_t* procqueue, process_t* proc, bool
     }
 
     process_t* prev = procqueue->top;
+    while(prev->next && cmp(prev->next, proc)) prev = prev->next;
     if(!prev->next) procqueue->bottom = proc;
-    else while(prev->next && cmp(prev->next, proc)) prev = prev->next;
 
     proc->next = prev->next;
     prev->next = proc;

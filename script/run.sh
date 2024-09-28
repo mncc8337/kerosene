@@ -15,7 +15,7 @@ if [ "$1" == "debug" ]; then
         -ex 'target remote localhost:1234' \
         -ex 'layout src' \
         -ex 'layout reg' \
-        -ex 'break kmain' \
+        -ex 'break kinit' \
         -ex 'continue'
 else
     qemu-system-i386 -drive format=raw,file=${BIN_DIR}disk.img $QEMUFLAGS

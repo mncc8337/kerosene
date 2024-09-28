@@ -1,5 +1,6 @@
 #include "video.h"
 #include "misc/psf.h"
+#include "system.h"
 
 #include "string.h"
 
@@ -28,6 +29,8 @@ static int cursor_buffer[512];
 static int cursor_buffer_posx = 0;
 static int cursor_buffer_posy = 0;
 
+static atomic_flag pixel_lock = ATOMIC_FLAG_INIT;
+
 static void scroll_screen(unsigned ammount) {
     if(cursor_posy == 0) return;
 
@@ -39,6 +42,7 @@ static void scroll_screen(unsigned ammount) {
         cursor_buffer_posy = 0;
     }
 
+    asm("cli");
     memcpy(
         framebuffer,
         framebuffer + ammount * font_height * fb_pitch,
@@ -48,6 +52,7 @@ static void scroll_screen(unsigned ammount) {
         framebuffer + cursor_posy * font_height * fb_pitch,
         0, ammount * font_height * fb_pitch
     );
+    asm("sti");
 }
 
 void video_vesa_set_ptr(int ptr) {
@@ -104,6 +109,8 @@ void video_vesa_get_rowcol(int* c, int* r) {
 }
 
 void video_vesa_plot_pixel(unsigned x, unsigned y, int color) {
+    spinlock_acquire(&pixel_lock);
+
     // TODO: support other bpp
 
     if(x >= fb_width || y >= fb_height) return;
@@ -120,6 +127,8 @@ void video_vesa_plot_pixel(unsigned x, unsigned y, int color) {
         uint32_t* pixel = (uint32_t*)(framebuffer + y * fb_pitch) + x;
         *pixel = color;
     }
+
+    spinlock_release(&pixel_lock);
 }
 
 int video_vesa_get_pixel(unsigned x, unsigned y) {
@@ -145,6 +154,8 @@ int video_vesa_get_pixel(unsigned x, unsigned y) {
 }
 
 void video_vesa_fill_rectangle(int x0, int y0, int x1, int y1, int color) {
+    spinlock_acquire(&pixel_lock);
+
     // TODO: support other bpp
 
     if((unsigned)x0 >= fb_width) x0 = fb_width-1;
@@ -180,6 +191,8 @@ void video_vesa_fill_rectangle(int x0, int y0, int x1, int y1, int color) {
         }
         fb += fb_pitch - (dx+1) * bytes_per_pixel;
     }
+
+    spinlock_release(&pixel_lock);
 }
 
 static void draw_line_low(int x0, int y0, int x1, int y1, int color) {

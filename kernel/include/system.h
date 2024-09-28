@@ -76,11 +76,6 @@ typedef struct stackframe {
   uint32_t eip;
 } stackframe_t;
 
-typedef struct {
-    atomic_flag flag;
-    uint8_t rank;
-} spinlock_t;
-
 // port_io.c
 uint8_t port_inb(uint16_t port);
 void port_outb(uint16_t port, uint8_t data);
@@ -115,5 +110,5 @@ void isr_new_interrupt(int isr, void (*handler)(regs_t*), uint8_t flags);
 void isr_init();
 
 // spinlock.c
-void spinlock_acquire(spinlock_t* lock);
-void spinlock_release(spinlock_t* lock);
+void spinlock_acquire(atomic_flag* lock);
+void spinlock_release(atomic_flag* lock);
