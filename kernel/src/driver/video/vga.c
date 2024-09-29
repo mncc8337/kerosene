@@ -1,16 +1,14 @@
 #include "video.h"
 #include "system.h"
 
-static uint8_t* vid_mem;
+static uint8_t* vid_mem = (uint8_t*)VIDEO_START;
 
 static uint8_t current_attr = 0x7;
 
 static int text_rows;
 static int text_cols;
 
-void video_vga_set_ptr(int ptr) {
-    vid_mem = (uint8_t*)ptr;
-}
+static volatile atomic_flag lock = ATOMIC_FLAG_INIT;
 
 void video_vga_set_attr(int fg, int bg) {
     current_attr = (bg << 4) | fg;
@@ -168,11 +166,13 @@ void video_vga_set_cursor(int offset) {
 }
 
 void video_vga_cls(int bg) {
+    spinlock_acquire(&lock);
     for(int i = 0; i < text_rows * text_cols; i++) {
         vid_mem[i * 2 + 1] = (bg & 0xf) << 4;
         vid_mem[i * 2]     = ' ';
     }
     video_vga_set_cursor(0);
+    spinlock_release(&lock);
 }
 
 static void scroll_screen(unsigned ammount) {
@@ -197,6 +197,8 @@ static void scroll_screen(unsigned ammount) {
 void video_vga_print_char(char chr, int offset, int fg, int bg, bool move) {
     if(chr == 0) return;
 
+    spinlock_acquire(&lock);
+
     if(offset < 0) offset = video_vga_get_cursor();
 
     uint8_t attr = current_attr;
@@ -210,12 +212,6 @@ void video_vga_print_char(char chr, int offset, int fg, int bg, bool move) {
         offset--;
         vid_mem[offset * 2] = ' ';
     }
-    else if(chr == '\t') {
-        // handle tabs like spaces
-        // change later
-        video_vga_print_char(' ', offset, fg, bg, move);
-        // offset += - offset % text_cols % 8 + 8;
-    }
     else {
         vid_mem[offset * 2] = chr;
         vid_mem[offset * 2 + 1] = attr;
@@ -226,4 +222,6 @@ void video_vga_print_char(char chr, int offset, int fg, int bg, bool move) {
         video_vga_set_cursor(offset);
         if(offset > text_rows * text_cols - 1) scroll_screen(1);
     }
+
+    spinlock_release(&lock);
 }

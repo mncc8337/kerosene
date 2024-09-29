@@ -26,12 +26,6 @@ uint32_t kernel_size;
 int FS_ID = 0;
 fs_t* fs = NULL;
 
-virtual_addr_t video_addr = 0;
-unsigned video_width = 0;
-unsigned video_height = 0;
-unsigned video_pitch = 0;
-unsigned video_bpp = 0;
-
 process_t* kernel_process = 0;
 
 void mem_init(void* mmap_addr, uint32_t mmap_length) {
@@ -73,6 +67,12 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
 }
 
 void video_init(multiboot_info_t* mbd) {
+    virtual_addr_t video_addr = 0;
+    unsigned video_width = 0;
+    unsigned video_height = 0;
+    unsigned video_pitch = 0;
+    unsigned video_bpp = 0;
+
     bool using_framebuffer = false;
     if(mbd->flags & MULTIBOOT_INFO_FRAMEBUFFER_INFO) {
         video_addr = mbd->framebuffer_addr;
@@ -108,9 +108,7 @@ void video_init(multiboot_info_t* mbd) {
     // map video ptr
     for(unsigned i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
         vmmngr_map(NULL, video_addr + i, VIDEO_START + i, PTE_WRITABLE);
-    video_addr = VIDEO_START;
     if(using_framebuffer) {
-        video_vesa_set_ptr(video_addr);
         video_vesa_init(
             video_width, video_height,
             video_pitch, video_bpp
@@ -118,7 +116,6 @@ void video_init(multiboot_info_t* mbd) {
         print_debug(LT_OK, "VESA video initialised\n");
     }
     else {
-        video_vga_set_ptr(video_addr);
         video_vga_init(video_width, video_height);
         print_debug(LT_OK, "VGA video initialised\n");
     }
@@ -299,17 +296,19 @@ void kernel_proc1() {
     int ret;
     while(true) {
         SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
-        video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_GREEN));
+        // video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_GREEN));
         cnt++;
     }
+    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
 }
 void kernel_proc2() {
     int ret;
     while(true) {
         SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
-        video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_RED));
+        // video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_RED));
         cnt++;
     }
+    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
 }
 
 void kmain() {

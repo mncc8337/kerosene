@@ -4,7 +4,7 @@
 
 #include "string.h"
 
-static uint8_t* framebuffer;
+static uint8_t* framebuffer = (uint8_t*)VIDEO_START;
 
 static int current_fg = 0x969696;
 static int current_bg = 0x000000;
@@ -29,7 +29,7 @@ static int cursor_buffer[512];
 static int cursor_buffer_posx = 0;
 static int cursor_buffer_posy = 0;
 
-static atomic_flag pixel_lock = ATOMIC_FLAG_INIT;
+static volatile atomic_flag pixel_lock = ATOMIC_FLAG_INIT;
 
 static void scroll_screen(unsigned ammount) {
     if(cursor_posy == 0) return;
@@ -42,7 +42,6 @@ static void scroll_screen(unsigned ammount) {
         cursor_buffer_posy = 0;
     }
 
-    asm("cli");
     memcpy(
         framebuffer,
         framebuffer + ammount * font_height * fb_pitch,
@@ -52,11 +51,6 @@ static void scroll_screen(unsigned ammount) {
         framebuffer + cursor_posy * font_height * fb_pitch,
         0, ammount * font_height * fb_pitch
     );
-    asm("sti");
-}
-
-void video_vesa_set_ptr(int ptr) {
-    framebuffer = (uint8_t*)ptr;
 }
 
 void video_vesa_set_attr(int fg, int bg) {
@@ -132,25 +126,32 @@ void video_vesa_plot_pixel(unsigned x, unsigned y, int color) {
 }
 
 int video_vesa_get_pixel(unsigned x, unsigned y) {
+    spinlock_acquire(&pixel_lock);
+
     // TODO: support other bpp
 
     if(x >= fb_width || y >= fb_height) return 0;
+    
+    int ret;
 
     if(fb_bpp == 8) {
         uint8_t* pixel = framebuffer + y * fb_pitch + x;
-        return *pixel;
+        ret = *pixel;
     }
     else if(fb_bpp == 16) {
         uint16_t* pixel = (uint16_t*)(framebuffer + y * fb_pitch) + x;
-        return *pixel;
+        ret = *pixel;
     }
     else if(fb_bpp == 32) {
         uint32_t* pixel = (uint32_t*)(framebuffer + y * fb_pitch) + x;
-         return *pixel;
+        ret = *pixel;
     }
     else {
-        return 0;
+        ret = 0;
     }
+
+    spinlock_release(&pixel_lock);
+    return ret;
 }
 
 void video_vesa_fill_rectangle(int x0, int y0, int x1, int y1, int color) {
@@ -328,12 +329,16 @@ int video_vesa_get_cursor() {
     return cursor_posy * text_cols + cursor_posx;
 }
 void video_vesa_set_cursor(int offset) {
+    spinlock_acquire(&pixel_lock);
     cursor_posy = offset / text_cols;
     cursor_posx = offset % text_cols;
+    spinlock_release(&pixel_lock);
 }
 
 void video_vesa_cls(int bg) {
     video_vesa_fill_rectangle(0, 0, fb_width-1, fb_height-1, bg);
+    cursor_posy = 0;
+    cursor_posx = 0;
 }
 
 void video_vesa_print_char(char chr, int offset, int fg, int bg, bool move) {
@@ -372,13 +377,6 @@ void video_vesa_print_char(char chr, int offset, int fg, int bg, bool move) {
                     0x0
                 );
     }
-    // else if(chr == '\t') {
-    //     video_vesa_print_char(
-    //         ' ', _cursor_posy * text_cols + _cursor_posx,
-    //         0x0, 0x0, true
-    //     );
-    //     _cursor_posx++;
-    // }
     else {
         char* glyph = psf_get_glyph(chr);
 

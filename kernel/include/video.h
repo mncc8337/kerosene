@@ -43,7 +43,6 @@
 #define VIDEO_WHITE         255, 255, 255
 
 // vga.c
-void video_vga_set_ptr(int ptr);
 void video_vga_set_attr(int fg, int bg);
 void video_vga_get_size(int* w, int* h);
 void video_vga_set_size(int w, int h);
@@ -56,7 +55,6 @@ void video_vga_cls(int bg);
 void video_vga_print_char(char chr, int offset, int fg, int bg, bool move);
 
 // vesa.c
-void video_vesa_set_ptr(int ptr);
 void video_vesa_set_attr(int fg, int bg);
 void video_vesa_get_size(int* w, int* h);
 void video_vesa_set_size(int pitch, int bpp, int w, int h);

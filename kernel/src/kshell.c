@@ -157,9 +157,7 @@ static void help(char* arg) {
 
 static void clear(char* arg) {
     (void)(arg);
-
     video_cls(video_rgb(VIDEO_BLACK));
-    video_set_cursor(0);
 }
 
 static void run_sh(char* args) {

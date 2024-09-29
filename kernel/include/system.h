@@ -110,5 +110,5 @@ void isr_new_interrupt(int isr, void (*handler)(regs_t*), uint8_t flags);
 void isr_init();
 
 // spinlock.c
-void spinlock_acquire(atomic_flag* lock);
-void spinlock_release(atomic_flag* lock);
+void spinlock_acquire(volatile atomic_flag* lock);
+void spinlock_release(volatile atomic_flag* lock);
