@@ -295,8 +295,8 @@ uint64_t cnt = 0;
 void kernel_proc1() {
     int ret;
     while(true) {
-        SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
-        // video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_GREEN));
+        SYSCALL_1P(SYSCALL_SLEEP, ret, 10);
+        video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_GREEN));
         cnt++;
     }
     SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
@@ -304,8 +304,8 @@ void kernel_proc1() {
 void kernel_proc2() {
     int ret;
     while(true) {
-        SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
-        // video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_RED));
+        SYSCALL_1P(SYSCALL_SLEEP, ret, 10);
+        video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_RED));
         cnt++;
     }
     SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);

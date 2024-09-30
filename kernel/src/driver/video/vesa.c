@@ -1,6 +1,5 @@
 #include "video.h"
 #include "misc/psf.h"
-#include "system.h"
 
 #include "string.h"
 
@@ -28,8 +27,6 @@ static int font_bpg;
 static int cursor_buffer[512];
 static int cursor_buffer_posx = 0;
 static int cursor_buffer_posy = 0;
-
-static volatile atomic_flag pixel_lock = ATOMIC_FLAG_INIT;
 
 static void scroll_screen(unsigned ammount) {
     if(cursor_posy == 0) return;
@@ -103,8 +100,6 @@ void video_vesa_get_rowcol(int* c, int* r) {
 }
 
 void video_vesa_plot_pixel(unsigned x, unsigned y, int color) {
-    spinlock_acquire(&pixel_lock);
-
     // TODO: support other bpp
 
     if(x >= fb_width || y >= fb_height) return;
@@ -121,13 +116,9 @@ void video_vesa_plot_pixel(unsigned x, unsigned y, int color) {
         uint32_t* pixel = (uint32_t*)(framebuffer + y * fb_pitch) + x;
         *pixel = color;
     }
-
-    spinlock_release(&pixel_lock);
 }
 
 int video_vesa_get_pixel(unsigned x, unsigned y) {
-    spinlock_acquire(&pixel_lock);
-
     // TODO: support other bpp
 
     if(x >= fb_width || y >= fb_height) return 0;
@@ -150,13 +141,10 @@ int video_vesa_get_pixel(unsigned x, unsigned y) {
         ret = 0;
     }
 
-    spinlock_release(&pixel_lock);
     return ret;
 }
 
 void video_vesa_fill_rectangle(int x0, int y0, int x1, int y1, int color) {
-    spinlock_acquire(&pixel_lock);
-
     // TODO: support other bpp
 
     if((unsigned)x0 >= fb_width) x0 = fb_width-1;
@@ -192,8 +180,6 @@ void video_vesa_fill_rectangle(int x0, int y0, int x1, int y1, int color) {
         }
         fb += fb_pitch - (dx+1) * bytes_per_pixel;
     }
-
-    spinlock_release(&pixel_lock);
 }
 
 static void draw_line_low(int x0, int y0, int x1, int y1, int color) {
@@ -329,10 +315,8 @@ int video_vesa_get_cursor() {
     return cursor_posy * text_cols + cursor_posx;
 }
 void video_vesa_set_cursor(int offset) {
-    spinlock_acquire(&pixel_lock);
     cursor_posy = offset / text_cols;
     cursor_posx = offset % text_cols;
-    spinlock_release(&pixel_lock);
 }
 
 void video_vesa_cls(int bg) {
