@@ -5,10 +5,10 @@
 #include "stdio.h"
 
 static process_queue_t ready_queue = {NULL, NULL, 0};
-
 // this is a linked list sorted by sleep_ticks
 // TODO: use a priority queue instead
 static process_queue_t sleep_queue = {NULL, NULL, 0};
+static process_queue_t delete_queue = {NULL, NULL, 0};
 
 static process_t* current_process = NULL;
 
@@ -16,7 +16,7 @@ static uint64_t global_sleep_ticks = 0;
 
 static bool process_switched = false;
 
-// static volatile atomic_flag lock = ATOMIC_FLAG_INIT;
+static volatile atomic_flag lock = ATOMIC_FLAG_INIT;
 
 static void context_switch(regs_t* regs) {
     memcpy(regs, &current_process->regs, sizeof(regs_t));
@@ -46,35 +46,61 @@ static void to_next_process(regs_t* regs, bool add_back) {
 }
 
 process_t* scheduler_get_current_process() {
-    return current_process;
+    spinlock_acquire(&lock);
+    process_t* ret = current_process;
+    spinlock_release(&lock);
+
+    return ret;
 }
 
 process_t* scheduler_get_ready_processes() {
-    return ready_queue.top;
+    spinlock_acquire(&lock);
+    process_t* ret = ready_queue.top;
+    spinlock_release(&lock);
+
+    return ret;
 }
 
 process_t* scheduler_get_sleep_processes() {
-    return sleep_queue.top;
+    spinlock_acquire(&lock);
+    process_t* ret = sleep_queue.top;
+    spinlock_release(&lock);
+
+    return ret;
 }
 
 void scheduler_add_process(process_t* proc) {
+    spinlock_acquire(&lock);
+
     proc->state = PROCESS_STATE_READY;
     process_queue_push(&ready_queue, proc);
+
+    spinlock_release(&lock);
 }
 
-// kill current process
+// put current process to delete queue, delete it later
 void scheduler_kill_process(regs_t* regs) {
-    process_t* saved = current_process;
+    if(current_process->id == 1) return; // avoid deleting kernel process
+
+    spinlock_acquire(&lock);
+
+    // because we are using the stack of the process
+    // and process_delete() will free the stack
+    // we will postpone the process deleting
+    // and do it later when we are using other process's stack
+    process_queue_push(&delete_queue, current_process);
+
     // dont save registers, dont add process back to ready queue
     to_next_process(NULL, false);
+    // process switching always happens because there is always a kernel process to switch to
+    context_switch(regs);
 
-    if(process_switched) {
-        process_delete(saved);
-        context_switch(regs);
-    }
+    spinlock_release(&lock);
 }
 
 void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
+    spinlock_acquire(&lock);
+
     // set sleep target
     current_process->sleep_ticks = ticks + global_sleep_ticks;
 
@@ -84,9 +110,16 @@ void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
     to_next_process(regs, false);
 
     if(process_switched) context_switch(regs);
+
+    spinlock_release(&lock);
 }
 
 void scheduler_switch(regs_t* regs) {
+    spinlock_acquire(&lock);
+
+    while(delete_queue.size)
+        process_delete(process_queue_pop(&delete_queue));
+
     if(sleep_queue.size) {
         global_sleep_ticks++;
         while(sleep_queue.top && sleep_queue.top->sleep_ticks <= global_sleep_ticks) {
@@ -110,6 +143,8 @@ void scheduler_switch(regs_t* regs) {
     current_process->alive_ticks++;
 
     if(process_switched) context_switch(regs);
+
+    spinlock_release(&lock);
 }
 
 void scheduler_init(process_t* proc) {
@@ -117,6 +152,7 @@ void scheduler_init(process_t* proc) {
 
     proc->state = PROCESS_STATE_ACTIVE;
     current_process = proc;
+    current_process->id = 1;
 
     // note that we do not switch page directory
     // because kernel page directory is preloaded

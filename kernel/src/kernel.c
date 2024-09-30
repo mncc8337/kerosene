@@ -299,7 +299,7 @@ void kernel_proc1() {
         video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_GREEN));
         cnt++;
     }
-    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
+    // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
 }
 void kernel_proc2() {
     int ret;
@@ -308,7 +308,7 @@ void kernel_proc2() {
         video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_RED));
         cnt++;
     }
-    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
+    // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
 }
 
 void kmain() {
@@ -327,6 +327,5 @@ void kmain() {
     if(proc2) scheduler_add_process(proc2);
     if(proc3) scheduler_add_process(proc3);
 
-    // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
     while(true);
 }

@@ -916,6 +916,7 @@ static void panic(char* arg) {
 }
 
 static void print_proc(process_t* proc) {
+    if(!proc) return;
     printf(
         "process %d:\n"
         "    priority: %d\n"
