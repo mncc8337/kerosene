@@ -4,11 +4,11 @@
 #include "string.h"
 #include "stdio.h"
 
-static process_queue_t ready_queue = {NULL, NULL, 0};
+static process_queue_t ready_queue = PROCESS_QUEUE_INIT;
 // this is a linked list sorted by sleep_ticks
 // TODO: use a priority queue instead
-static process_queue_t sleep_queue = {NULL, NULL, 0};
-static process_queue_t delete_queue = {NULL, NULL, 0};
+static process_queue_t sleep_queue = PROCESS_QUEUE_INIT;
+static process_queue_t delete_queue = PROCESS_QUEUE_INIT;
 
 static process_t* current_process = NULL;
 
@@ -158,4 +158,50 @@ void scheduler_init(process_t* proc) {
     // because kernel page directory is preloaded
 
     process_switched = true;
+}
+
+
+semaphore_t* semaphore_create(unsigned max_count) {
+    semaphore_t* ret = (semaphore_t*)kmalloc(sizeof(semaphore_t));
+
+    if(ret) {
+        ret->max_count = max_count;
+        ret->current_count = 0;
+        ret->waiting_queue.top = NULL;
+        ret->waiting_queue.bottom = NULL;
+        ret->waiting_queue.size = 0;
+    }
+
+    return ret;
+}
+
+void semaphore_acquire(semaphore_t* semaphore, regs_t* regs) {
+    spinlock_acquire(&lock);
+
+    if(semaphore->current_count < semaphore->max_count) {
+        semaphore->current_count++;
+    }
+    else {
+        current_process->state = PROCESS_STATE_BLOCK;
+        process_queue_push(&semaphore->waiting_queue, current_process);
+
+        // save registers, dont add process back to ready queue
+        to_next_process(regs, false);
+        if(process_switched) context_switch(regs);
+    }
+
+    spinlock_release(&lock);
+}
+
+void semaphore_release(semaphore_t* semaphore) {
+    spinlock_acquire(&lock);
+
+    if(semaphore->waiting_queue.size) {
+        process_t* proc = process_queue_pop(&semaphore->waiting_queue);
+        proc->state = PROCESS_STATE_READY;
+        process_queue_push(&ready_queue, proc);
+    }
+    else semaphore->current_count--;
+
+    spinlock_release(&lock);
 }

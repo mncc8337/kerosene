@@ -12,6 +12,7 @@ enum PROCESS_STATE {
     PROCESS_STATE_READY,
     PROCESS_STATE_ACTIVE,
     PROCESS_STATE_SLEEP,
+    PROCESS_STATE_BLOCK,
 };
 
 typedef struct process {
@@ -32,6 +33,14 @@ typedef struct {
     uint32_t size;
 } process_queue_t;
 
+#define PROCESS_QUEUE_INIT {NULL, NULL, 0}
+
+typedef struct {
+    uint32_t max_count;
+    uint32_t current_count;
+    process_queue_t waiting_queue;
+} semaphore_t;
+
 // process.c
 process_t* process_new(uint32_t eip, int priority, bool is_user);
 void process_delete(process_t* proc);
@@ -51,3 +60,8 @@ void scheduler_kill_process(regs_t* regs);
 void scheduler_set_sleep(regs_t* regs, unsigned ticks);
 void scheduler_switch(regs_t* regs);
 void scheduler_init(process_t* proc);
+
+// scheduler.c
+semaphore_t* semaphore_create(unsigned max_count);
+void semaphore_acquire(semaphore_t* semaphore, regs_t* regs);
+void semaphore_release(semaphore_t* semaphore);
