@@ -1,7 +1,6 @@
 #pragma once
 
 enum {
-    SYSCALL_TEST,
     SYSCALL_PUTCHAR,
     SYSCALL_TIME,
     SYSCALL_KILL_PROCESS,

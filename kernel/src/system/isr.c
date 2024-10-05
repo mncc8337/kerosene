@@ -109,7 +109,7 @@ void isr_handler(regs_t* reg) {
     void (*handler)(regs_t*) = routines[reg->int_no];
     if(handler) handler(reg);
 
-    // if is an IRQ
+    // if it is an IRQ
     if(reg->int_no >= 32 && reg->int_no <= 47)
         pic_send_eoi(reg->int_no - 32);
 }

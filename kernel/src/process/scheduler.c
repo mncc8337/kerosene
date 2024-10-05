@@ -2,7 +2,6 @@
 #include "system.h"
 
 #include "string.h"
-#include "stdio.h"
 
 static process_queue_t ready_queue = PROCESS_QUEUE_INIT;
 // this is a linked list sorted by sleep_ticks
@@ -12,18 +11,21 @@ static process_queue_t delete_queue = PROCESS_QUEUE_INIT;
 
 static process_t* current_process = NULL;
 
+// FIXME
+// currently the only way to get all processes is though process queues
+// now i have semaphore implemented and each semaphore have its own process queue
+// now to get blocked processes i need to read semaphores' queue
+// since semaphores are unmanaged so it is imposible to get all of them
+
 static uint64_t global_sleep_ticks = 0;
 
 static bool process_switched = false;
-
-static volatile atomic_flag lock = ATOMIC_FLAG_INIT;
 
 static void context_switch(regs_t* regs) {
     memcpy(regs, &current_process->regs, sizeof(regs_t));
     vmmngr_switch_page_directory(current_process->page_directory);
 
-    // this regs ptr maybe a copy so set err_code to 1
-    // see syscall.c syscall_dispatcher() notes
+    // set err_code to tell that the registers has changed (see syscall.c)
     regs->err_code = 1;
     process_switched = false;
 }
@@ -46,43 +48,25 @@ static void to_next_process(regs_t* regs, bool add_back) {
 }
 
 process_t* scheduler_get_current_process() {
-    spinlock_acquire(&lock);
-    process_t* ret = current_process;
-    spinlock_release(&lock);
-
-    return ret;
+    return current_process;
 }
 
 process_t* scheduler_get_ready_processes() {
-    spinlock_acquire(&lock);
-    process_t* ret = ready_queue.top;
-    spinlock_release(&lock);
-
-    return ret;
+    return ready_queue.top;
 }
 
 process_t* scheduler_get_sleep_processes() {
-    spinlock_acquire(&lock);
-    process_t* ret = sleep_queue.top;
-    spinlock_release(&lock);
-
-    return ret;
+    return sleep_queue.top;
 }
 
 void scheduler_add_process(process_t* proc) {
-    spinlock_acquire(&lock);
-
     proc->state = PROCESS_STATE_READY;
     process_queue_push(&ready_queue, proc);
-
-    spinlock_release(&lock);
 }
 
 // put current process to delete queue, delete it later
 void scheduler_kill_process(regs_t* regs) {
     if(current_process->id == 1) return; // avoid deleting kernel process
-
-    spinlock_acquire(&lock);
 
     // because we are using the stack of the process
     // and process_delete() will free the stack
@@ -94,13 +78,9 @@ void scheduler_kill_process(regs_t* regs) {
     to_next_process(NULL, false);
     // process switching always happens because there is always a kernel process to switch to
     context_switch(regs);
-
-    spinlock_release(&lock);
 }
 
 void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
-    spinlock_acquire(&lock);
-
     // set sleep target
     current_process->sleep_ticks = ticks + global_sleep_ticks;
 
@@ -110,13 +90,9 @@ void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
     to_next_process(regs, false);
 
     if(process_switched) context_switch(regs);
-
-    spinlock_release(&lock);
 }
 
 void scheduler_switch(regs_t* regs) {
-    spinlock_acquire(&lock);
-
     while(delete_queue.size)
         process_delete(process_queue_pop(&delete_queue));
 
@@ -143,8 +119,6 @@ void scheduler_switch(regs_t* regs) {
     current_process->alive_ticks++;
 
     if(process_switched) context_switch(regs);
-
-    spinlock_release(&lock);
 }
 
 void scheduler_init(process_t* proc) {
@@ -160,6 +134,7 @@ void scheduler_init(process_t* proc) {
     process_switched = true;
 }
 
+// semaphores interract closely to the scheduler so i put them here
 
 semaphore_t* semaphore_create(unsigned max_count) {
     semaphore_t* ret = (semaphore_t*)kmalloc(sizeof(semaphore_t));
@@ -176,8 +151,6 @@ semaphore_t* semaphore_create(unsigned max_count) {
 }
 
 void semaphore_acquire(semaphore_t* semaphore, regs_t* regs) {
-    spinlock_acquire(&lock);
-
     if(semaphore->current_count < semaphore->max_count) {
         semaphore->current_count++;
     }
@@ -189,19 +162,13 @@ void semaphore_acquire(semaphore_t* semaphore, regs_t* regs) {
         to_next_process(regs, false);
         if(process_switched) context_switch(regs);
     }
-
-    spinlock_release(&lock);
 }
 
 void semaphore_release(semaphore_t* semaphore) {
-    spinlock_acquire(&lock);
-
     if(semaphore->waiting_queue.size) {
         process_t* proc = process_queue_pop(&semaphore->waiting_queue);
         proc->state = PROCESS_STATE_READY;
         process_queue_push(&ready_queue, proc);
     }
     else semaphore->current_count--;
-
-    spinlock_release(&lock);
 }

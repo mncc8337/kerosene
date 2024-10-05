@@ -70,7 +70,7 @@ isr_no_err_stub 47
 %assign i i+1
 %endrep
 
-extern isr_handler
+extern isr_handler ; from isr.c
 isr_common_stub:
     pusha
     push ds
@@ -85,6 +85,8 @@ isr_common_stub:
     mov eax, esp
     push eax
     mov eax, isr_handler
+    cli
+    cld
     call eax
     pop eax
     pop gs

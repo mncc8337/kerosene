@@ -13,10 +13,6 @@ static void* syscalls[MAX_SYSCALL];
 
 static regs_t regs_copy;
 
-static void test_syscall() {
-    puts("this is a syscall!");
-}
-
 static void proc_kill() {
     scheduler_kill_process(&regs_copy);
 }
@@ -32,12 +28,9 @@ static void syscall_dispatcher(regs_t* regs) {
     if(!fn) return;
 
     // NOTE:
-    // since changing directly into the registers save will cause page fault
-    // on calling SYSCALL_SLEEP (dont ask, idk why), we need to make an copy of it
-    // and make changes to it (some how this do works lmao)
-    // when done loading new registers we set err_code to 1
-    // so that we would know when to copy the changed registers back to the original one
-    // yeah this is a hack, to fix a wtf problem
+    // somehow modifying the registers directly will very likely to cause a page fault
+    // so we make a copy of it
+    // and only copy it back when err_code is 1 (turned on when loading saved registers)
     memcpy(&regs_copy, regs, sizeof(regs_t));
     regs_copy.err_code = 0;
 
@@ -60,17 +53,24 @@ static void syscall_dispatcher(regs_t* regs) {
         : "=a" (ret)
         : "r" (regs->edi), "r" (regs->esi), "r" (regs->edx), "r" (regs->ecx), "r" (regs->ebx), "r" (fn)
     );
-    regs->eax = ret;
 
-    putchar(0); // idk why without this line the code below wont run
+    // make a volatile ptr copy so that compiler will not optimize it out
+    volatile regs_t* vol_regs_copy = &regs_copy;
 
-    // check if regs has changed
-    if(regs_copy.err_code)
-        memcpy(regs, &regs_copy, sizeof(regs_t));
+    // compiler will optimize out the code below if we dont use the volatile ptr defined above
+    // because it will think regs_copy will not change, which is true for it because it does not know
+    // what the inline asm would do to regs_copy and assume that regs_copy will not change
+
+    // if regs_copy.err_code changed (only when context is switched)
+    // then load regs_copy to the original regs pointer
+    // and DO NOT CHANGE eax (returned value) because of context switching
+    // make sure that there are no context switching function that also return a value
+    // since it is not support here
+    if(vol_regs_copy->err_code) memcpy(regs, &regs_copy, sizeof(regs_t));
+    else regs->eax = ret;
 }
 
 void syscall_init() {
-    ADD_SYSCALL(SYSCALL_TEST, test_syscall);
     ADD_SYSCALL(SYSCALL_PUTCHAR, putchar);
     ADD_SYSCALL(SYSCALL_TIME, time);
     ADD_SYSCALL(SYSCALL_KILL_PROCESS, proc_kill);
