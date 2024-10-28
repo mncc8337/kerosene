@@ -1,9 +1,21 @@
 #pragma once
 
+#include "filesystem.h"
+
 #include "stdint.h"
 
- // 0x7f ELF
-#define ELF_MAGIC 0x7f454c46
+typedef enum {
+    ERR_ELF_SUCCESS,
+    ERR_ELF_OOM,
+    ERR_ELF_FILE_ERROR,
+    ERR_ELF_NOT_ELF,
+    ERR_ELF_NOT_32_BITS,
+    ERR_ELF_NOT_LITTLE_ENDIAN,
+    ERR_ELF_NOT_x86,
+} ELF_ERR;
+
+ // 0x7f ELF but in reverse
+#define ELF_MAGIC 0x464c457f
 
 // INSSET = instruction set
 #define ELF_INSSET_UNKNOWN 0x00
@@ -17,6 +29,12 @@
 #define ELF_INSSET_X86_64  0x3e
 #define ELF_INSSET_AARCH64 0xb7
 #define ELF_INSSET_RISC_V  0xf3
+
+#define ELF_32_BITS 1
+#define ELF_64_BITS 2
+
+#define ELF_LITTLE_ENDIAN 1
+#define ELF_BIG_ENDIAN    2
 
 // SHT = section header type
 #define ELF_SHT_NULL         0
@@ -55,6 +73,22 @@
 #define ELF_STT_LOPROC  13
 #define ELF_STT_HIPROC  15
 
+// PT = program type
+#define ELF_PT_NULL    0
+#define ELF_PT_LOAD    1
+#define ELF_PT_DYNAMIC 2
+#define ELF_PT_INTERP  3
+#define ELF_PT_NOTE    4
+#define ELF_PT_SHLIB   5
+#define ELF_PT_PHDR    6
+#define ELF_PT_LOPROC  0x70000000
+#define ELF_PT_HIPROC  0x7fffffff
+
+// PF = program flag
+#define ELF_PF_X 1
+#define ELF_PF_W 2
+#define ELF_PF_R 4
+
 typedef struct {
     uint32_t magic;
     uint8_t bits;
@@ -65,17 +99,17 @@ typedef struct {
     uint16_t type;
     uint16_t instruction_set;
     uint32_t elf_version;
-    uint32_t program_entry_offset;
-    uint32_t pht_offset;
-    uint32_t sht_offset;
+    uint32_t program_entry;
+    uint32_t ph_offset;
+    uint32_t sh_offset;
     uint32_t flags;
     uint16_t elf_header_size;
-    uint16_t pht_entry_size;
-    uint16_t pht_entry_count;
-    uint16_t sht_entry_size;
-    uint16_t sht_entry_count;
+    uint16_t ph_entry_size;
+    uint16_t ph_entry_count;
+    uint16_t sh_entry_size;
+    uint16_t sh_entry_count;
     uint16_t shstrndx; // Section Header STRing iNDeX (the index of the section name string table)
-} elf_header_t;
+} __attribute__((packed)) elf_header_t;
 
 // addr: uint32
 // half uint16
@@ -94,7 +128,7 @@ typedef struct {
     uint32_t info;
     uint32_t addr_align;
     uint32_t entry_size;
-} elf_section_header_t;
+} __attribute__((packed)) elf_section_header_t;
 
 typedef struct {
     uint32_t name;
@@ -103,7 +137,7 @@ typedef struct {
     uint8_t info;
     uint8_t other;
     uint16_t shndx; // Section Header iNDeX (the index in the string table)
-} elf_symbol_table_t;
+} __attribute__((packed)) elf_symbol_table_t;
 
 typedef struct {
     uint32_t type;
@@ -114,6 +148,12 @@ typedef struct {
     uint32_t mem_segment_size;
     uint32_t flags;
     uint32_t align;
-} elf_program_header_t;
+} __attribute__((packed)) elf_program_header_t;
 
 // TODO: fully implement ELF32
+
+elf_section_header_t* elf_get_shtab(elf_header_t* eh);
+elf_program_header_t* elf_get_phtab(elf_header_t* eh);
+char* elf_get_shstrtab(elf_header_t* eh);
+ELF_ERR elf_validate(elf_header_t* elf_header);
+ELF_ERR elf_load(fs_node_t* node, void* addr, uint32_t* entry);

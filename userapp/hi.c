@@ -1,7 +1,10 @@
 #include "stdio.h"
 
-void _start() {
-    printf("hi user!\n");
+char buffer1[512];
+char sss[] = "ngu1";
 
-    return;
+int main() {
+    printf("hi user eeee!\n");
+
+    return 0;
 }

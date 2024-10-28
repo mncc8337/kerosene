@@ -82,7 +82,7 @@ $(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(OBJ) $(BIN_DIR)lib
 
 # user app
 fsfiles/%.elf: userapp/%.c
-	$(CC) -I./libc/include -ffreestanding -nostdlib -Ttext 0x0 -lgcc -o $@ $< -L./bin -lc
+	$(CC) -I./libc/include -ffreestanding -nostdlib -lgcc -e main -o $@ $< -L./bin -lc
 
 libc: $(BIN_DIR)libc.a
 

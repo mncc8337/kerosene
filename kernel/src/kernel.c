@@ -1,16 +1,16 @@
 #include "multiboot.h"
 
-#include "system.h"
-#include "process.h"
-#include "syscall.h"
-#include "mem.h"
-
 #include "video.h"
 #include "ata.h"
 #include "kbd.h"
 #include "timer.h"
 #include "filesystem.h"
 #include "locale.h"
+
+#include "system.h"
+#include "process.h"
+#include "syscall.h"
+#include "mem.h"
 
 #include "stdio.h"
 #include "stdlib.h"
@@ -223,14 +223,12 @@ void kinit(multiboot_info_t* mbd) {
     // also only one of the two (a.out option or ELF option) must be existed
     // so we dont need to check the flag
     multiboot_elf_section_header_table_t* elf_sec = &(mbd->u.elf_sec);
-    elf_section_header_t* shstrtab_sh = (elf_section_header_t*)
-            (elf_sec->addr + KERNEL_START + elf_sec->shndx * elf_sec->size);
+    elf_section_header_t* shstrtab_sh = (elf_section_header_t*)(elf_sec->addr + KERNEL_START) + elf_sec->shndx;
     char* shstrtab = (char*)(shstrtab_sh->addr + KERNEL_START);
 
     // find symtab and strtab
     for(unsigned i = 0; i < elf_sec->num; i++) {
-        elf_section_header_t* sh = (elf_section_header_t*)
-            (elf_sec->addr + KERNEL_START + i * elf_sec->size);
+        elf_section_header_t* sh = (elf_section_header_t*)(elf_sec->addr + KERNEL_START) + i;
         char* sec_name = shstrtab + sh->name;
 
         if(strcmp(sec_name, ".symtab")) {
@@ -290,23 +288,43 @@ void kinit(multiboot_info_t* mbd) {
     while(true);
 }
 
-uint64_t cnt = 0;
+void load_elf_file(char* path) {
+    fs_node_t elf = fs_find(&fs->root_node, path);
+    if(!elf.valid) return;
+
+    printf("found %s\n", path);
+
+    void* addr = kmalloc(elf.size);
+    if(!addr) {
+        puts("OOM!");
+        return;
+    }
+
+    uint32_t entry;
+    ELF_ERR err = elf_load(&elf, addr, &entry);
+    if(err) printf("failed to load elf, err %d\n", err);
+    else puts("elf file loaded");
+    kfree(addr);
+
+    printf("jumping to entry (%x)\n", entry);
+    int (*prog)(void) = (void*)entry;
+    int exit_code = prog();
+    printf("program exited with code %d\n", exit_code);
+}
 
 void kernel_proc1() {
     int ret;
     while(true) {
-        SYSCALL_1P(SYSCALL_SLEEP, ret, 10);
+        SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
         video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_GREEN));
-        cnt++;
     }
     // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
 }
 void kernel_proc2() {
     int ret;
     while(true) {
-        SYSCALL_1P(SYSCALL_SLEEP, ret, 10);
+        SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
         video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_RED));
-        cnt++;
     }
     // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
 }
@@ -319,13 +337,17 @@ void kmain() {
     }
     else puts("not enough memory for kshell.");
 
+    process_t* shell_proc = process_new((uint32_t)shell_start, 0, false);
+    if(shell_proc) scheduler_add_process(shell_proc);
+
     process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
     process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
-    process_t* proc3 = process_new((uint32_t)shell_start, 0, false);
-
     if(proc1) scheduler_add_process(proc1);
     if(proc2) scheduler_add_process(proc2);
-    if(proc3) scheduler_add_process(proc3);
+
+    int ret;
+    SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
+    load_elf_file("hi.elf");
 
     while(true);
 }
