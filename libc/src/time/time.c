@@ -14,7 +14,7 @@ time_t time(time_t* timer) {
 #if defined(__is_libk)
     curr_time = timer_get_current_time();
 #else
-    SYSCALL_0P(SYSCALL_TIME, curr_time);
+    SYSCALL_1P(SYSCALL_TIME, curr_time, timer);
 #endif
 
     if(timer != NULL)

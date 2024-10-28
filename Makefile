@@ -49,7 +49,7 @@ endif
 
 .PHONY: all libk libc kernel disk copyfs run run-debug userapp clean clean-all
 
-all: libk libc kernel disk copyfs userapp
+all: libk libc userapp kernel disk copyfs
 
 # libk
 $(OBJ_DIR)libk/%.o: libc/src/%.c
@@ -82,7 +82,8 @@ $(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(OBJ) $(BIN_DIR)lib
 
 # user app
 fsfiles/%.elf: userapp/%.c
-	$(CC) -I./libc/include -ffreestanding -nostdlib -lgcc -e main -o $@ $< -L./bin -lc
+	# TODO: remove -I./kernel/include
+	$(CC) -I./libc/include -I./kernel/include -ffreestanding -nostdlib -lgcc -e main -o $@ $< -L./bin -lc
 
 libc: $(BIN_DIR)libc.a
 

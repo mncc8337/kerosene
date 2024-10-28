@@ -25,8 +25,7 @@ static int days_in_month(int month, bool leap_year) {
 }
 
 struct tm gmtime(const time_t* timer) {
-    // normally this function return a pointer
-    // but i dont know how to do it
+    // TODO: return a pointer
 
     struct tm t;
     time_t clone = *timer;

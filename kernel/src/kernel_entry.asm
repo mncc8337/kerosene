@@ -69,8 +69,7 @@ kernel_entry:
     mov [kernel_pd_virt - KERNEL_START + phys_to_virt(0)], eax
 
     mov eax, page_table_kernel1 - KERNEL_START
-    ; FIXME: kernel is temporary accessible to user (flag 0b111)
-    or eax, 0b111
+    or eax, 0b011
     mov [kernel_pd_virt - KERNEL_START + phys_to_virt(KERNEL_START)], eax
 
     ; map the first 4mb
@@ -87,8 +86,7 @@ kernel_entry:
     ; map kernel to 0xc0000000
     mov edi, page_table_kernel1 - KERNEL_START
     mov eax, 0x0
-    ; FIXME: kernel is temporary accessible to user (flag 0b111)
-    or eax, 0b111
+    or eax, 0b011
     ; NOTE: .text and .rodata are actually should only be readable
     ; but idk how to do it separately so just set them to read/write for now
     mov ecx, 1023 ; reserve the final entry of page_table_kernel1
@@ -101,8 +99,7 @@ kernel_entry:
     ; map kernel_pd_virt using the final entry
     ; this will be mapped to 0xc03ff000 (VMMNGR_PD)
     mov eax, kernel_pd_virt - KERNEL_START
-    ; FIXME: kernel is temporary accessible to user (flag 0b111)
-    or eax, 0b111
+    or eax, 0b011
     mov [edi], eax
 
     ; load page directory
