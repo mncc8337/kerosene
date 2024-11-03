@@ -127,11 +127,16 @@ FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t delete_node) {
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     fs_node_t copied;
 
-    if(new_parent->fs->type == FS_FAT32)
-        copied = fat32_add_entry(new_parent,
-                                 new_name == NULL ? node->name : new_name,
-                                 node->start_cluster,
-                                 FS_NODE_IS_DIR(*node) | FS_NODE_IS_HIDDEN(*node), node->size);
+    if(new_parent->fs->type == FS_FAT32) {
+        uint8_t attr = 0;
+        if(FS_NODE_IS_DIR(*node)) attr |= FAT_ATTR_DIRECTORY;
+        if(FS_NODE_IS_HIDDEN(*node)) attr |= FAT_ATTR_HIDDEN;
+        copied = fat32_add_entry(
+            new_parent,
+            new_name == NULL ? node->name : new_name,
+            node->start_cluster, attr, node->size
+        );
+    }
     else return ERR_FS_UNKNOWN_FS;
 
     if(!FS_NODE_IS_VALID(copied)) return ERR_FS_FAILED;
@@ -151,10 +156,14 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
         uint32_t start_cluster = fat32_copy_cluster_chain(new_parent->fs, node->start_cluster);
         if(start_cluster == 0) return ERR_FS_FAILED;
 
-        *copied = fat32_add_entry(new_parent,
-                                  new_name == NULL ? node->name : new_name,
-                                  start_cluster,
-                                  FS_NODE_IS_DIR(*node) | FS_NODE_IS_HIDDEN(*node), node->size);
+        uint8_t attr = 0;
+        if(FS_NODE_IS_DIR(*node)) attr |= FAT_ATTR_DIRECTORY;
+        if(FS_NODE_IS_HIDDEN(*node)) attr |= FAT_ATTR_HIDDEN;
+        *copied = fat32_add_entry(
+            new_parent,
+            new_name == NULL ? node->name : new_name,
+            start_cluster, attr, node->size
+        );
     }
     else return ERR_FS_UNKNOWN_FS;
 
@@ -174,9 +183,13 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
         uint32_t start_cluster = fat32_allocate_clusters(new_parent->fs, 1);
         if(start_cluster == 0) return ERR_FS_FAILED;
 
-        *copied = fat32_mkdir(new_parent,
-                              new_name == NULL ? node->name : new_name,
-                              start_cluster, FS_NODE_IS_HIDDEN(*node) | FAT_ATTR_DIRECTORY);
+        uint8_t attr = FAT_ATTR_DIRECTORY;
+        if(FS_NODE_IS_HIDDEN(*node)) attr |= FAT_ATTR_HIDDEN;
+        *copied = fat32_mkdir(
+            new_parent,
+            new_name == NULL ? node->name : new_name,
+            start_cluster, attr
+        );
         if(!FS_NODE_IS_VALID(*copied)) return ERR_FS_FAILED;
         copy_current_dir = *copied;
 
@@ -242,8 +255,10 @@ FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
             // send offset = 512 so we will know to change to the next cluster
             offset = 512;
         }
-        FS_ERR err = fat32_write_file(file->node->fs,
-                                      &(file->current_cluster), data, size, offset);
+        FS_ERR err = fat32_write_file(
+            file->node->fs,
+            &(file->current_cluster), data, size, offset
+        );
         if(err) return err;
     }
     else return ERR_FS_UNKNOWN_FS;
@@ -269,8 +284,10 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
             // send offset = 512 so we will know to change to the next cluster
             offset = 512;
         }
-        err = fat32_read_file(file->node->fs,
-                              &(file->current_cluster), buffer, size, offset);
+        err = fat32_read_file(
+            file->node->fs,
+            &(file->current_cluster), buffer, size, offset
+        );
     }
     else return ERR_FS_UNKNOWN_FS;
 

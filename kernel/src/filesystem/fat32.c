@@ -120,9 +120,11 @@ static void get_fsinfo(partition_entry_t part, fat32_bootrecord_t* bootrec, uint
     ata_pio_LBA28_access(true, part.LBA_start + bootrec->ebpb.fsinfo_sector, 1, fsinfo);
 }
 static void update_fsinfo(fs_t* fs) {
-    ata_pio_LBA28_access(false,
-                         fs->partition.LBA_start + fs->fat32_info.bootrec.ebpb.fsinfo_sector,
-                         1, (uint8_t*)(&(fs->fat32_info.fsinfo)));
+    ata_pio_LBA28_access(
+        false,
+        fs->partition.LBA_start + fs->fat32_info.bootrec.ebpb.fsinfo_sector,
+        1, (uint8_t*)(&(fs->fat32_info.fsinfo))
+    );
 }
 
 static uint32_t get_total_sectors(fat32_bootrecord_t* bootrec) {
@@ -465,7 +467,7 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
             parse_datetime(temp_dir->last_access_date, 0, &(node.accessed_timestamp));
             parse_datetime(temp_dir->last_mod_date, temp_dir->last_mod_time, &(node.modified_timestamp));
 
-            node.flags = 0;
+            node.flags = FS_FLAG_VALID;
             if(temp_dir->attr & FAT_ATTR_DIRECTORY)
                 node.flags |= FS_FLAG_DIRECTORY;
             if(temp_dir->attr & FAT_ATTR_HIDDEN)
