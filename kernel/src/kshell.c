@@ -54,7 +54,7 @@ static int indent_level = 0;
 static int max_depth = 0;
 static bool show_hidden = false;
 static bool list_dir(fs_node_t node) {
-    if((node.hidden || node.name[0] == '.') && !show_hidden) return true;
+    if((FS_NODE_IS_HIDDEN(node) || node.name[0] == '.') && !show_hidden) return true;
     if(indent_level >= max_depth) return true;
     indent_level++;
 
@@ -62,11 +62,11 @@ static bool list_dir(fs_node_t node) {
         printf("|   ");
     printf("|---");
 
-    if(node.isdir) video_set_attr(video_rgb(VIDEO_LIGHT_BLUE), video_rgb(VIDEO_BLACK));
+    if(FS_NODE_IS_DIR(node)) video_set_attr(video_rgb(VIDEO_LIGHT_BLUE), video_rgb(VIDEO_BLACK));
     puts(node.name);
-    if(node.isdir) video_set_attr(video_rgb(VIDEO_LIGHT_GREY), video_rgb(VIDEO_BLACK));
+    if(FS_NODE_IS_DIR(node)) video_set_attr(video_rgb(VIDEO_LIGHT_GREY), video_rgb(VIDEO_BLACK));
 
-    if(node.isdir && !strcmp(node.name, ".") && !strcmp(node.name, ".."))
+    if(FS_NODE_IS_DIR(node) && !strcmp(node.name, ".") && !strcmp(node.name, ".."))
         fs_list_dir(&node, list_dir);
 
     indent_level--;
@@ -74,7 +74,8 @@ static bool list_dir(fs_node_t node) {
     return true;
 }
 static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
-    node->valid = false;
+    FS_NODE_FLAG_UNSET(node, FS_FLAG_VALID);
+    
     *parent = *(node_stack_top());
 
     if(path[0] == '/') {
@@ -85,20 +86,20 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
 
     char* nodename = strtok(path, "/");
     while(nodename != NULL) {
-        if(node->valid) *parent = *node;
+        if(FS_NODE_IS_VALID(*node)) *parent = *node;
         // root dir does not have the . and .. dir so we need to handle it differently
         if((strcmp(nodename, ".") || strcmp(nodename, ".."))
                 && parent->name[0] == '/')
             *node = node_stack[0];
         else *node = fs_find(parent, nodename);
-        if(!node->valid) {
+        if(!FS_NODE_IS_VALID(*node)) {
             memcpy(node->name, nodename, strlen(nodename)+1);
             if(strtok(NULL, "/") != NULL)
                 return ERR_SHELL_NOT_FOUND;
             return ERR_SHELL_TARGET_NOT_FOUND;
         }
         nodename = strtok(NULL, "/");
-        if(nodename != NULL && !node->isdir) // this is illegal
+        if(nodename != NULL && !FS_NODE_IS_DIR(*node)) // this is illegal
             return ERR_SHELL_NOT_A_DIR;
     }
 
@@ -162,7 +163,7 @@ static void clear(char* arg) {
 
 static void run_sh(char* args) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -181,7 +182,7 @@ static void run_sh(char* args) {
         printf("no such directory '%s'\n", node.name);
         return;
     }
-    if(err == ERR_SHELL_TARGET_NOT_FOUND || node.isdir) {
+    if(err == ERR_SHELL_TARGET_NOT_FOUND || FS_NODE_IS_DIR(node)) {
         printf("no such file '%s'\n", node.name);
         return;
     }
@@ -219,7 +220,7 @@ static void clocks(char* args) {
 
 static void ls(char* args) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -263,7 +264,7 @@ static void ls(char* args) {
         if(err == ERR_SHELL_NOT_FOUND
                 || err == ERR_SHELL_NOT_A_DIR
                 || err == ERR_SHELL_TARGET_NOT_FOUND
-                || !node.isdir) {
+                || !FS_NODE_IS_DIR(node)) {
             printf("no such directory '%s'\n", node.name);
             return;
         }
@@ -274,7 +275,7 @@ static void ls(char* args) {
 
 static void read(char* path) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -293,7 +294,7 @@ static void read(char* path) {
         printf("no such directory '%s'\n", node.name);
         return;
     }
-    if(err == ERR_SHELL_TARGET_NOT_FOUND || node.isdir) {
+    if(err == ERR_SHELL_TARGET_NOT_FOUND || FS_NODE_IS_DIR(node)) {
         printf("no such file '%s'\n", node.name);
         return;
     }
@@ -308,7 +309,7 @@ static void read(char* path) {
 
 static void cd(char* path) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -330,11 +331,11 @@ static void cd(char* path) {
         if(strcmp(nodename, "..")) node_stack_pop();
         else if(!strcmp(nodename, ".")) {
             fs_node_t tmp = fs_find(node_stack_top(), nodename);
-            if(!tmp.valid) {
+            if(!FS_NODE_IS_VALID(tmp)) {
                 printf("no such directory '%s'\n", nodename);
                 return;
             }
-            if(!tmp.isdir) {
+            if(!FS_NODE_IS_DIR(tmp)) {
                 printf("no such directory '%s'\n", nodename);
                 return;
             }
@@ -352,7 +353,7 @@ static void cd(char* path) {
 
 static void mkdir(char* path) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -374,13 +375,13 @@ static void mkdir(char* path) {
     char* dirname = strtok(path, "/");
     while(dirname != NULL) {
         fs_node_t node = fs_find(&_curr_node, dirname);
-        if(node.valid) {
+        if(FS_NODE_IS_VALID(node)) {
             printf("a file or directory with name '%s' has already existed\n", dirname);
             return;
         }
 
         fs_node_t newdir = fs_mkdir(&_curr_node, dirname);
-        if(!newdir.valid) {
+        if(!FS_NODE_IS_VALID(newdir)) {
             printf("failed to create directory '%s'\n", dirname);
             return;
         }
@@ -391,7 +392,7 @@ static void mkdir(char* path) {
 
 static void rm(char* path) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -421,7 +422,7 @@ static void rm(char* path) {
 
 static void touch(char* path) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -448,12 +449,12 @@ static void touch(char* path) {
     // which is what we wanted
 
     node = fs_touch(&node_parent, node.name);
-    if(!node.valid) printf("cannot create '%s', out of space\n", node.name);
+    if(!FS_NODE_IS_VALID(node)) printf("cannot create '%s', out of space\n", node.name);
 }
 
 static void write(char* path) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -474,7 +475,7 @@ static void write(char* path) {
     if(err == ERR_SHELL_TARGET_NOT_FOUND) {
         // try to create one
         node = fs_touch(&node_parent, node.name);
-        if(!node.valid) {
+        if(!FS_NODE_IS_VALID(node)) {
             printf("cannot create file '%s', out of space\n", node.name);
             return;
         }
@@ -515,7 +516,7 @@ static void write(char* path) {
 
 static void mv(char* args) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -551,7 +552,7 @@ static void mv(char* args) {
         return;
     }
     if(err == ERR_SHELL_SUCCESS) {
-        if(!target_node.isdir) {
+        if(!FS_NODE_IS_DIR(target_node)) {
             printf("a file with name '%s' has already existed\n", target_node.name);
             return;
         }
@@ -568,7 +569,7 @@ static void mv(char* args) {
 
 static void cp(char* args) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -604,7 +605,7 @@ static void cp(char* args) {
         return;
     }
     if(err == ERR_SHELL_SUCCESS) {
-        if(!target_node.isdir) {
+        if(!FS_NODE_IS_DIR(target_node)) {
             printf("a file with name '%s' has already existed\n", target_node.name);
             return;
         }
@@ -622,7 +623,7 @@ static void cp(char* args) {
 
 static void stat(char* path) {
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -649,8 +650,8 @@ static void stat(char* path) {
     printf("filesystem: %s\n", (node.fs->type == 1 ? "FAT32" : (node.fs->type == 2 ? "ext2" : "unknown")));
     printf("parent: '%s'\n", node.parent_node->name);
     printf("start cluster: 0x%x\n", node.start_cluster);
-    printf("type: %s\n", (node.isdir ? "directory" : "file"));
-    printf("hidden: %s\n", (node.hidden ? "true" : "false"));
+    printf("type: %s\n", (FS_NODE_IS_DIR(node) ? "directory" : "file"));
+    printf("hidden: %s\n", (FS_NODE_IS_HIDDEN(node) ? "true" : "false"));
     printf("size: %d bytes\n", node.size);
 
     struct tm t_dump = gmtime(&(node.creation_timestamp));
@@ -671,7 +672,7 @@ static void pwd(char* args) {
     (void)(args);
 
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -970,7 +971,7 @@ static void loadfont(char* path) {
     }
 
     fs_node_t* current_node = node_stack_top();
-    if(!current_node->valid) {
+    if(!FS_NODE_IS_VALID(*current_node)) {
         puts("no fs installed");
         return;
     }
@@ -989,7 +990,7 @@ static void loadfont(char* path) {
         printf("no such directory '%s'\n", node.name);
         return;
     }
-    if(err == ERR_SHELL_TARGET_NOT_FOUND || node.isdir) {
+    if(err == ERR_SHELL_TARGET_NOT_FOUND || FS_NODE_IS_DIR(node)) {
         printf("no such file '%s'\n", node.name);
         return;
     }

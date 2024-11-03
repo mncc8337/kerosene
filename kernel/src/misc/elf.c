@@ -31,7 +31,7 @@ ELF_ERR elf_validate(elf_header_t* elf_header) {
     return ERR_ELF_SUCCESS;
 }
 
-ELF_ERR elf_load(fs_node_t* node, void* addr, uint32_t* entry) {
+ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry) {
     FILE f = file_open(node, FILE_READ);
     if(!f.valid) return ERR_ELF_FILE_ERROR;
 
@@ -71,15 +71,14 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, uint32_t* entry) {
     required_pages += (prog_size % MMNGR_PAGE_SIZE) > 0;
 
     unsigned flags = PTE_WRITABLE;
-    page_directory_t* current_pd = vmmngr_get_page_directory();
-    if(current_pd != vmmngr_get_kernel_page_directory())
+    if(pd != vmmngr_get_kernel_page_directory())
         flags |= PTE_USER;
 
     // TODO: check and apply flags for each section
     physical_addr_t phys = (physical_addr_t)pmmngr_alloc_multi_block(required_pages);
     if(!phys) return ERR_ELF_OOM;
     for(unsigned i = 0; i < required_pages; i++) {
-        MEM_ERR mem_err = vmmngr_map(current_pd, phys + i * MMNGR_PAGE_SIZE, minaddr + i * MMNGR_PAGE_SIZE, flags);
+        MEM_ERR mem_err = vmmngr_map(pd, phys + i * MMNGR_PAGE_SIZE, minaddr + i * MMNGR_PAGE_SIZE, flags);
         if(mem_err) return ERR_ELF_OOM; // the only error returned by vmmngr_map() is OOM
     }
 

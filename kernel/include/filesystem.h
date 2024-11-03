@@ -9,11 +9,21 @@
 
 #include "fat_type.h"
 
-// including the null char
-// the limit is 256
-#define FILENAME_LIMIT 64
+// filename limit including null char
+#define FILENAME_LIMIT 256
 
 #define MAX_DISK 5
+
+#define FS_FLAG_VALID 1
+#define FS_FLAG_DIRECTORY 2
+#define FS_FLAG_HIDDEN 4
+
+#define FS_NODE_IS_VALID(node) ((node).flags & FS_FLAG_VALID)
+#define FS_NODE_IS_DIR(node) ((node).flags & FS_FLAG_DIRECTORY)
+#define FS_NODE_IS_HIDDEN(node) ((node).flags & FS_FLAG_HIDDEN)
+
+#define FS_NODE_FLAG_SET(node, flag) ((node)->flags |= flag)
+#define FS_NODE_FLAG_UNSET(node, flag) ((node)->flags &= ~flag)
 
 typedef enum {
     ERR_FS_SUCCESS,
@@ -79,12 +89,10 @@ typedef struct {
 
 typedef struct fs_node {
     char name[FILENAME_LIMIT];
-    bool valid;
     struct fs* fs;
     struct fs_node* parent_node;
     uint32_t start_cluster;
-    bool isdir;
-    bool hidden;
+    uint32_t flags;
     uint16_t creation_milisecond;
     time_t creation_timestamp;
     time_t modified_timestamp;

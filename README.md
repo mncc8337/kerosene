@@ -120,7 +120,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     - [x] process terminate
     - [x] spinlock
     - [ ] semaphore
-- [ ] load and run ELF file
+- [x] load and run ELF file
 ## Known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
 - `print_debug` gives gliberrish result if put in many formats

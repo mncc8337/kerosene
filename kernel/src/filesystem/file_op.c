@@ -56,11 +56,13 @@ FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
 fs_node_t fs_find(fs_node_t* parent, const char* nodename) {
     memcpy(name_buffer, nodename, strlen(nodename) + 1);
 
-    ret_node.valid = false;
+    FS_NODE_FLAG_UNSET(&ret_node, FS_FLAG_VALID);
 
     if(parent->fs->type == FS_FAT32) {
-        if(fat32_read_dir(parent, find_node_callback) == ERR_FS_CALLBACK_STOP) ret_node.valid = true;
-        else ret_node.valid = false;
+        if(fat32_read_dir(parent, find_node_callback) == ERR_FS_CALLBACK_STOP)
+            ret_node.flags |= FS_FLAG_VALID;
+        else
+            FS_NODE_FLAG_UNSET(&ret_node, FS_FLAG_VALID);
     }
 
     return ret_node;
@@ -69,7 +71,7 @@ fs_node_t fs_find(fs_node_t* parent, const char* nodename) {
 // make a directory in parent node
 // return invalid node when failed to find free cluster / fs not defined / directory already exists
 fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
-    ret_node.valid = false;
+    FS_NODE_FLAG_UNSET(&ret_node, FS_FLAG_VALID);
 
     if(parent->fs->type == FS_FAT32) {
         uint32_t dir_cluster = fat32_allocate_clusters(parent->fs, 1);
@@ -84,7 +86,7 @@ fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
 // make an empty file in parent node
 fs_node_t fs_touch(fs_node_t* parent, char* name) {
     fs_node_t node;
-    node.valid = false;
+    node.flags = 0;
 
     if(parent->fs->type == FS_FAT32) {
         uint32_t file_cluster = fat32_allocate_clusters(parent->fs, 1);
@@ -105,7 +107,7 @@ FS_ERR fs_rm(fs_node_t* node, fs_node_t delete_node) {
 
 // remove a directory or a file and its content recursively if is a directory
 FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t delete_node) {
-    if(delete_node.isdir) {
+    if(FS_NODE_IS_DIR(delete_node)) {
         // try remove its content recursively
         if(parent->fs->type == FS_FAT32) {
             // this only happended when an error occurs
@@ -128,10 +130,11 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     if(new_parent->fs->type == FS_FAT32)
         copied = fat32_add_entry(new_parent,
                                  new_name == NULL ? node->name : new_name,
-                                 node->start_cluster, node->isdir | node->hidden, node->size);
+                                 node->start_cluster,
+                                 FS_NODE_IS_DIR(*node) | FS_NODE_IS_HIDDEN(*node), node->size);
     else return ERR_FS_UNKNOWN_FS;
 
-    if(!copied.valid) return ERR_FS_FAILED;
+    if(!FS_NODE_IS_VALID(copied)) return ERR_FS_FAILED;
 
     FS_ERR err;
     if(node->fs->type == FS_FAT32)
@@ -150,16 +153,17 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
 
         *copied = fat32_add_entry(new_parent,
                                   new_name == NULL ? node->name : new_name,
-                                  start_cluster, node->isdir | node->hidden, node->size);
+                                  start_cluster,
+                                  FS_NODE_IS_DIR(*node) | FS_NODE_IS_HIDDEN(*node), node->size);
     }
     else return ERR_FS_UNKNOWN_FS;
 
-    if(!copied->valid) return ERR_FS_FAILED;
+    if(!FS_NODE_IS_VALID(*copied)) return ERR_FS_FAILED;
     return ERR_FS_SUCCESS;
 }
 
 FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
-    if(!node->isdir) return fs_copy(node, new_parent, copied, new_name);
+    if(!FS_NODE_IS_DIR(*node)) return fs_copy(node, new_parent, copied, new_name);
 
     // the node we need to copy is a directory at this point
 
@@ -172,8 +176,8 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
 
         *copied = fat32_mkdir(new_parent,
                               new_name == NULL ? node->name : new_name,
-                              start_cluster, node->hidden | FAT_ATTR_DIRECTORY);
-        if(!copied->valid) return ERR_FS_FAILED;
+                              start_cluster, FS_NODE_IS_HIDDEN(*node) | FAT_ATTR_DIRECTORY);
+        if(!FS_NODE_IS_VALID(*copied)) return ERR_FS_FAILED;
         copy_current_dir = *copied;
 
         // try copy all of its content to the new dir

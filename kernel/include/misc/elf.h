@@ -1,6 +1,7 @@
 #pragma once
 
 #include "filesystem.h"
+#include "mem.h"
 
 #include "stdint.h"
 
@@ -156,4 +157,4 @@ elf_section_header_t* elf_get_shtab(elf_header_t* eh);
 elf_program_header_t* elf_get_phtab(elf_header_t* eh);
 char* elf_get_shstrtab(elf_header_t* eh);
 ELF_ERR elf_validate(elf_header_t* elf_header);
-ELF_ERR elf_load(fs_node_t* node, void* addr, uint32_t* entry);
+ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry);

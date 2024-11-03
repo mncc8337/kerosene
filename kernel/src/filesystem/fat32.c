@@ -410,7 +410,7 @@ uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster) {
 // loop through all files/entries in a dir
 // call the callback when find one
 FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
-    if(!parent->isdir) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
 
     fat32_bootrecord_t* bootrec = &(parent->fs->fat32_info.bootrec);
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
@@ -464,8 +464,12 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
             parse_datetime(temp_dir->creation_date, temp_dir->creation_time, &(node.creation_timestamp));
             parse_datetime(temp_dir->last_access_date, 0, &(node.accessed_timestamp));
             parse_datetime(temp_dir->last_mod_date, temp_dir->last_mod_time, &(node.modified_timestamp));
-            node.isdir = temp_dir->attr & FAT_ATTR_DIRECTORY;
-            node.hidden = temp_dir->attr & FAT_ATTR_HIDDEN;
+
+            node.flags = 0;
+            if(temp_dir->attr & FAT_ATTR_DIRECTORY)
+                node.flags |= FS_FLAG_DIRECTORY;
+            if(temp_dir->attr & FAT_ATTR_HIDDEN)
+                node.flags |= FS_FLAG_HIDDEN;
 
             node.size = temp_dir->size;
             node.parent_cluster = current_cluster;
@@ -650,7 +654,7 @@ FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size
 // return invalid node when cannot find a free cluster / an entry with the same name has already exists
 fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size) {
     fs_node_t node;
-    node.valid = false;
+    node.flags = 0;
 
     fat32_bootrecord_t* bootrec = &(parent->fs->fat32_info.bootrec);
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
@@ -811,14 +815,18 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     // generate checksum
     uint8_t checksum = gen_checksum(shortname);
 
-    node.valid = true;
     node.parent_node = parent;
     node.fs = parent->fs;
     node.parent_node = parent;
     node.start_cluster = start_cluster;
-    node.isdir = attr & FAT_ATTR_DIRECTORY;
-    node.hidden = attr & FAT_ATTR_HIDDEN;
     node.size = size;
+
+    node.flags = FS_FLAG_VALID;
+    if(attr & FAT_ATTR_DIRECTORY)
+        node.flags |= FS_FLAG_DIRECTORY;
+    if(attr & FAT_ATTR_HIDDEN)
+        node.flags |= FS_FLAG_HIDDEN;
+
     node.creation_milisecond = (clock() % CLOCKS_PER_SEC) * 1000 / CLOCKS_PER_SEC;
     node.creation_timestamp = time(NULL);
     node.modified_timestamp = 0;
@@ -919,7 +927,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
 
     int namelen; (void)(namelen); // avoid unused param
     char entry_name[FILENAME_LIMIT];
-    if(remove_node.isdir && remove_content) {
+    if(FS_NODE_IS_DIR(remove_node) && remove_content) {
         // check if it has any child entry
         uint32_t first_sector = ((remove_node.start_cluster - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
@@ -1058,10 +1066,14 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
     dir->last_mod_time = time_dump;
     dir->last_mod_date = date_dump;
 
-    dir->attr = node->isdir | node->hidden;
+    dir->attr = 0;
+    if(node->flags & FS_FLAG_DIRECTORY)
+        dir->attr |= FAT_ATTR_DIRECTORY;
+    if(node->flags & FS_FLAG_HIDDEN)
+        dir->attr |= FAT_ATTR_HIDDEN;
     dir->size = node->size;
     // name updating is very problematic
-    // so i you want to update the name
+    // so if you want to update the name
     // just add a new entry and delete the old one
 
     // write changes
@@ -1076,7 +1088,7 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
 // return invalid node when node with the same name has already exists / cannot find free cluster
 fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr) {
     fs_node_t created_dir;
-    created_dir.valid = false;
+    created_dir.flags = 0;
 
     // remove leading spaces, trailing spaces and trailing periods
     while(name[0] == ' ') name++;
@@ -1089,15 +1101,16 @@ fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uin
     }
 
     created_dir = fat32_add_entry(parent, name, start_cluster, attr | FAT_ATTR_DIRECTORY, 0);
-    if(!created_dir.valid) return created_dir;
+    if(!FS_NODE_IS_VALID(created_dir)) return created_dir;
 
     // create the '..' and the '.' dir
     // in linux you need to create them
     // so that `ls` will not show input/output error
     fs_node_t dot_dir = fat32_add_entry(&created_dir, ".", start_cluster, FAT_ATTR_DIRECTORY, 0);
-    if(!dot_dir.valid) return dot_dir;
+    if(!FS_NODE_IS_VALID(dot_dir)) return dot_dir;
+
     fs_node_t dotdot_dir = fat32_add_entry(&created_dir, "..", parent->start_cluster, FAT_ATTR_DIRECTORY, 0);
-    if(!dotdot_dir.valid) return dotdot_dir;
+    if(!FS_NODE_IS_VALID(dotdot_dir)) return dotdot_dir;
 
     return created_dir;
 }
@@ -1136,9 +1149,7 @@ FS_ERR fat32_init(partition_entry_t part, int id) {
     fs->root_node.fs = fs;
     fs->root_node.start_cluster = bootrec->ebpb.rootdir_cluster;
     fs->root_node.parent_node = 0; // no parent
-    fs->root_node.isdir = true;
-    fs->root_node.hidden = false;
-    fs->root_node.valid = true; // this is the way to know if a fs is valid
+    fs->root_node.flags = FS_FLAG_VALID | FS_FLAG_DIRECTORY;
 
     return ERR_FS_SUCCESS;
 }

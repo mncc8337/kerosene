@@ -167,7 +167,7 @@ void disk_init() {
         }
     }
 
-    if(fs->root_node.valid) {
+    if(FS_NODE_IS_VALID(fs->root_node)) {
         fs->root_node.name[0] = '/';
         fs->root_node.name[1] = '\0';
     }
@@ -290,7 +290,7 @@ void kinit(multiboot_info_t* mbd) {
 
 void load_elf_file(char* path) {
     fs_node_t elf = fs_find(&fs->root_node, path);
-    if(!elf.valid) return;
+    if(!FS_NODE_IS_VALID(elf)) return;
 
     printf("found %s\n", path);
 
@@ -301,10 +301,13 @@ void load_elf_file(char* path) {
     }
 
     uint32_t entry;
-    ELF_ERR err = elf_load(&elf, addr, &entry);
-    if(err) printf("failed to load elf, err %d\n", err);
-    else puts("elf file loaded");
+    ELF_ERR err = elf_load(&elf, addr, vmmngr_get_page_directory(), &entry);
     kfree(addr);
+    if(err) {
+        printf("failed to load elf, err %d\n", err);
+        return;
+    }
+    else puts("elf file loaded");
 
     printf("jumping to entry (%x)\n", entry);
     int (*prog)(void) = (void*)entry;
