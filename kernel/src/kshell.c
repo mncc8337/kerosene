@@ -32,6 +32,8 @@ static char* last_input;
 
 static char* current_font = NULL;
 
+static int fsid = -1;
+
 // a stack that contain the path of current dir
 static fs_node_t* node_stack;
 static unsigned node_stack_offset = 0;
@@ -108,7 +110,7 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help clear . echo clocks ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic catproc sleep exit");
+        puts("help clear . echo clocks cfs ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic catproc sleep exit");
     }
     else {
         arg = strtok(arg, " ");
@@ -117,6 +119,7 @@ static void help(char* arg) {
         else if(strcmp(arg, ".")) puts("execute file content as shell command\n. <path>");
         else if(strcmp(arg, "echo")) puts("print string\necho <string>");
         else if(strcmp(arg, "clocks")) puts("print current clocks\nclocks <no-args>");
+        else if(strcmp(arg, "cfs")) puts("change filesystem\ncfs <disk-id>");
         else if(strcmp(arg, "ls")) {
             puts(
                 "list directory contents\n"
@@ -162,12 +165,6 @@ static void clear(char* arg) {
 }
 
 static void run_sh(char* args) {
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
-
     if(args == NULL) {
         puts("no file input");
         return;
@@ -218,12 +215,23 @@ static void clocks(char* args) {
     printf("%d\n", clock());
 }
 
-static void ls(char* args) {
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
+static void cfs(char* disk) {
+    if(disk == NULL) {
+        puts("no filesystem provided");
         return;
     }
+
+    int diskid = atoi(disk);
+    if(!vfs_is_fs_available(diskid)) {
+        puts("disk not available");
+        return;
+    }
+
+    shell_set_fs(diskid);
+}
+
+static void ls(char* args) {
+    fs_node_t* current_node = node_stack_top();
     max_depth = 1;
     show_hidden = false;
     char* ls_name = NULL;
@@ -274,12 +282,6 @@ static void ls(char* args) {
 }
 
 static void read(char* path) {
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
-
     if(path == NULL) {
         puts("no file input");
         return;
@@ -308,11 +310,6 @@ static void read(char* path) {
 }
 
 static void cd(char* path) {
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
     if(path == NULL) {
         puts("no path provided");
         return;
@@ -353,10 +350,6 @@ static void cd(char* path) {
 
 static void mkdir(char* path) {
     fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
 
     if(path == NULL) {
         puts("no name provided");
@@ -391,11 +384,6 @@ static void mkdir(char* path) {
 }
 
 static void rm(char* path) {
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
     if(path == NULL) {
         puts("no name provided");
         return;
@@ -421,11 +409,6 @@ static void rm(char* path) {
 }
 
 static void touch(char* path) {
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
     if(path == NULL) {
         puts("no name provided");
         return;
@@ -453,11 +436,6 @@ static void touch(char* path) {
 }
 
 static void write(char* path) {
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
     if(path == NULL) {
         puts("no name provided");
         return;
@@ -515,12 +493,6 @@ static void write(char* path) {
 }
 
 static void mv(char* args) {
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
-
     char* source_path = strtok(args, " ");
     if(source_path == NULL) {
         puts("no source provided");
@@ -568,12 +540,6 @@ static void mv(char* args) {
 }
 
 static void cp(char* args) {
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
-
     char* source_path = strtok(args, " ");
     if(source_path == NULL) {
         puts("no source provided");
@@ -622,12 +588,6 @@ static void cp(char* args) {
 }
 
 static void stat(char* path) {
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
-
     if(path == NULL) {
         puts("no input");
         return;
@@ -649,7 +609,7 @@ static void stat(char* path) {
 
     printf("filesystem: %s\n", (node.fs->type == 1 ? "FAT32" : (node.fs->type == 2 ? "ext2" : "unknown")));
     printf("parent: '%s'\n", node.parent_node->name);
-    printf("start cluster: 0x%x\n", node.start_cluster);
+    printf("start cluster: 0x%x\n", node.fat_cluster.start_cluster);
     printf("type: %s\n", (FS_NODE_IS_DIR(node) ? "directory" : "file"));
     printf("hidden: %s\n", (FS_NODE_IS_HIDDEN(node) ? "true" : "false"));
     printf("size: %d bytes\n", node.size);
@@ -670,12 +630,6 @@ static void stat(char* path) {
 
 static void pwd(char* args) {
     (void)(args);
-
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
 
     if(node_stack_offset == 0) {
         puts("/");
@@ -970,12 +924,6 @@ static void loadfont(char* path) {
         return;
     }
 
-    fs_node_t* current_node = node_stack_top();
-    if(!FS_NODE_IS_VALID(*current_node)) {
-        puts("no fs installed");
-        return;
-    }
-
     if(path == NULL) {
         puts("no file input");
         return;
@@ -1039,6 +987,7 @@ void shell_process_prompt(char* prompts, unsigned prompts_len) {
         else if(strcmp(cmd_name, ".")) run_sh(remain_arg);
         else if(strcmp(cmd_name, "echo")) echo(remain_arg);
         else if(strcmp(cmd_name, "clocks")) clocks(remain_arg);
+        else if(strcmp(cmd_name, "cfs")) cfs(remain_arg);
         else if(strcmp(cmd_name, "ls")) ls(remain_arg);
         else if(strcmp(cmd_name, "read")) read(remain_arg);
         else if(strcmp(cmd_name, "cd")) cd(remain_arg);
@@ -1079,7 +1028,9 @@ static void print_prompt() {
     video_set_attr(video_rgb(VIDEO_GREEN), video_rgb(VIDEO_BLACK));
     printf("kernel@kshell");
     video_set_attr(video_rgb(VIDEO_LIGHT_BLUE), video_rgb(VIDEO_BLACK));
-    printf(" %s ", node_stack[node_stack_offset].name);
+    putchar(' ');
+    if(node_stack[node_stack_offset].name[0] == '/') printf("(%d)", fsid); // add fsid when at root
+    printf("%s ", node_stack[node_stack_offset].name);
     video_set_attr(video_rgb(VIDEO_LIGHT_GREY), video_rgb(VIDEO_BLACK));
     printf("]$ ");
 }
@@ -1100,11 +1051,15 @@ bool shell_init() {
     return false;
 }
 
-void shell_set_root_node(fs_node_t node) {
-    node_stack[0] = node;
+void shell_set_fs(int id) {
+    node_stack[0] = vfs_getfs(id)->root_node;
     node_stack_offset = 0;
+    fsid = id;
 }
 void shell_start() {
+    // default disk
+    if(fsid < 0) shell_set_fs(RAMFS_DISK);
+
     shell_running = true;
     puts("welcome to keroshell");
     puts("type `help` t show all command. `help <command>` to see all available argument.");

@@ -148,28 +148,28 @@ void disk_init() {
         partition_entry_t part = mbr_get_partition_entry(i);
         if(part.sector_count == 0) continue;
 
+        unsigned fs_count = 0;
+
         FS_ERR err;
-        switch(fs_detect(part)) {
+        switch(vfs_detectfs(&part)) {
             case FS_EMPTY:
+            case FS_RAMFS:
                 break;
+
             case FS_FAT32:
-                err = fat32_init(part, FS_ID);
-                if(err) {
+                err = fat32_init(vfs_getfs(fs_count), part);
+                if(err)
                     print_debug(LT_ER, "failed to initialize FAT32 filesystem on partition %d. error code %d\n", i+1, err);
-                    break;
+                else {
+                    print_debug(LT_OK, "initialised FAT32 filesystem on partition %d", i+1);
+                    printf(" on fs (%d)\n", fs_count);
+                    fs_count++;
                 }
-                print_debug(LT_OK, "initialised FAT32 filesystem on partition %d\n", i+1);
-                fs = fs_get(FS_ID);
                 break;
             case FS_EXT2:
                 print_debug(LT_WN, "EXT2 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
                 break;
         }
-    }
-
-    if(FS_NODE_IS_VALID(fs->root_node)) {
-        fs->root_node.name[0] = '/';
-        fs->root_node.name[1] = '\0';
     }
 }
 
@@ -257,8 +257,17 @@ void kinit(multiboot_info_t* mbd) {
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
 
-    if(!fs_mngr_init()) disk_init();
+    if(!vfs_init()) {
+        print_debug(LT_OK, "initialised ramFS on fs (%d)\n", RAMFS_DISK);
+        fs = vfs_getfs(RAMFS_DISK);
+        disk_init();
+    }
     else print_debug(LT_ER, "failed to initialise FS. not enough memory\n");
+
+    print_debug(LT_IF, "all disk detected: ");
+    for(int i = 0; i < MAX_FS; i++)
+        if(vfs_is_fs_available(i)) printf("%d ", i);
+    putchar('\n');
 
     locale_set_keyboard_layout(KBD_LAYOUT_US);
     print_debug(LT_IF, "set keyboard layout to US\n");
@@ -335,10 +344,7 @@ void kernel_proc2() {
 void kmain() {
     print_debug(LT_OK, "done initialising\n");
     
-    if(!shell_init()) {
-        if(fs) shell_set_root_node(fs->root_node);
-    }
-    else puts("not enough memory for kshell.");
+    if(shell_init()) puts("not enough memory for kshell.");
 
     process_t* shell_proc = process_new((uint32_t)shell_start, 0, false);
     if(shell_proc) scheduler_add_process(shell_proc);

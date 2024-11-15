@@ -7,16 +7,15 @@
 
 #include "time.h"
 
-#include "fat_type.h"
-
 // filename limit including null char
 #define FILENAME_LIMIT 256
 
-#define MAX_DISK 5
+#define MAX_FS 32
+#define RAMFS_DISK (MAX_FS-1)
 
-#define FS_FLAG_VALID 1
+#define FS_FLAG_VALID     1
 #define FS_FLAG_DIRECTORY 2
-#define FS_FLAG_HIDDEN 4
+#define FS_FLAG_HIDDEN    4
 
 #define FS_NODE_IS_VALID(node) ((node).flags & FS_FLAG_VALID)
 #define FS_NODE_IS_DIR(node) ((node).flags & FS_FLAG_DIRECTORY)
@@ -44,7 +43,8 @@ typedef enum {
 typedef enum {
     FS_EMPTY,
     FS_FAT32,
-    FS_EXT2
+    FS_EXT2,
+    FS_RAMFS
 } fs_type_t;
 
 typedef enum {
@@ -72,36 +72,47 @@ typedef struct {
     uint16_t boot_signature; // should be 0xaa55
 } __attribute__((packed)) mbr_t; // 512 bytes
 
-// // https://en.wikipedia.org/wiki/Master_boot_record
-// typedef struct {
-//     uint8_t bootstrap_part1[218];
-//     uint16_t null1; // 0x0000
-//     uint8_t original_physical_drive;
-//     uint8_t seconds;
-//     uint8_t minutes;
-//     uint8_t hours;
-//     uint8_t bootstrap_part2[216];
-//     uint32_t disk_32bit_signature;
-//     uint16_t null2; // 0x0000, 0x5a5a if copy-protected
-//     partition_entry_t partition_entry[4];
-//     uint16_t boot_signature; // should be 0xaa55
-// } __attribute__((packed)) modern_MBR_t; // 512 bytes
+#define RAMNODE_FLAG_DIRECTORY 1
+#define RAMNODE_FLAG_HIDDEN    2
+
+typedef struct ramnode {
+    uint32_t length;
+    uint16_t creation_milisecond;
+    time_t creation_timestamp;
+    time_t modified_timestamp;
+    time_t accessed_timestamp;
+    uint32_t name_length;
+    uint32_t flags;
+    struct ramnode* next;
+} ramnode_t;
+
+#include "fat_type.h"
 
 typedef struct fs_node {
     char name[FILENAME_LIMIT];
     struct fs* fs;
     struct fs_node* parent_node;
-    uint32_t start_cluster;
     uint32_t flags;
     uint16_t creation_milisecond;
     time_t creation_timestamp;
     time_t modified_timestamp;
     time_t accessed_timestamp;
     uint32_t size;
-    // filesystem infomation
-    // may change when i add support for other filesystem
-    uint32_t parent_cluster;
-    unsigned int parent_cluster_index;
+
+    // fs depended field
+    union {
+        struct {
+            uint32_t start_cluster;
+            uint32_t parent_cluster;
+            uint32_t parent_cluster_index;
+        } fat_cluster;
+
+        struct {
+            uint32_t current_node_addr;
+            uint32_t parent_node_addr;
+            uint32_t a; // placeholder
+        } ramfs_node;
+    };
 } fs_node_t;
 
 typedef struct fs {
@@ -109,12 +120,12 @@ typedef struct fs {
     partition_entry_t partition;
     struct fs_node root_node;
 
-    // type-depend field
+    // fs-depend field
     union {
         struct {
-            uint8_t infotable1[512];
-            uint8_t infotable2[512];
+            uint8_t infotable[1024];
         } info;
+
         struct {
             fat32_bootrecord_t bootrec;
             fat32_fsinfo_t fsinfo;
@@ -127,7 +138,13 @@ typedef struct {
     bool valid;
     int mode;
     unsigned int position;
-    uint32_t current_cluster;
+
+    // fs depended field
+    union {
+        uint32_t fat32_current_cluster;
+        uint32_t ramnode_current_addr;
+    };
+
     // TODO: add more thing here
 } FILE;
 
@@ -135,10 +152,11 @@ typedef struct {
 bool mbr_load();
 partition_entry_t mbr_get_partition_entry(unsigned int id);
 
-// fsmngr.c
-bool fs_mngr_init();
-fs_type_t fs_detect(partition_entry_t part);
-fs_t* fs_get(int id);
+// vfs.c
+bool vfs_init();
+fs_type_t vfs_detectfs(partition_entry_t* part);
+fs_t* vfs_getfs(int id);
+bool vfs_is_fs_available(int id);
 
 // file_op.c
 FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
@@ -155,6 +173,11 @@ FILE file_open(fs_node_t* node, int mode);
 FS_ERR file_write(FILE* file, uint8_t* data, size_t size);
 FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size);
 FS_ERR file_close(FILE* file);
+
+// ramfs.c
+ramnode_t* ramfs_rootnode();
+void ramfs_add_entry(ramnode_t* node, char* name);
+void ramfs_remove_entry(ramnode_t* node, ramnode_t* remove_node, bool remove_content);
 
 // fat32.c
 uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count);
@@ -173,4 +196,4 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
 FS_ERR fat32_update_entry(fs_node_t* node);
 fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr);
 
-FS_ERR fat32_init(partition_entry_t part, int id);
+FS_ERR fat32_init(fs_t* fs, partition_entry_t part);

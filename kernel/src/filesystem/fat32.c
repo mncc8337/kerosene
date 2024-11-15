@@ -419,7 +419,7 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
     uint32_t first_data_sector = get_first_data_sector(bootrec);
     uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
 
-    uint32_t current_cluster = parent->start_cluster;
+    uint32_t current_cluster = parent->fat_cluster.start_cluster;
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t directory[cluster_size];
 
@@ -454,13 +454,13 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
 
             node.fs = parent->fs;
             node.parent_node = parent;
-            node.start_cluster = (uint32_t)temp_dir->first_cluster_number_high << 16
+            node.fat_cluster.start_cluster = (uint32_t)temp_dir->first_cluster_number_high << 16
                                 | temp_dir->first_cluster_number_low;
-            if(node.start_cluster == 0 && strcmp(node.name, "..")) {
+            if(node.fat_cluster.start_cluster == 0 && strcmp(node.name, "..")) {
                 // in linux the .. dir of a root's child directory is pointed to cluster 0
                 // we need to fix it because root directory is in cluster 2
                 // else we would destroy cluster 0 which contain filesystem infomation
-                node.start_cluster = bootrec->ebpb.rootdir_cluster;
+                node.fat_cluster.start_cluster = bootrec->ebpb.rootdir_cluster;
             }
             node.creation_milisecond = temp_dir->centisecond * 10;
             parse_datetime(temp_dir->creation_date, temp_dir->creation_time, &(node.creation_timestamp));
@@ -474,8 +474,8 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
                 node.flags |= FS_FLAG_HIDDEN;
 
             node.size = temp_dir->size;
-            node.parent_cluster = current_cluster;
-            node.parent_cluster_index = i;
+            node.fat_cluster.parent_cluster = current_cluster;
+            node.fat_cluster.parent_cluster_index = i;
 
             // run callback
             if(!callback(node)) return ERR_FS_CALLBACK_STOP;
@@ -663,7 +663,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     uint32_t first_data_sector = get_first_data_sector(bootrec);
     uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
 
-    uint32_t current_cluster = parent->start_cluster;
+    uint32_t current_cluster = parent->fat_cluster.start_cluster;
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t directory[cluster_size];
 
@@ -820,7 +820,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     node.parent_node = parent;
     node.fs = parent->fs;
     node.parent_node = parent;
-    node.start_cluster = start_cluster;
+    node.fat_cluster.start_cluster = start_cluster;
     node.size = size;
 
     node.flags = FS_FLAG_VALID;
@@ -885,8 +885,8 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
             dir_entry->first_cluster_number_low = start_cluster & 0xffff;
             dir_entry->size = size;
 
-            node.parent_cluster = current_cluster;
-            node.parent_cluster_index = start_index;
+            node.fat_cluster.parent_cluster = current_cluster;
+            node.fat_cluster.parent_cluster_index = start_index;
         }
         done_parsing_name:
 
@@ -931,7 +931,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
     char entry_name[FILENAME_LIMIT];
     if(FS_NODE_IS_DIR(remove_node) && remove_content) {
         // check if it has any child entry
-        uint32_t first_sector = ((remove_node.start_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        uint32_t first_sector = ((remove_node.fat_cluster.start_cluster - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
         for(unsigned int i = 0; i < cluster_size; i += 32) {
@@ -954,8 +954,8 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
 
     int lfn_entry_count = (strlen(remove_node.name) + 12) / 13;
 
-    int node_index = remove_node.parent_cluster_index;
-    uint32_t current_cluster = remove_node.parent_cluster;
+    int node_index = remove_node.fat_cluster.parent_cluster_index;
+    uint32_t current_cluster = remove_node.fat_cluster.parent_cluster;
 
     // check if the next entry is clear
     int clear_val;
@@ -990,7 +990,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
     ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
     // delete the cluster
-    if(remove_content) fat32_free_cluster_chain(parent->fs, remove_node.start_cluster);
+    if(remove_content) fat32_free_cluster_chain(parent->fs, remove_node.fat_cluster.start_cluster);
 
     // calculate the start of the chain
     int start_index = node_index - lfn_entry_count * sizeof(fat_directory_entry_t);
@@ -1015,8 +1015,8 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
         entry_cnt = go_back / sizeof(fat_directory_entry_t);
 
         // find previous cluster of current cluster
-        uint32_t last_cluster = parent->start_cluster;
-        uint32_t FAT_val = parent->start_cluster;
+        uint32_t last_cluster = parent->fat_cluster.start_cluster;
+        uint32_t FAT_val = parent->fat_cluster.start_cluster;
         while(FAT_val != current_cluster) {
             last_cluster = FAT_val;
             FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, FAT_val);
@@ -1040,7 +1040,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
     }
 
     if(clear_val == 0x0)
-        fix_empty_entries(parent->fs, parent->start_cluster, remove_node.parent_cluster);
+        fix_empty_entries(parent->fs, parent->fat_cluster.start_cluster, remove_node.fat_cluster.parent_cluster);
 
     return ERR_FS_SUCCESS;
 }
@@ -1054,10 +1054,10 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t directory[cluster_size];
 
-    uint32_t first_sector = ((node->parent_cluster - 2) * sectors_per_cluster) + first_data_sector;
+    uint32_t first_sector = ((node->fat_cluster.parent_cluster - 2) * sectors_per_cluster) + first_data_sector;
     ata_pio_LBA28_access(true, node->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
-    fat_directory_entry_t* dir = (fat_directory_entry_t*)(directory+node->parent_cluster_index);
+    fat_directory_entry_t* dir = (fat_directory_entry_t*)(directory+node->fat_cluster.parent_cluster_index);
     // TODO: check if the entry is really exists
     
     uint16_t date_dump, time_dump;
@@ -1111,7 +1111,7 @@ fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uin
     fs_node_t dot_dir = fat32_add_entry(&created_dir, ".", start_cluster, FAT_ATTR_DIRECTORY, 0);
     if(!FS_NODE_IS_VALID(dot_dir)) return dot_dir;
 
-    fs_node_t dotdot_dir = fat32_add_entry(&created_dir, "..", parent->start_cluster, FAT_ATTR_DIRECTORY, 0);
+    fs_node_t dotdot_dir = fat32_add_entry(&created_dir, "..", parent->fat_cluster.start_cluster, FAT_ATTR_DIRECTORY, 0);
     if(!FS_NODE_IS_VALID(dotdot_dir)) return dotdot_dir;
 
     return created_dir;
@@ -1119,8 +1119,7 @@ fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uin
 
 // initialize FAT 32
 // return the root node
-FS_ERR fat32_init(partition_entry_t part, int id) {
-    fs_t* fs = fs_get(id);
+FS_ERR fat32_init(fs_t* fs, partition_entry_t part) {
     fs->partition = part;
     fs->type = FS_FAT32;
 
@@ -1149,9 +1148,11 @@ FS_ERR fat32_init(partition_entry_t part, int id) {
     if(fsinfo_update) update_fsinfo(fs);
 
     fs->root_node.fs = fs;
-    fs->root_node.start_cluster = bootrec->ebpb.rootdir_cluster;
-    fs->root_node.parent_node = 0; // no parent
+    fs->root_node.fat_cluster.start_cluster = bootrec->ebpb.rootdir_cluster;
+    fs->root_node.parent_node = NULL;
     fs->root_node.flags = FS_FLAG_VALID | FS_FLAG_DIRECTORY;
+    fs->root_node.name[0] = '/';
+    fs->root_node.name[1] = '\0';
 
     return ERR_FS_SUCCESS;
 }
