@@ -33,7 +33,7 @@ bool vfs_init() {
     FS = (fs_t*)kmalloc(sizeof(fs_t) * MAX_FS);
     if(!FS) return true;
 
-    // init ramfs at (31)
+    // init ramfs
     fs_t* fs = &FS[RAMFS_DISK];
     fs->type = FS_RAMFS;
 
@@ -65,9 +65,11 @@ fs_type_t vfs_detectfs(partition_entry_t* part) {
 }
 
 fs_t* vfs_getfs(int id) {
+    if(id >= MAX_FS) return 0;
     return FS + id;
 }
 
 bool vfs_is_fs_available(int id) {
+    if(id >= MAX_FS) return false;
     return FS_NODE_IS_VALID(FS[id].root_node);
 }
