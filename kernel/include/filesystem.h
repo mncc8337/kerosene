@@ -72,10 +72,10 @@ typedef struct {
     uint16_t boot_signature; // should be 0xaa55
 } __attribute__((packed)) mbr_t; // 512 bytes
 
-typedef struct ramnode_data {
+typedef struct ramfs_datanode {
     uint32_t size;
-    struct ramnode_data* next;
-} ramnode_data_t;
+    struct ramfs_datanode* next;
+} ramfs_datanode_t;
 
 typedef struct {
     uint32_t size;
@@ -85,8 +85,8 @@ typedef struct {
     time_t accessed_timestamp;
     uint32_t name_length;
     uint32_t flags;
-    ramnode_data_t* data;
-} ramnode_t;
+    ramfs_datanode_t* data;
+} ramfs_node_t;
 
 #include "fat_type.h"
 
@@ -179,7 +179,7 @@ FS_ERR file_close(FILE* file);
 // ramfs.c
 FS_ERR ramfs_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 fs_node_t ramfs_add_entry(fs_node_t* parent, char* name, uint32_t flags, size_t size);
-void ramfs_remove_entry(fs_node_t* node, ramnode_t* remove_node, bool remove_content);
+void ramfs_remove_entry(fs_node_t* node, ramfs_node_t* remove_node, bool remove_content);
 
 FS_ERR ramfs_init(fs_t* fs);
 
