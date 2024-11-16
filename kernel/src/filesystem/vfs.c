@@ -33,18 +33,7 @@ bool vfs_init() {
     FS = (fs_t*)kmalloc(sizeof(fs_t) * MAX_FS);
     if(!FS) return true;
 
-    // init ramfs
-    fs_t* fs = &FS[RAMFS_DISK];
-    fs->type = FS_RAMFS;
-
-    fs->root_node.fs = fs;
-    fs->root_node.parent_node = NULL;
-    fs->root_node.flags = FS_FLAG_VALID | FS_FLAG_DIRECTORY;
-    fs->root_node.name[0] = '/';
-    fs->root_node.name[1] = '\0';
-
-    // create root node
-    if(!ramfs_rootnode()) {
+    if(ramfs_init(&FS[RAMFS_DISK])) {
         kfree(FS);
         return true;
     }

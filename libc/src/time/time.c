@@ -7,7 +7,6 @@
 #include "syscall.h"
 #endif
 
-// TODO: fix this :(
 time_t time(time_t* timer) {
     time_t curr_time = -1;
 

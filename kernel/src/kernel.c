@@ -23,9 +23,6 @@
 
 uint32_t kernel_size;
 
-int FS_ID = 0;
-fs_t* fs = NULL;
-
 process_t* kernel_process = 0;
 
 void mem_init(void* mmap_addr, uint32_t mmap_length) {
@@ -259,7 +256,6 @@ void kinit(multiboot_info_t* mbd) {
 
     if(!vfs_init()) {
         print_debug(LT_OK, "initialised ramFS on fs (%d)\n", RAMFS_DISK);
-        fs = vfs_getfs(RAMFS_DISK);
         disk_init();
     }
     else print_debug(LT_ER, "failed to initialise FS. not enough memory\n");
@@ -298,6 +294,9 @@ void kinit(multiboot_info_t* mbd) {
 }
 
 void load_elf_file(char* path) {
+    fs_t* fs = vfs_getfs(0);
+    if(!fs) return;
+
     fs_node_t elf = fs_find(&fs->root_node, path);
     if(!FS_NODE_IS_VALID(elf)) return;
 
@@ -354,9 +353,9 @@ void kmain() {
     if(proc1) scheduler_add_process(proc1);
     if(proc2) scheduler_add_process(proc2);
 
-    int ret;
-    SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
-    load_elf_file("hi.elf");
+    // int ret;
+    // SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
+    // load_elf_file("hi.elf");
 
     while(true);
 }

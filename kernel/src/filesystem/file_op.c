@@ -2,17 +2,18 @@
 
 #include "string.h"
 
+// FIXME: these "local" variable for recursion need to be truly local to avoid conflicts between processes
 static char name_buffer[FILENAME_LIMIT];
 static fs_node_t ret_node;
 
 static bool find_node_callback(fs_node_t node) {
-    if(node.fs->type == FS_FAT32) {
+    if(node.fs->type == FS_FAT32) { // case-insensitive FS goes here
         if(strcmp_case_insensitive(node.name, name_buffer)) {
             ret_node = node;
             return false;
         }
     }
-    else if(node.fs->type == FS_EXT2) {
+    else {
         if(strcmp(node.name, name_buffer)) {
             ret_node = node;
             return false;
@@ -46,10 +47,14 @@ static bool cp_node_callback(fs_node_t node) {
 
 // go through all files and directories in `parent`. call the callback when found one
 FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
-    if(parent->fs->type == FS_FAT32)
-        return fat32_read_dir(parent, callback);
-
-    return ERR_FS_UNKNOWN_FS;
+    switch(parent->fs->type) {
+        case FS_FAT32:
+            return fat32_read_dir(parent, callback);
+        case FS_RAMFS:
+            return ramfs_read_dir(parent, callback);
+        default:
+            return ERR_FS_NOT_SUPPORTED;
+    }
 }
 
 // find a node in parent
@@ -58,12 +63,18 @@ fs_node_t fs_find(fs_node_t* parent, const char* nodename) {
 
     FS_NODE_FLAG_UNSET(&ret_node, FS_FLAG_VALID);
 
-    if(parent->fs->type == FS_FAT32) {
-        if(fat32_read_dir(parent, find_node_callback) == ERR_FS_CALLBACK_STOP)
-            ret_node.flags |= FS_FLAG_VALID;
-        else
-            FS_NODE_FLAG_UNSET(&ret_node, FS_FLAG_VALID);
+    FS_ERR out = ERR_FS_FAILED;
+
+    switch(parent->fs->type) {
+        case FS_FAT32:
+            out = fat32_read_dir(parent, find_node_callback); break;
+        case FS_RAMFS:
+            out = ramfs_read_dir(parent, find_node_callback); break;
+        default: break;
     }
+
+    if(out == ERR_FS_CALLBACK_STOP)
+        ret_node.flags |= FS_FLAG_VALID;
 
     return ret_node;
 }
@@ -88,10 +99,18 @@ fs_node_t fs_touch(fs_node_t* parent, char* name) {
     fs_node_t node;
     node.flags = 0;
 
-    if(parent->fs->type == FS_FAT32) {
-        uint32_t file_cluster = fat32_allocate_clusters(parent->fs, 1);
-        if(file_cluster == 0) return node;
-        node = fat32_add_entry(parent, name, file_cluster, 0, 0);
+    uint32_t file_cluster;
+
+    switch(parent->fs->type) {
+        case FS_FAT32:
+            file_cluster = fat32_allocate_clusters(parent->fs, 1);
+            if(file_cluster == 0) return node;
+            node = fat32_add_entry(parent, name, file_cluster, 0, 0);
+            break;
+        case FS_RAMFS:
+            node = ramfs_add_entry(parent, name, 0, 32);
+            break;
+        default: break;
     }
 
     return node;
@@ -99,23 +118,25 @@ fs_node_t fs_touch(fs_node_t* parent, char* name) {
 
 // remove a node
 FS_ERR fs_rm(fs_node_t* node, fs_node_t delete_node) {
-    if(node->fs->type == FS_FAT32)
-        return fat32_remove_entry(node, delete_node, true);
-
-    return ERR_FS_UNKNOWN_FS;
+    switch(node->fs->type) {
+        case FS_FAT32:
+            return fat32_remove_entry(node, delete_node, true);
+        default: return ERR_FS_NOT_SUPPORTED;
+    }
 }
 
 // remove a directory or a file and its content recursively if is a directory
 FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t delete_node) {
     if(FS_NODE_IS_DIR(delete_node)) {
         // try remove its content recursively
-        if(parent->fs->type == FS_FAT32) {
-            // this only happended when an error occurs
-            if(fat32_read_dir(&delete_node, rm_node_callback) == ERR_FS_CALLBACK_STOP)
-                return ERR_FS_FAILED;
+        switch(parent->fs->type) {
+            case FS_FAT32:
+                // this only happended when an error occurs
+                if(fat32_read_dir(&delete_node, rm_node_callback) == ERR_FS_CALLBACK_STOP)
+                    return ERR_FS_FAILED;
+                break;
+            default: return ERR_FS_NOT_SUPPORTED;
         }
-        else return ERR_FS_UNKNOWN_FS;
-
     }
 
     // now try remove it. it should success
@@ -137,14 +158,14 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
             node->fat_cluster.start_cluster, attr, node->size
         );
     }
-    else return ERR_FS_UNKNOWN_FS;
+    else return ERR_FS_NOT_SUPPORTED;
 
     if(!FS_NODE_IS_VALID(copied)) return ERR_FS_FAILED;
 
     FS_ERR err;
     if(node->fs->type == FS_FAT32)
         err = fat32_remove_entry(node->parent_node, *node, false); // do not delete the node content
-    else return ERR_FS_UNKNOWN_FS;
+    else return ERR_FS_NOT_SUPPORTED;
 
     if(err) return err;
     *node = copied;
@@ -165,7 +186,7 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
             start_cluster, attr, node->size
         );
     }
-    else return ERR_FS_UNKNOWN_FS;
+    else return ERR_FS_NOT_SUPPORTED;
 
     if(!FS_NODE_IS_VALID(*copied)) return ERR_FS_FAILED;
     return ERR_FS_SUCCESS;
@@ -200,7 +221,7 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
         // load current dir back up
         copy_current_dir = current_dir_bck;
     }
-    else return ERR_FS_UNKNOWN_FS;
+    else return ERR_FS_NOT_SUPPORTED;
 
     return ERR_FS_SUCCESS;
 }
@@ -261,7 +282,7 @@ FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
         );
         if(err) return err;
     }
-    else return ERR_FS_UNKNOWN_FS;
+    else return ERR_FS_NOT_SUPPORTED;
 
     file->position += size;
     file->node->size += size;
@@ -289,7 +310,7 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
             &(file->fat32_current_cluster), buffer, size, offset
         );
     }
-    else return ERR_FS_UNKNOWN_FS;
+    else return ERR_FS_NOT_SUPPORTED;
 
     if(err) return err;
     file->position += size;
@@ -301,7 +322,7 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
 FS_ERR file_close(FILE* file) {
     if(file->node->fs->type == FS_FAT32)
         fat32_update_entry(file->node);
-    else return ERR_FS_UNKNOWN_FS;
+    else return ERR_FS_NOT_SUPPORTED;
 
     file->valid = false;
     return ERR_FS_SUCCESS;

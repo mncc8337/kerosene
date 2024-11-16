@@ -188,7 +188,8 @@ static void run_sh(char* args) {
     char chr;
     input_len = 0;
     input[0] = '\0';
-    while(file_read(&f, (uint8_t*)(&chr), 1) != ERR_FS_EOF) {
+    FS_ERR last_err;
+    while((last_err = file_read(&f, (uint8_t*)(&chr), 1)) == ERR_FS_SUCCESS) {
         if(chr != '\n' && chr != ';')
             input[input_len++] = chr;
         else {
@@ -198,6 +199,12 @@ static void run_sh(char* args) {
             input[0] = '\0';
         }
     }
+    if(last_err != ERR_FS_EOF) {
+        file_close(&f);
+        printf("failed to read. error code %d\n", last_err);
+        return;
+    }
+
     if(input_len > 0 && input[0] != '\0') {
         input[input_len] = '\0';
         shell_process_prompt(input, input_len);
@@ -303,10 +310,15 @@ static void read(char* path) {
 
     FILE f = file_open(&node, FILE_READ);
     char chr;
-    while(file_read(&f, (uint8_t*)(&chr), 1) != ERR_FS_EOF) {
+    FS_ERR last_err;
+    while((last_err = file_read(&f, (uint8_t*)(&chr), 1)) == ERR_FS_SUCCESS) {
         putchar(chr);
     }
     file_close(&f);
+
+    if(last_err != ERR_FS_EOF) {
+        printf("failed to read, error code %d\n", last_err);
+    }
 }
 
 static void cd(char* path) {
@@ -950,8 +962,14 @@ static void loadfont(char* path) {
     }
 
     FILE f = file_open(&node, FILE_READ);
-    file_read(&f, (uint8_t*)new_font, node.size);
+    FS_ERR read_err = file_read(&f, (uint8_t*)new_font, node.size);
     file_close(&f);
+
+    if(read_err != ERR_FS_EOF && read_err != ERR_FS_SUCCESS) {
+        kfree(new_font);
+        printf("read file failed, error code %d\n", read_err);
+        return;
+    }
 
     bool font_err = video_vesa_set_font(new_font);
     if(font_err) {

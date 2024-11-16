@@ -48,6 +48,7 @@
 
 // the table will be used very frequently
 // so it is a good idea to only declare it once
+// FIXME: turns out this is dumb because it would cause conflicts between processes
 static uint8_t FAT[512];
 // store the last sector that is read to FAT
 static int last_read_FAT_sector = -1;

@@ -1,5 +1,6 @@
 #include "string.h"
 
+// FIXME: dont use global var because it would cause process conflict
 static char* old;
 
 char* strtok(char* str, const char* delimiters) {

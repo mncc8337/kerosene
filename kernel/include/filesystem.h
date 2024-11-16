@@ -35,7 +35,7 @@ typedef enum {
     ERR_FS_INVALID_FSINFO,
     ERR_FS_NOT_FILE,
     ERR_FS_NOT_DIR,
-    ERR_FS_UNKNOWN_FS,
+    ERR_FS_NOT_SUPPORTED,
     ERR_FS_IN_USE,
     ERR_FS_EOF
 } FS_ERR;
@@ -72,18 +72,20 @@ typedef struct {
     uint16_t boot_signature; // should be 0xaa55
 } __attribute__((packed)) mbr_t; // 512 bytes
 
-#define RAMNODE_FLAG_DIRECTORY 1
-#define RAMNODE_FLAG_HIDDEN    2
+typedef struct ramnode_data {
+    uint32_t size;
+    struct ramnode_data* next;
+} ramnode_data_t;
 
-typedef struct ramnode {
-    uint32_t length;
+typedef struct {
+    uint32_t size;
     uint16_t creation_milisecond;
     time_t creation_timestamp;
     time_t modified_timestamp;
     time_t accessed_timestamp;
     uint32_t name_length;
     uint32_t flags;
-    struct ramnode* next;
+    ramnode_data_t* data;
 } ramnode_t;
 
 #include "fat_type.h"
@@ -108,7 +110,7 @@ typedef struct fs_node {
         } fat_cluster;
 
         struct {
-            uint32_t current_node_addr;
+            uint32_t node_addr;
             uint32_t parent_node_addr;
             uint32_t a; // placeholder
         } ramfs_node;
@@ -175,9 +177,11 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size);
 FS_ERR file_close(FILE* file);
 
 // ramfs.c
-ramnode_t* ramfs_rootnode();
-void ramfs_add_entry(ramnode_t* node, char* name);
-void ramfs_remove_entry(ramnode_t* node, ramnode_t* remove_node, bool remove_content);
+FS_ERR ramfs_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
+fs_node_t ramfs_add_entry(fs_node_t* parent, char* name, uint32_t flags, size_t size);
+void ramfs_remove_entry(fs_node_t* node, ramnode_t* remove_node, bool remove_content);
+
+FS_ERR ramfs_init(fs_t* fs);
 
 // fat32.c
 uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count);
