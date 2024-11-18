@@ -22,12 +22,12 @@ static bool find_node_callback(fs_node_t node) {
     return true;
 }
 
-FS_ERR fs_rm_recursive(fs_node_t*  parent, fs_node_t delete_node); // declare it first
+FS_ERR fs_rm_recursive(fs_node_t*  parent, fs_node_t* delete_node); // declare it first
 static bool rm_node_callback(fs_node_t node) {
     // ignore . and ..
     if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
     
-    FS_ERR err = fs_rm_recursive(node.parent_node, node);
+    FS_ERR err = fs_rm_recursive(node.parent_node, &node);
     if(err) return false;
 
     return true;
@@ -82,16 +82,17 @@ fs_node_t fs_find(fs_node_t* parent, const char* nodename) {
 // make a directory in parent node
 // return invalid node when failed to find free cluster / fs not defined / directory already exists
 fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
-    FS_NODE_FLAG_UNSET(&ret_node, FS_FLAG_VALID);
+    fs_node_t invalid_node;
+    invalid_node.flags = 0;
 
-    if(parent->fs->type == FS_FAT32) {
-        uint32_t dir_cluster = fat32_allocate_clusters(parent->fs, 1);
-        if(dir_cluster == 0) return ret_node;
-
-        ret_node = fat32_mkdir(parent, name, dir_cluster, FAT_ATTR_DIRECTORY);
+    switch(parent->fs->type) {
+        case FS_FAT32:
+            return fat32_mkdir(parent, name, 0);
+        case FS_RAMFS:
+        return ramfs_mkdir(parent, name, 0);
+        default:
+            return invalid_node;
     }
-
-    return ret_node;
 }
 
 // make an empty file in parent node
@@ -100,6 +101,7 @@ fs_node_t fs_touch(fs_node_t* parent, char* name) {
     node.flags = 0;
 
     uint32_t file_cluster;
+    ramfs_datanode_t* datanode_chain;
 
     switch(parent->fs->type) {
         case FS_FAT32:
@@ -108,7 +110,8 @@ fs_node_t fs_touch(fs_node_t* parent, char* name) {
             node = fat32_add_entry(parent, name, file_cluster, 0, 0);
             break;
         case FS_RAMFS:
-            node = ramfs_add_entry(parent, name, 0, 32);
+            datanode_chain = ramfs_allocate_datanodes(1, false);
+            node = ramfs_add_entry(parent, name, datanode_chain, 0, 0);
             break;
         default: break;
     }
@@ -117,22 +120,24 @@ fs_node_t fs_touch(fs_node_t* parent, char* name) {
 }
 
 // remove a node
-FS_ERR fs_rm(fs_node_t* node, fs_node_t delete_node) {
+FS_ERR fs_rm(fs_node_t* node, fs_node_t* delete_node) {
     switch(node->fs->type) {
         case FS_FAT32:
             return fat32_remove_entry(node, delete_node, true);
+        case FS_RAMFS:
+            return ramfs_remove_entry(node, delete_node, true);
         default: return ERR_FS_NOT_SUPPORTED;
     }
 }
 
 // remove a directory or a file and its content recursively if is a directory
-FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t delete_node) {
-    if(FS_NODE_IS_DIR(delete_node)) {
+FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t* delete_node) {
+    if(FS_NODE_IS_DIR(*delete_node)) {
         // try remove its content recursively
         switch(parent->fs->type) {
             case FS_FAT32:
                 // this only happended when an error occurs
-                if(fat32_read_dir(&delete_node, rm_node_callback) == ERR_FS_CALLBACK_STOP)
+                if(fat32_read_dir(delete_node, rm_node_callback) == ERR_FS_CALLBACK_STOP)
                     return ERR_FS_FAILED;
                 break;
             default: return ERR_FS_NOT_SUPPORTED;
@@ -149,13 +154,10 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     fs_node_t copied;
 
     if(new_parent->fs->type == FS_FAT32) {
-        uint8_t attr = 0;
-        if(FS_NODE_IS_DIR(*node)) attr |= FAT_ATTR_DIRECTORY;
-        if(FS_NODE_IS_HIDDEN(*node)) attr |= FAT_ATTR_HIDDEN;
         copied = fat32_add_entry(
             new_parent,
             new_name == NULL ? node->name : new_name,
-            node->fat_cluster.start_cluster, attr, node->size
+            node->fat_cluster.start_cluster, fat32_to_fat_attr(node->flags), node->size
         );
     }
     else return ERR_FS_NOT_SUPPORTED;
@@ -164,7 +166,7 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
 
     FS_ERR err;
     if(node->fs->type == FS_FAT32)
-        err = fat32_remove_entry(node->parent_node, *node, false); // do not delete the node content
+        err = fat32_remove_entry(node->parent_node, node, false); // do not delete the node content
     else return ERR_FS_NOT_SUPPORTED;
 
     if(err) return err;
@@ -177,13 +179,10 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
         uint32_t start_cluster = fat32_copy_cluster_chain(new_parent->fs, node->fat_cluster.start_cluster);
         if(start_cluster == 0) return ERR_FS_FAILED;
 
-        uint8_t attr = 0;
-        if(FS_NODE_IS_DIR(*node)) attr |= FAT_ATTR_DIRECTORY;
-        if(FS_NODE_IS_HIDDEN(*node)) attr |= FAT_ATTR_HIDDEN;
         *copied = fat32_add_entry(
             new_parent,
             new_name == NULL ? node->name : new_name,
-            start_cluster, attr, node->size
+            start_cluster, fat32_to_fat_attr(node->flags), node->size
         );
     }
     else return ERR_FS_NOT_SUPPORTED;
@@ -200,16 +199,14 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
     if(new_parent->fs->type == FS_FAT32) {
         // save current dir
         fs_node_t current_dir_bck = copy_current_dir;
-        // create a new dir first
-        uint32_t start_cluster = fat32_allocate_clusters(new_parent->fs, 1);
-        if(start_cluster == 0) return ERR_FS_FAILED;
 
+        // create a new dir first
         uint8_t attr = FAT_ATTR_DIRECTORY;
         if(FS_NODE_IS_HIDDEN(*node)) attr |= FAT_ATTR_HIDDEN;
         *copied = fat32_mkdir(
             new_parent,
             new_name == NULL ? node->name : new_name,
-            start_cluster, attr
+            attr
         );
         if(!FS_NODE_IS_VALID(*copied)) return ERR_FS_FAILED;
         copy_current_dir = *copied;

@@ -13,6 +13,9 @@
 #define MAX_FS 32
 #define RAMFS_DISK (MAX_FS-1)
 
+// this must be multiply of 4
+#define RAMFS_DATANODE_SIZE 512
+
 #define FS_FLAG_VALID     1
 #define FS_FLAG_DIRECTORY 2
 #define FS_FLAG_HIDDEN    4
@@ -36,7 +39,6 @@ typedef enum {
     ERR_FS_NOT_FILE,
     ERR_FS_NOT_DIR,
     ERR_FS_NOT_SUPPORTED,
-    ERR_FS_IN_USE,
     ERR_FS_EOF
 } FS_ERR;
 
@@ -72,9 +74,11 @@ typedef struct {
     uint16_t boot_signature; // should be 0xaa55
 } __attribute__((packed)) mbr_t; // 512 bytes
 
+typedef uint32_t ramfs_datanode_entry_t;
+
 typedef struct ramfs_datanode {
-    uint32_t size;
     struct ramfs_datanode* next;
+    uint8_t data[RAMFS_DATANODE_SIZE];
 } ramfs_datanode_t;
 
 typedef struct {
@@ -85,7 +89,7 @@ typedef struct {
     time_t accessed_timestamp;
     uint32_t name_length;
     uint32_t flags;
-    ramfs_datanode_t* data;
+    ramfs_datanode_t* datanode_chain;
 } ramfs_node_t;
 
 #include "fat_type.h"
@@ -111,8 +115,7 @@ typedef struct fs_node {
 
         struct {
             uint32_t node_addr;
-            uint32_t parent_node_addr;
-            uint32_t a; // placeholder
+            uint32_t a[2]; // placeholder
         } ramfs_node;
     };
 } fs_node_t;
@@ -165,8 +168,8 @@ FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
 fs_node_t fs_find(fs_node_t* parent, const char* path);
 fs_node_t fs_mkdir(fs_node_t* parent, char* name);
 fs_node_t fs_touch(fs_node_t* parent, char* name);
-FS_ERR fs_rm(fs_node_t* node, fs_node_t delete_node);
-FS_ERR fs_rm_recursive(fs_node_t*  parent, fs_node_t delete_node);
+FS_ERR fs_rm(fs_node_t* node, fs_node_t* delete_node);
+FS_ERR fs_rm_recursive(fs_node_t*  parent, fs_node_t* delete_node);
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
@@ -177,16 +180,19 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size);
 FS_ERR file_close(FILE* file);
 
 // ramfs.c
+ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear);
 FS_ERR ramfs_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
-fs_node_t ramfs_add_entry(fs_node_t* parent, char* name, uint32_t flags, size_t size);
-void ramfs_remove_entry(fs_node_t* node, ramfs_node_t* remove_node, bool remove_content);
+fs_node_t ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size);
+FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
+FS_ERR ramfs_update_entry(fs_node_t* node);
+fs_node_t ramfs_mkdir(fs_node_t* parent, char* name, uint32_t flags);
 
 FS_ERR ramfs_init(fs_t* fs);
 
 // fat32.c
+uint8_t fat32_to_fat_attr(uint32_t flags);
+
 uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count);
-FS_ERR fat32_free_cluster_chain(fs_t* fs, uint32_t start_cluster);
-uint32_t fat32_expand_cluster_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count);
 FS_ERR fat32_cut_cluster_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster);
@@ -196,8 +202,8 @@ FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_
 FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset);
 
 fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size);
-FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_content);
+FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
 FS_ERR fat32_update_entry(fs_node_t* node);
-fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr);
+fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint8_t attr);
 
 FS_ERR fat32_init(fs_t* fs, partition_entry_t part);

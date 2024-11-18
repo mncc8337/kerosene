@@ -177,7 +177,6 @@ static void fix_empty_entries(fs_t* fs, uint32_t start_cluster, uint32_t end_clu
     // the while block below will find a chain of 0xe5 entries that end with a 0x0 entry
     // and also store the cluster that the chain start and how many clusters that the chain lied in
 
-    bool forming_chain = false;
     uint32_t trash_start_cluster = 0;
     int cluster_count = 0;
     while(true) {
@@ -185,25 +184,16 @@ static void fix_empty_entries(fs_t* fs, uint32_t start_cluster, uint32_t end_clu
         ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
         for(int index = 0; (unsigned)index < cluster_size; index += sizeof(fat_directory_entry_t)) {
-            if(directory[index] != 0x0 && directory[index] != 0xe5) {
-                forming_chain = false;
-                continue;
-            }
+            if(directory[index] == 0x0)
+                goto start_deleting;
             if(directory[index] == 0xe5) {
-                if(!forming_chain) {
-                    forming_chain = true;
+                if(!trash_start_cluster) {
                     trash_start_cluster = current_cluster;
                     cluster_count = 1;
-                    continue;
                 }
-                cluster_count++;
-                continue;
+                else cluster_count++;
             }
-            if(directory[index] == 0x0) {
-                if(!forming_chain) return; // no job to be done
-                // start
-                goto start_deleting;
-            }
+            else trash_start_cluster = 0;
         }
 
         if(current_cluster == end_cluster) return; // it should never reached here
@@ -211,6 +201,7 @@ static void fix_empty_entries(fs_t* fs, uint32_t start_cluster, uint32_t end_clu
     }
 
     start_deleting:
+    if(!trash_start_cluster) return; // no job to be done
 
     if(cluster_count > 1) {
         // the clusters after trash_start_cluster only contain 0xe5 entries and 0x0 entries
@@ -255,6 +246,59 @@ static void parse_timestamp(uint16_t* date, uint16_t* time, struct tm t) {
     *date |= (t.tm_year >= 1980 ? t.tm_year - 1980 : 0) << 9;
 }
 
+// expand a cluster chain
+// return start of expanded cluster address when success
+// return 0 when cannot find free cluster
+static uint32_t expand_cluster_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count) {
+    fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
+    uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
+    // create new chain
+    uint32_t new_chain = fat32_allocate_clusters(fs, cluster_count);
+    // no more free space
+    if(new_chain == 0) return 0;
+    // link them
+    set_FAT_entry(bootrec, fs, first_FAT_sector, end_cluster, new_chain);
+    return new_chain;
+}
+
+// free a cluster chain
+static FS_ERR free_cluster_chain(fs_t* fs, uint32_t start_cluster) {
+    fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
+    uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
+
+    fat32_fsinfo_t* fsinfo = &(fs->fat32_info.fsinfo);
+
+    size_t fsinfo_free_cluster_count = fsinfo->free_cluster_count;
+    uint32_t fsinfo_start_cluster = fsinfo->available_clusters_start;
+
+    uint32_t current_cluster = start_cluster;
+    while(current_cluster < FAT_EOC && current_cluster != FAT_BAD_CLUSTER) {
+        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
+        set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, FAT_FREE_CLUSTER);
+        current_cluster = FAT_val;
+        fsinfo_free_cluster_count++;
+    }
+
+    if(current_cluster == FAT_BAD_CLUSTER) return ERR_FS_BAD_CLUSTER;
+
+    // update fsinfo
+    // only update the start cluster if it is smaller
+    if(start_cluster < fsinfo_start_cluster) fsinfo->available_clusters_start = start_cluster;
+    fsinfo->free_cluster_count = fsinfo_free_cluster_count;
+    update_fsinfo(fs);
+
+    return ERR_FS_SUCCESS;
+}
+
+uint8_t fat32_to_fat_attr(uint32_t flags) {
+    // TODO: expand
+
+    uint8_t attr = 0;
+    if(flags & FS_FLAG_DIRECTORY) attr |= FAT_ATTR_DIRECTORY;
+    if(flags & FS_FLAG_HIDDEN) attr |= FAT_ATTR_HIDDEN;
+
+    return attr;
+}
 
 // find a free custer / clusters chain
 // return start cluster address when success
@@ -302,50 +346,6 @@ uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count) {
     return start_cluster;
 }
 
-// free a cluster chain
-FS_ERR fat32_free_cluster_chain(fs_t* fs, uint32_t start_cluster) {
-    fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
-    uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
-
-    fat32_fsinfo_t* fsinfo = &(fs->fat32_info.fsinfo);
-
-    size_t fsinfo_free_cluster_count = fsinfo->free_cluster_count;
-    uint32_t fsinfo_start_cluster = fsinfo->available_clusters_start;
-
-    uint32_t current_cluster = start_cluster;
-    while(current_cluster < FAT_EOC && current_cluster != FAT_BAD_CLUSTER) {
-        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
-        set_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster, FAT_FREE_CLUSTER);
-        current_cluster = FAT_val;
-        fsinfo_free_cluster_count++;
-    }
-
-    if(current_cluster == FAT_BAD_CLUSTER) return ERR_FS_BAD_CLUSTER;
-
-    // update fsinfo
-    // only update the start cluster if it is smaller
-    if(start_cluster < fsinfo_start_cluster) fsinfo->available_clusters_start = start_cluster;
-    fsinfo->free_cluster_count = fsinfo_free_cluster_count;
-    update_fsinfo(fs);
-
-    return ERR_FS_SUCCESS;
-}
-
-// expand a cluster chain
-// return start of expanded cluster address when success
-// return 0 when cannot find free cluster
-uint32_t fat32_expand_cluster_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count) {
-    fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
-    uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
-    // create new chain
-    uint32_t new_chain = fat32_allocate_clusters(fs, cluster_count);
-    // no more free space
-    if(new_chain == 0) return 0;
-    // link them
-    set_FAT_entry(bootrec, fs, first_FAT_sector, end_cluster, new_chain);
-    return new_chain;
-}
-
 // cut a cluster chain at start_cluster
 FS_ERR fat32_cut_cluster_chain(fs_t* fs, uint32_t start_cluster) {
     fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
@@ -356,7 +356,7 @@ FS_ERR fat32_cut_cluster_chain(fs_t* fs, uint32_t start_cluster) {
     if(FAT_val == FAT_BAD_CLUSTER) return ERR_FS_BAD_CLUSTER;
 
     // free them
-    FS_ERR err = fat32_free_cluster_chain(fs, FAT_val);
+    FS_ERR err = free_cluster_chain(fs, FAT_val);
     if(err != ERR_FS_SUCCESS) return err;
     set_FAT_entry(bootrec, fs, first_FAT_sector, start_cluster, FAT_EOC);
     return ERR_FS_SUCCESS;
@@ -404,7 +404,7 @@ uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster) {
         if(current_cluster >= FAT_EOC || current_cluster == FAT_BAD_CLUSTER)
             break;
 
-        copied_current_cluster = fat32_expand_cluster_chain(fs, copied_current_cluster, 1);
+        copied_current_cluster = expand_cluster_chain(fs, copied_current_cluster, 1);
     }
 
     return copied_start_cluster;
@@ -612,13 +612,13 @@ FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size
 
         size -= cluster_size - cluster_offset;
         buffer += cluster_size - cluster_offset;
-        current_cluster = fat32_expand_cluster_chain(fs, current_cluster, 1);
+        current_cluster = expand_cluster_chain(fs, current_cluster, 1);
         if(current_cluster == 0) return ERR_FS_FAILED;
     }
 
     int estimated_clusters = size / cluster_size;
     if(estimated_clusters > 0)
-        fat32_expand_cluster_chain(fs, current_cluster, estimated_clusters);
+        expand_cluster_chain(fs, current_cluster, estimated_clusters);
 
     int write_time = 0;
     while(size > 0) {
@@ -730,7 +730,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
 
         if(FAT_val >= FAT_EOC) { // end of cluster
             // add a new cluster
-            current_cluster = fat32_expand_cluster_chain(parent->fs, current_cluster, 1);
+            current_cluster = expand_cluster_chain(parent->fs, current_cluster, 1);
             // no more space
             if(current_cluster == 0) return node;
             new_cluster_created = true;
@@ -752,7 +752,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
                                       (cluster_size / sizeof(fat_lfn_entry_t)); // ididthemath
     if(estimated_new_cluster_count > 0) {
         // try to expand
-        uint32_t valid = fat32_expand_cluster_chain(parent->fs, current_cluster, estimated_new_cluster_count);
+        uint32_t valid = expand_cluster_chain(parent->fs, current_cluster, estimated_new_cluster_count);
         if(!valid) return node;
     }
 
@@ -916,8 +916,9 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
 }
 
 // remove an entry from parent
-FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_content) {
-    if(strcmp(remove_node.name, ".") || strcmp(remove_node.name, ".."))
+FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content) {
+    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
+    if(strcmp(remove_node->name, ".") || strcmp(remove_node->name, ".."))
         return ERR_FS_FAILED;
 
     fat32_bootrecord_t* bootrec = &(parent->fs->fat32_info.bootrec);
@@ -930,9 +931,9 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
 
     int namelen; (void)(namelen); // avoid unused param
     char entry_name[FILENAME_LIMIT];
-    if(FS_NODE_IS_DIR(remove_node) && remove_content) {
+    if(FS_NODE_IS_DIR(*remove_node) && remove_content) {
         // check if it has any child entry
-        uint32_t first_sector = ((remove_node.fat_cluster.start_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        uint32_t first_sector = ((remove_node->fat_cluster.start_cluster - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
         for(unsigned int i = 0; i < cluster_size; i += 32) {
@@ -953,10 +954,10 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
 
     // now we are good to remove the entry
 
-    int lfn_entry_count = (strlen(remove_node.name) + 12) / 13;
+    int lfn_entry_count = (strlen(remove_node->name) + 12) / 13;
 
-    int node_index = remove_node.fat_cluster.parent_cluster_index;
-    uint32_t current_cluster = remove_node.fat_cluster.parent_cluster;
+    int node_index = remove_node->fat_cluster.parent_cluster_index;
+    uint32_t current_cluster = remove_node->fat_cluster.parent_cluster;
 
     // check if the next entry is clear
     int clear_val;
@@ -991,7 +992,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
     ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
     // delete the cluster
-    if(remove_content) fat32_free_cluster_chain(parent->fs, remove_node.fat_cluster.start_cluster);
+    if(remove_content) free_cluster_chain(parent->fs, remove_node->fat_cluster.start_cluster);
 
     // calculate the start of the chain
     int start_index = node_index - lfn_entry_count * sizeof(fat_directory_entry_t);
@@ -1035,13 +1036,13 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t remove_node, bool remove_
         ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
         if(clear_val == 0x0) {
-            fat32_free_cluster_chain(parent->fs, current_cluster);
+            free_cluster_chain(parent->fs, current_cluster);
             set_FAT_entry(bootrec, parent->fs, first_FAT_sector, last_cluster, FAT_EOC);
         }
     }
 
     if(clear_val == 0x0)
-        fix_empty_entries(parent->fs, parent->fat_cluster.start_cluster, remove_node.fat_cluster.parent_cluster);
+        fix_empty_entries(parent->fs, parent->fat_cluster.start_cluster, remove_node->fat_cluster.parent_cluster);
 
     return ERR_FS_SUCCESS;
 }
@@ -1059,6 +1060,7 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
     ata_pio_LBA28_access(true, node->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
     fat_directory_entry_t* dir = (fat_directory_entry_t*)(directory+node->fat_cluster.parent_cluster_index);
+
     // TODO: check if the entry is really exists
     
     uint16_t date_dump, time_dump;
@@ -1089,19 +1091,11 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
 // also create . and .. dir
 // return valid node when success
 // return invalid node when node with the same name has already exists / cannot find free cluster
-fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr) {
-    fs_node_t created_dir;
-    created_dir.flags = 0;
+fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint8_t attr) {
+    fs_node_t created_dir; created_dir.flags = 0;
 
-    // remove leading spaces, trailing spaces and trailing periods
-    while(name[0] == ' ') name++;
-    int namelen = strlen(name);
-    if(namelen == 0) return created_dir;
-    while(name[namelen-1] == ' ' || name[namelen-1] == '.') {
-        name[namelen-1] = '\0';
-        namelen--;
-        if(namelen == 0) return created_dir;
-    }
+    uint32_t start_cluster = fat32_allocate_clusters(parent->fs, 1);
+    if(start_cluster == 0) return created_dir;
 
     created_dir = fat32_add_entry(parent, name, start_cluster, attr | FAT_ATTR_DIRECTORY, 0);
     if(!FS_NODE_IS_VALID(created_dir)) return created_dir;
@@ -1109,10 +1103,22 @@ fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint32_t start_cluster, uin
     // create the '..' and the '.' dir
     // in linux you need to create them
     // so that `ls` will not show input/output error
-    fs_node_t dot_dir = fat32_add_entry(&created_dir, ".", start_cluster, FAT_ATTR_DIRECTORY, 0);
+    fs_node_t dot_dir = fat32_add_entry(
+        &created_dir,
+        ".",
+        start_cluster,
+        FAT_ATTR_DIRECTORY | FAT_ATTR_HIDDEN,
+        0
+    );
     if(!FS_NODE_IS_VALID(dot_dir)) return dot_dir;
 
-    fs_node_t dotdot_dir = fat32_add_entry(&created_dir, "..", parent->fat_cluster.start_cluster, FAT_ATTR_DIRECTORY, 0);
+    fs_node_t dotdot_dir = fat32_add_entry(
+        &created_dir,
+        "..",
+        parent->fat_cluster.start_cluster,
+        FAT_ATTR_DIRECTORY | FAT_ATTR_HIDDEN,
+        0
+    );
     if(!FS_NODE_IS_VALID(dotdot_dir)) return dotdot_dir;
 
     return created_dir;
