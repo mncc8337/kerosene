@@ -46,13 +46,6 @@
     entry_name[name_pos++] = '\0'; \
     namelen = name_pos;
 
-// the table will be used very frequently
-// so it is a good idea to only declare it once
-// FIXME: turns out this is dumb because it would cause conflicts between processes
-static uint8_t FAT[512];
-// store the last sector that is read to FAT
-static int last_read_FAT_sector = -1;
-
 static void parse_lfn(fat_lfn_entry_t* lfn, char* buff, int offset, int* cnt) {
     *cnt = 0;
 
@@ -76,26 +69,22 @@ static void parse_lfn(fat_lfn_entry_t* lfn, char* buff, int offset, int* cnt) {
 
 static void set_FAT_entry(fat32_bootrecord_t* bootrec, fs_t* fs,
     uint32_t first_FAT_sector, uint32_t cluster, uint32_t val) {
+    uint8_t FAT[512];
     int FAT_offset = cluster * 4;
     int FAT_sector = first_FAT_sector + FAT_offset / bootrec->bpb.bytes_per_sector;
     int entry_offset = FAT_offset % bootrec->bpb.bytes_per_sector;
-    if(FAT_sector != last_read_FAT_sector) {
-        ata_pio_LBA28_access(true, fs->partition.LBA_start + FAT_sector, 1, FAT);
-        last_read_FAT_sector = FAT_sector;
-    }
+    ata_pio_LBA28_access(true, fs->partition.LBA_start + FAT_sector, 1, FAT);
 
     *((uint32_t*)&(FAT[entry_offset])) = val;
     ata_pio_LBA28_access(false, fs->partition.LBA_start + FAT_sector, 1, FAT);
 }
 static uint32_t get_FAT_entry(fat32_bootrecord_t* bootrec, fs_t* fs,
         uint32_t first_FAT_sector, uint32_t cluster) {
+    uint8_t FAT[512];
     int FAT_offset = cluster * 4;
     int FAT_sector = first_FAT_sector + FAT_offset / bootrec->bpb.bytes_per_sector;
     int entry_offset = FAT_offset % bootrec->bpb.bytes_per_sector;
-    if(FAT_sector != last_read_FAT_sector) {
-        ata_pio_LBA28_access(true, fs->partition.LBA_start + FAT_sector, 1, FAT);
-        last_read_FAT_sector = FAT_sector;
-    }
+    ata_pio_LBA28_access(true, fs->partition.LBA_start + FAT_sector, 1, FAT);
 
     return *((uint32_t*)&(FAT[entry_offset])) & 0x0fffffff;
 }

@@ -126,7 +126,8 @@ FS_ERR fs_rm(fs_node_t* node, fs_node_t* delete_node) {
             return fat32_remove_entry(node, delete_node, true);
         case FS_RAMFS:
             return ramfs_remove_entry(node, delete_node, true);
-        default: return ERR_FS_NOT_SUPPORTED;
+        default:
+            return ERR_FS_NOT_SUPPORTED;
     }
 }
 
