@@ -3,8 +3,6 @@
 
 #include "string.h"
 
-#include "stdio.h"
-
 // a virtual fs which use system heap as its storage
 // each ramnode contains metadata of a file/directory
 // and a pointer to a datanodes chain (which contains the file/directory's data)
@@ -238,7 +236,6 @@ fs_node_t ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datan
             new_datanode->next = NULL;
             memset((void*)new_datanode->data, END_ENTRY, RAMFS_DATANODE_SIZE);
             final_datanode->next = new_datanode;
-            printf("create new datanode %x\n", new_datanode);
         }
     }
     entry_list[empty_entry] = (ramfs_datanode_entry_t)ramnode;

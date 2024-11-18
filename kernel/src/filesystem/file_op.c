@@ -140,6 +140,11 @@ FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t* delete_node) {
                 if(fat32_read_dir(delete_node, rm_node_callback) == ERR_FS_CALLBACK_STOP)
                     return ERR_FS_FAILED;
                 break;
+            case FS_RAMFS:
+                // this only happended when an error occurs
+                if(ramfs_read_dir(delete_node, rm_node_callback) == ERR_FS_CALLBACK_STOP)
+                    return ERR_FS_FAILED;
+                break;
             default: return ERR_FS_NOT_SUPPORTED;
         }
     }
