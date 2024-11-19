@@ -124,7 +124,8 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 ## Known bugs
 - ATA PIO mode initialization some time failed (very rare): address mark not found
 - `print_debug` gives gliberrish result if put in many formats
-- global variable would cause conflict between processes (see file_op.c strtok.c)
+- global variable would cause conflict between processes (see ~~fat32.c~~ ~~file_op.c~~ strtok.c)
+- `video_vesa_print_char` sometime cause a pagefault
 ## Learning resources
 Note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
 ### Great tutorials
