@@ -33,8 +33,6 @@ typedef enum {
     ERR_FS_BAD_CLUSTER,
     ERR_FS_NOT_FOUND,
     ERR_FS_DIR_NOT_EMPTY,
-    ERR_FS_CALLBACK_STOP,
-    ERR_FS_EXIT_NATURALLY,
     ERR_FS_INVALID_FSINFO,
     ERR_FS_NOT_FILE,
     ERR_FS_NOT_DIR,
@@ -120,6 +118,21 @@ typedef struct fs_node {
     };
 } fs_node_t;
 
+typedef struct {
+    fs_node_t* node;
+    int32_t current_index;
+
+    // fs depended field
+    union {
+        struct {
+            uint32_t current_cluster;
+        } fat32;
+        struct {
+            uint32_t current_datanode;
+        } ramfs;
+    };
+} directory_iterator_t;
+
 typedef struct fs {
     fs_type_t type;
     partition_entry_t partition;
@@ -164,7 +177,8 @@ fs_t* vfs_getfs(int id);
 bool vfs_is_fs_available(int id);
 
 // file_op.c
-FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
+FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
+FS_ERR fs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
 fs_node_t fs_find(fs_node_t* parent, const char* path);
 fs_node_t fs_mkdir(fs_node_t* parent, char* name);
 fs_node_t fs_touch(fs_node_t* parent, char* name);
@@ -181,7 +195,8 @@ FS_ERR file_close(FILE* file);
 
 // ramfs.c
 ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear);
-FS_ERR ramfs_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
+FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
+FS_ERR ramfs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
 fs_node_t ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size);
 FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
 FS_ERR ramfs_update_entry(fs_node_t* node);
@@ -197,7 +212,8 @@ FS_ERR fat32_cut_cluster_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster);
 uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster);
 
-FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t));
+FS_ERR fat32_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
+FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR fat32_read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset);
 FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset);
 

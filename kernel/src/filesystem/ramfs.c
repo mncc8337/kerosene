@@ -59,22 +59,19 @@ static ramfs_node_t* new_node(char* name, uint32_t flags, ramfs_datanode_t* data
     return node;
 }
 
-static fs_node_t to_fs_node(ramfs_node_t* ramnode, fs_node_t* parent) {
-    fs_node_t node;
+static void to_fs_node(ramfs_node_t* ramnode, fs_node_t* parent, fs_node_t* node) {
     char* name = (void*)ramnode + sizeof(ramfs_node_t);
-    memcpy(node.name, name, ramnode->name_length + 1);
-    node.fs = parent->fs;
-    node.parent_node = parent;
-    node.flags = FS_FLAG_VALID | ramnode->flags;
-    node.creation_milisecond = ramnode->creation_milisecond;
-    node.creation_timestamp = ramnode->creation_timestamp;
-    node.modified_timestamp = ramnode->modified_timestamp;
-    node.accessed_timestamp = ramnode->accessed_timestamp;
-    node.size = ramnode->size;
+    memcpy(node->name, name, ramnode->name_length + 1);
+    node->fs = parent->fs;
+    node->parent_node = parent;
+    node->flags = FS_FLAG_VALID | ramnode->flags;
+    node->creation_milisecond = ramnode->creation_milisecond;
+    node->creation_timestamp = ramnode->creation_timestamp;
+    node->modified_timestamp = ramnode->modified_timestamp;
+    node->accessed_timestamp = ramnode->accessed_timestamp;
+    node->size = ramnode->size;
     
-    node.ramfs_node.node_addr = (uint32_t)ramnode;
-
-    return node;
+    node->ramfs_node.node_addr = (uint32_t)ramnode;
 }
 
 static void remove_datanode_chain(ramfs_datanode_t* node) {
@@ -152,31 +149,45 @@ ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear) {
     return start_node;
 }
 
-FS_ERR ramfs_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
-    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
+FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
+    if(!FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_DIR;
 
-    ramfs_node_t* parent_ramnode = (ramfs_node_t*)parent->ramfs_node.node_addr;
+    diriter->node = node;
+    diriter->current_index = -1;
+    diriter->ramfs.current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain;
 
-    ramfs_datanode_t* parent_datanode = parent_ramnode->datanode_chain;
-    ramfs_datanode_entry_t* entry_list = (void*)parent_datanode->data;
-    while(true) {
-        for(unsigned entry_id = 0; entry_id < DIRECTORY_ENTRY_COUNT; entry_id++) {
-            if(entry_list[entry_id] == END_ENTRY) break;
-            if(entry_list[entry_id] == EMPTY_ENTRY) continue;
+    return ERR_FS_SUCCESS;
+}
 
-            // run callback
-            fs_node_t node = to_fs_node((ramfs_node_t*)entry_list[entry_id], parent);
-            if(!callback(node)) return ERR_FS_CALLBACK_STOP;
-        }
+FS_ERR ramfs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
+    ramfs_datanode_t* datanode = (ramfs_datanode_t*)diriter->ramfs.current_datanode;
+    ramfs_datanode_entry_t* entry_list = (void*)datanode->data;
 
-        // to next ramnode
-        parent_datanode = parent_datanode->next;
-        if(!parent_datanode) break;
-
-        entry_list = (void*)parent_datanode->data;
+    diriter->current_index++;
+    if(diriter->current_index == DIRECTORY_ENTRY_COUNT) {
+        datanode = datanode->next;
+        if(datanode == NULL) return ERR_FS_EOF;
+        entry_list = (void*)datanode->data;
+        diriter->current_index = 0;
     }
 
-    return ERR_FS_EXIT_NATURALLY;
+    while(entry_list[diriter->current_index] == EMPTY_ENTRY) {
+        diriter->current_index++;
+
+        if(diriter->current_index == DIRECTORY_ENTRY_COUNT) {
+            datanode = datanode->next;
+            if(datanode == NULL) return ERR_FS_EOF;
+            entry_list = (void*)datanode->data;
+            diriter->current_index = 0;
+        }
+    }
+
+    if(entry_list[diriter->current_index] == END_ENTRY)
+        return ERR_FS_EOF;
+
+    to_fs_node((ramfs_node_t*)entry_list[diriter->current_index], diriter->node, ret_node);
+    diriter->ramfs.current_datanode = (uint32_t)datanode;
+    return ERR_FS_SUCCESS;
 }
 
 fs_node_t ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size) {
@@ -240,7 +251,7 @@ fs_node_t ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datan
     }
     entry_list[empty_entry] = (ramfs_datanode_entry_t)ramnode;
 
-    node = to_fs_node(ramnode, parent);
+    to_fs_node(ramnode, parent, &node);
     node.size = size;
     return node;
 }

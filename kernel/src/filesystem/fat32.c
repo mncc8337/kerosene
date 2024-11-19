@@ -399,17 +399,23 @@ uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster) {
     return copied_start_cluster;
 }
 
-// loop through all files/entries in a dir
-// call the callback when find one
-FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
-    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
+FS_ERR fat32_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
+    if(!FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_DIR;
 
-    fat32_bootrecord_t* bootrec = &(parent->fs->fat32_info.bootrec);
+    diriter->node = node;
+    diriter->current_index = -32;
+    diriter->fat32.current_cluster = node->fat_cluster.start_cluster;
+
+    return ERR_FS_SUCCESS;
+}
+
+FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
+    fat32_bootrecord_t* bootrec = &(diriter->node->fs->fat32_info.bootrec);
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = get_first_data_sector(bootrec);
     uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
 
-    uint32_t current_cluster = parent->fat_cluster.start_cluster;
+    uint32_t current_cluster = diriter->fat32.current_cluster;
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t directory[cluster_size];
 
@@ -418,13 +424,29 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
     int namelen = 0;
     bool found_last_LFN_entry = false;
 
+    // start at next_index
+    unsigned iter = diriter->current_index;
+    iter += 32;
+    if(iter >= cluster_size) {
+        // load next cluster
+        uint32_t FAT_val = get_FAT_entry(bootrec, diriter->node->fs, first_FAT_sector, current_cluster);
+
+        if(FAT_val >= FAT_EOC)
+            return ERR_FS_EOF;
+        if(FAT_val == FAT_BAD_CLUSTER)
+            return ERR_FS_BAD_CLUSTER;
+
+        current_cluster = FAT_val;
+        iter = 0;
+    }
+
     while(true) {
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
-        ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
+        ata_pio_LBA28_access(true, diriter->node->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
-        for(unsigned int i = 0; i < cluster_size; i += 32) {
+        for(unsigned i = iter; i < cluster_size; i += 32) {
             if(directory[i] == 0x00) // no more file/directory in this dir, free entry
-                return ERR_FS_EXIT_NATURALLY;
+                return ERR_FS_EOF;
             if(directory[i] == 0xe5) continue; // free entry
             // check if it is a long file name entry
             if(directory[i+11] == 0x0f) {
@@ -438,44 +460,46 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
             if(!lfn_ready) {
                 PROCESS_SFN_ENTRY(entry_name, namelen, temp_dir)
             }
-            // LFN name is already ready
-            fs_node_t node;
-            memcpy(node.name, entry_name, namelen);
 
-            node.fs = parent->fs;
-            node.parent_node = parent;
-            node.fat_cluster.start_cluster = (uint32_t)temp_dir->first_cluster_number_high << 16
+            // LFN name is already ready
+            memcpy(ret_node->name, entry_name, namelen);
+
+            ret_node->fs = diriter->node->fs;
+            ret_node->parent_node = diriter->node;
+            ret_node->fat_cluster.start_cluster = (uint32_t)temp_dir->first_cluster_number_high << 16
                                 | temp_dir->first_cluster_number_low;
-            if(node.fat_cluster.start_cluster == 0 && strcmp(node.name, "..")) {
+            if(ret_node->fat_cluster.start_cluster == 0 && strcmp(ret_node->name, "..")) {
                 // in linux the .. dir of a root's child directory is pointed to cluster 0
                 // we need to fix it because root directory is in cluster 2
                 // else we would destroy cluster 0 which contain filesystem infomation
-                node.fat_cluster.start_cluster = bootrec->ebpb.rootdir_cluster;
+                ret_node->fat_cluster.start_cluster = bootrec->ebpb.rootdir_cluster;
             }
-            node.creation_milisecond = temp_dir->centisecond * 10;
-            parse_datetime(temp_dir->creation_date, temp_dir->creation_time, &(node.creation_timestamp));
-            parse_datetime(temp_dir->last_access_date, 0, &(node.accessed_timestamp));
-            parse_datetime(temp_dir->last_mod_date, temp_dir->last_mod_time, &(node.modified_timestamp));
+            ret_node->creation_milisecond = temp_dir->centisecond * 10;
+            parse_datetime(temp_dir->creation_date, temp_dir->creation_time, &(ret_node->creation_timestamp));
+            parse_datetime(temp_dir->last_access_date, 0, &(ret_node->accessed_timestamp));
+            parse_datetime(temp_dir->last_mod_date, temp_dir->last_mod_time, &(ret_node->modified_timestamp));
 
-            node.flags = FS_FLAG_VALID;
+            ret_node->flags = FS_FLAG_VALID;
             if(temp_dir->attr & FAT_ATTR_DIRECTORY)
-                node.flags |= FS_FLAG_DIRECTORY;
+                ret_node->flags |= FS_FLAG_DIRECTORY;
             if(temp_dir->attr & FAT_ATTR_HIDDEN)
-                node.flags |= FS_FLAG_HIDDEN;
+                ret_node->flags |= FS_FLAG_HIDDEN;
 
-            node.size = temp_dir->size;
-            node.fat_cluster.parent_cluster = current_cluster;
-            node.fat_cluster.parent_cluster_index = i;
+            ret_node->size = temp_dir->size;
+            ret_node->fat_cluster.parent_cluster = current_cluster;
+            ret_node->fat_cluster.parent_cluster_index = i;
 
-            // run callback
-            if(!callback(node)) return ERR_FS_CALLBACK_STOP;
+            // update diriter
+            diriter->fat32.current_cluster = current_cluster;
+            diriter->current_index = i;
+            return ERR_FS_SUCCESS;
 
-            // reset control var
-            lfn_ready = false;
-            found_last_LFN_entry = false;
+            // // reset control var
+            // lfn_ready = false;
+            // found_last_LFN_entry = false;
         }
 
-        uint32_t FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
+        uint32_t FAT_val = get_FAT_entry(bootrec, diriter->node->fs, first_FAT_sector, current_cluster);
 
         if(FAT_val >= FAT_EOC)
             break; // end of cluster
@@ -483,9 +507,10 @@ FS_ERR fat32_read_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
             return ERR_FS_BAD_CLUSTER;
 
         current_cluster = FAT_val;
+        iter = 0;
     }
 
-    return ERR_FS_EXIT_NATURALLY;
+    return ERR_FS_EOF;
 }
 
 // read some clusters to buffer

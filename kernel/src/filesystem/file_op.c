@@ -2,80 +2,61 @@
 
 #include "string.h"
 
-// FIXME: these "local" variable for recursion need to be truly local to avoid conflicts between processes
-static char name_buffer[FILENAME_LIMIT];
-static fs_node_t ret_node;
+// static fs_node_t copy_current_dir;
+// static bool cp_node_callback(fs_node_t node) {
+//     // ignore . and ..
+//     if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
+//
+//     FS_ERR err = fs_copy_recursive(&node, &copy_current_dir, NULL, NULL);
+//     if(err) return false;
+//
+//     return true;
+// }
 
-static bool find_node_callback(fs_node_t node) {
-    if(node.fs->type == FS_FAT32) { // case-insensitive FS goes here
-        if(strcmp_case_insensitive(node.name, name_buffer)) {
-            ret_node = node;
-            return false;
-        }
-    }
-    else {
-        if(strcmp(node.name, name_buffer)) {
-            ret_node = node;
-            return false;
-        }
-    }
-    return true;
-}
-
-FS_ERR fs_rm_recursive(fs_node_t*  parent, fs_node_t* delete_node); // declare it first
-static bool rm_node_callback(fs_node_t node) {
-    // ignore . and ..
-    if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
-    
-    FS_ERR err = fs_rm_recursive(node.parent_node, &node);
-    if(err) return false;
-
-    return true;
-}
-
-FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name); // declare it first
-static fs_node_t copy_current_dir;
-static bool cp_node_callback(fs_node_t node) {
-    // ignore . and ..
-    if(strcmp(node.name, ".") || strcmp(node.name, "..")) return true;
-    
-    FS_ERR err = fs_copy_recursive(&node, &copy_current_dir, NULL, NULL);
-    if(err) return false;
-
-    return true;
-}
-
-// go through all files and directories in `parent`. call the callback when found one
-FS_ERR fs_list_dir(fs_node_t* parent, bool (*callback)(fs_node_t)) {
-    switch(parent->fs->type) {
+FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
+    switch(node->fs->type) {
         case FS_FAT32:
-            return fat32_read_dir(parent, callback);
+            return fat32_setup_directory_iterator(diriter, node);
         case FS_RAMFS:
-            return ramfs_read_dir(parent, callback);
+            return ramfs_setup_directory_iterator(diriter, node);
         default:
             return ERR_FS_NOT_SUPPORTED;
     }
 }
 
-// find a node in parent
-fs_node_t fs_find(fs_node_t* parent, const char* nodename) {
-    memcpy(name_buffer, nodename, strlen(nodename) + 1);
-
-    FS_NODE_FLAG_UNSET(&ret_node, FS_FLAG_VALID);
-
-    FS_ERR out = ERR_FS_FAILED;
-
-    switch(parent->fs->type) {
+FS_ERR fs_read_dir( directory_iterator_t* diriter, fs_node_t* ret_node) {
+    switch(diriter->node->fs->type) {
         case FS_FAT32:
-            out = fat32_read_dir(parent, find_node_callback); break;
+            return fat32_read_dir(diriter, ret_node);
         case FS_RAMFS:
-            out = ramfs_read_dir(parent, find_node_callback); break;
-        default: break;
+            return ramfs_read_dir(diriter, ret_node);
+        default:
+            return ERR_FS_NOT_SUPPORTED;
+    }
+}
+
+fs_node_t fs_find(fs_node_t* parent, const char* nodename) {
+    FS_ERR last_err;
+    fs_node_t ret_node; ret_node.flags = 0;
+
+    directory_iterator_t diriter;
+    FS_ERR diriter_err = fs_setup_directory_iterator(&diriter, parent);
+    if(diriter_err) return ret_node;
+
+    bool (*cmpcmd)(const char*, const char*);
+    if(parent->fs->type == FS_FAT32) cmpcmd = strcmp_case_insensitive;
+    else cmpcmd = strcmp;
+
+    while(!(last_err = fs_read_dir(&diriter, &ret_node))) {
+        if(cmpcmd(nodename, ret_node.name))
+            return ret_node;
     }
 
-    if(out == ERR_FS_CALLBACK_STOP)
-        ret_node.flags |= FS_FLAG_VALID;
+    if(last_err != ERR_FS_EOF) {
+        // TODO: handle error
+    }
 
+    ret_node.flags = 0;
     return ret_node;
 }
 
@@ -89,7 +70,7 @@ fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
         case FS_FAT32:
             return fat32_mkdir(parent, name, 0);
         case FS_RAMFS:
-        return ramfs_mkdir(parent, name, 0);
+            return ramfs_mkdir(parent, name, 0);
         default:
             return invalid_node;
     }
@@ -134,20 +115,18 @@ FS_ERR fs_rm(fs_node_t* node, fs_node_t* delete_node) {
 // remove a directory or a file and its content recursively if is a directory
 FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t* delete_node) {
     if(FS_NODE_IS_DIR(*delete_node)) {
-        // try remove its content recursively
-        switch(parent->fs->type) {
-            case FS_FAT32:
-                // this only happended when an error occurs
-                if(fat32_read_dir(delete_node, rm_node_callback) == ERR_FS_CALLBACK_STOP)
-                    return ERR_FS_FAILED;
-                break;
-            case FS_RAMFS:
-                // this only happended when an error occurs
-                if(ramfs_read_dir(delete_node, rm_node_callback) == ERR_FS_CALLBACK_STOP)
-                    return ERR_FS_FAILED;
-                break;
-            default: return ERR_FS_NOT_SUPPORTED;
+        // try to remove all of its contents
+        directory_iterator_t diriter;
+        fs_setup_directory_iterator(&diriter, delete_node);
+
+        fs_node_t child_node;
+        FS_ERR last_err;
+        while(!(last_err = fs_read_dir(&diriter, &child_node))) {
+            if(strcmp(child_node.name, ".") || strcmp(child_node.name, "..")) continue;
+            fs_rm_recursive(delete_node, &child_node);
         }
+
+        if(last_err != ERR_FS_EOF) return last_err;
     }
 
     // now try remove it. it should success
@@ -181,50 +160,50 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
 }
 
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
-    if(new_parent->fs->type == FS_FAT32) {
-        uint32_t start_cluster = fat32_copy_cluster_chain(new_parent->fs, node->fat_cluster.start_cluster);
-        if(start_cluster == 0) return ERR_FS_FAILED;
-
-        *copied = fat32_add_entry(
-            new_parent,
-            new_name == NULL ? node->name : new_name,
-            start_cluster, fat32_to_fat_attr(node->flags), node->size
-        );
-    }
-    else return ERR_FS_NOT_SUPPORTED;
-
-    if(!FS_NODE_IS_VALID(*copied)) return ERR_FS_FAILED;
+    // if(new_parent->fs->type == FS_FAT32) {
+    //     uint32_t start_cluster = fat32_copy_cluster_chain(new_parent->fs, node->fat_cluster.start_cluster);
+    //     if(start_cluster == 0) return ERR_FS_FAILED;
+    //
+    //     *copied = fat32_add_entry(
+    //         new_parent,
+    //         new_name == NULL ? node->name : new_name,
+    //         start_cluster, fat32_to_fat_attr(node->flags), node->size
+    //     );
+    // }
+    // else return ERR_FS_NOT_SUPPORTED;
+    //
+    // if(!FS_NODE_IS_VALID(*copied)) return ERR_FS_FAILED;
     return ERR_FS_SUCCESS;
 }
 
 FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
-    if(!FS_NODE_IS_DIR(*node)) return fs_copy(node, new_parent, copied, new_name);
-
-    // the node we need to copy is a directory at this point
-
-    if(new_parent->fs->type == FS_FAT32) {
-        // save current dir
-        fs_node_t current_dir_bck = copy_current_dir;
-
-        // create a new dir first
-        uint8_t attr = FAT_ATTR_DIRECTORY;
-        if(FS_NODE_IS_HIDDEN(*node)) attr |= FAT_ATTR_HIDDEN;
-        *copied = fat32_mkdir(
-            new_parent,
-            new_name == NULL ? node->name : new_name,
-            attr
-        );
-        if(!FS_NODE_IS_VALID(*copied)) return ERR_FS_FAILED;
-        copy_current_dir = *copied;
-
-        // try copy all of its content to the new dir
-        if(fat32_read_dir(node, cp_node_callback) == ERR_FS_CALLBACK_STOP)
-            return ERR_FS_FAILED;
-
-        // load current dir back up
-        copy_current_dir = current_dir_bck;
-    }
-    else return ERR_FS_NOT_SUPPORTED;
+    // if(!FS_NODE_IS_DIR(*node)) return fs_copy(node, new_parent, copied, new_name);
+    //
+    // // the node we need to copy is a directory at this point
+    //
+    // if(new_parent->fs->type == FS_FAT32) {
+    //     // save current dir
+    //     fs_node_t current_dir_bck = copy_current_dir;
+    //
+    //     // create a new dir first
+    //     uint8_t attr = FAT_ATTR_DIRECTORY;
+    //     if(FS_NODE_IS_HIDDEN(*node)) attr |= FAT_ATTR_HIDDEN;
+    //     *copied = fat32_mkdir(
+    //         new_parent,
+    //         new_name == NULL ? node->name : new_name,
+    //         attr
+    //     );
+    //     if(!FS_NODE_IS_VALID(*copied)) return ERR_FS_FAILED;
+    //     copy_current_dir = *copied;
+    //
+    //     // try copy all of its content to the new dir
+    //     if(fat32_read_dir(node, cp_node_callback) == ERR_FS_CALLBACK_STOP)
+    //         return ERR_FS_FAILED;
+    //
+    //     // load current dir back up
+    //     copy_current_dir = current_dir_bck;
+    // }
+    // else return ERR_FS_NOT_SUPPORTED;
 
     return ERR_FS_SUCCESS;
 }

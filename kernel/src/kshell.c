@@ -52,28 +52,37 @@ static void node_stack_pop() {
     if(node_stack_offset > 0) node_stack_offset--;
 }
 
-static int indent_level = 0;
-static int max_depth = 0;
-static bool show_hidden = false;
-static bool list_dir(fs_node_t node) {
-    if((FS_NODE_IS_HIDDEN(node) || node.name[0] == '.') && !show_hidden) return true;
-    if(indent_level >= max_depth) return true;
-    indent_level++;
+static FS_ERR list_dir(fs_node_t* parent, int max_depth, bool show_hidden, int* indent_level) {
+    if((*indent_level) == max_depth) return ERR_FS_SUCCESS;
+    directory_iterator_t diriter;
+    fs_setup_directory_iterator(&diriter, parent);
 
-    for(int i = 0; i < indent_level-1; i++)
-        printf("|   ");
-    printf("|---");
+    fs_node_t node;
 
-    if(FS_NODE_IS_DIR(node)) video_set_attr(video_rgb(VIDEO_LIGHT_BLUE), video_rgb(VIDEO_BLACK));
-    puts(node.name);
-    if(FS_NODE_IS_DIR(node)) video_set_attr(video_rgb(VIDEO_LIGHT_GREY), video_rgb(VIDEO_BLACK));
+    FS_ERR last_err;
+    while(!(last_err = fs_read_dir(&diriter, &node))) {
+        if((FS_NODE_IS_HIDDEN(node) || node.name[0] == '.') && !show_hidden) continue;
+        (*indent_level)++;
 
-    if(FS_NODE_IS_DIR(node) && !strcmp(node.name, ".") && !strcmp(node.name, ".."))
-        fs_list_dir(&node, list_dir);
+        for(int i = 0; i < (*indent_level)-1; i++)
+            printf("|   ");
+        printf("|---");
 
-    indent_level--;
+        if(FS_NODE_IS_DIR(node)) video_set_attr(video_rgb(VIDEO_LIGHT_BLUE), video_rgb(VIDEO_BLACK));
+        puts(node.name);
+        if(FS_NODE_IS_DIR(node)) video_set_attr(video_rgb(VIDEO_LIGHT_GREY), video_rgb(VIDEO_BLACK));
 
-    return true;
+        if(FS_NODE_IS_DIR(node) && !strcmp(node.name, ".") && !strcmp(node.name, "..")) {
+            FS_ERR err = list_dir(&node, max_depth, show_hidden, indent_level);
+            if(err) return err;
+        }
+
+        (*indent_level)--;
+    }
+
+    if(last_err != ERR_FS_EOF)
+        return last_err;
+    return ERR_FS_SUCCESS;
 }
 static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
     FS_NODE_FLAG_UNSET(node, FS_FLAG_VALID);
@@ -239,8 +248,8 @@ static void cfs(char* disk) {
 
 static void ls(char* args) {
     fs_node_t* current_node = node_stack_top();
-    max_depth = 1;
-    show_hidden = false;
+    int max_depth = 1;
+    bool show_hidden = false;
     char* ls_name = NULL;
 
     char* arg = strtok(args, " ");
@@ -267,9 +276,10 @@ static void ls(char* args) {
         arg = strtok(NULL, " ");
     }
 
+    int indent_level = 0;
+
     if(ls_name == NULL) {
-        // list current dir
-        fs_list_dir(current_node, list_dir);
+        list_dir(current_node, max_depth, show_hidden, &indent_level);
         return;
     }
     else {
@@ -284,7 +294,7 @@ static void ls(char* args) {
             return;
         }
 
-        fs_list_dir(&node, list_dir);
+        list_dir(&node, max_depth, show_hidden, &indent_level);
     }
 }
 
