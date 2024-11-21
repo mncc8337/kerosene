@@ -13,9 +13,10 @@ bool strcmp(const char* str1, const char* str2) {
 }
 
 // TODO: implement ctype.h
-static char toupper(char a) {
-    if(a >= 0x61 && a <= 0x7a) a -= 0x20;
-    return a;
+static char toupper(char chr) {
+    bool is_lower = (chr >= 'a' && chr <= 'z');
+    chr += 32 * is_lower;
+    return chr;
 }
 
 bool strcmp_case_insensitive(const char* str1, const char* str2) {

@@ -382,6 +382,28 @@ fs_node_t ramfs_mkdir(fs_node_t* parent, char* name, uint32_t flags) {
     return new_dir;
 }
 
+FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
+    if(!new_name) new_name = node->name;
+
+    fs_node_t copied = ramfs_add_entry(
+        new_parent, new_name,
+        ((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain,
+        node->flags, node->size
+    );
+
+    if(!FS_NODE_IS_VALID(copied)) return ERR_FS_FAILED;
+
+    // remove the entry but not the content
+    FS_ERR err = ramfs_remove_entry(node->parent_node, node, false);
+    if(err) {
+        // TODO: revert adding entry
+        return err;
+    }
+
+    *node = copied;
+    return ERR_FS_SUCCESS;
+}
+
 FS_ERR ramfs_init(fs_t* fs) {
     ramfs_datanode_t* datanode_chain = ramfs_allocate_datanodes(1, true);
     if(!datanode_chain) return ERR_FS_FAILED;

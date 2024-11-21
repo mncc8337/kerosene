@@ -76,7 +76,6 @@ fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
     }
 }
 
-// make an empty file in parent node
 fs_node_t fs_touch(fs_node_t* parent, char* name) {
     fs_node_t node;
     node.flags = 0;
@@ -86,7 +85,7 @@ fs_node_t fs_touch(fs_node_t* parent, char* name) {
 
     switch(parent->fs->type) {
         case FS_FAT32:
-            file_cluster = fat32_allocate_clusters(parent->fs, 1);
+            file_cluster = fat32_allocate_clusters(parent->fs, 1, false);
             if(file_cluster == 0) return node;
             node = fat32_add_entry(parent, name, file_cluster, 0, 0);
             break;
@@ -100,7 +99,6 @@ fs_node_t fs_touch(fs_node_t* parent, char* name) {
     return node;
 }
 
-// remove a node
 FS_ERR fs_rm(fs_node_t* node, fs_node_t* delete_node) {
     switch(node->fs->type) {
         case FS_FAT32:
@@ -112,7 +110,6 @@ FS_ERR fs_rm(fs_node_t* node, fs_node_t* delete_node) {
     }
 }
 
-// remove a directory or a file and its content recursively if is a directory
 FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t* delete_node) {
     if(FS_NODE_IS_DIR(*delete_node)) {
         // try to remove all of its contents
@@ -131,32 +128,6 @@ FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t* delete_node) {
 
     // now try remove it. it should success
     return fs_rm(parent, delete_node);
-}
-
-// move a node to new parent
-// set new_name to NULL to reuse the old name
-FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
-    fs_node_t copied;
-
-    if(new_parent->fs->type == FS_FAT32) {
-        copied = fat32_add_entry(
-            new_parent,
-            new_name == NULL ? node->name : new_name,
-            node->fat_cluster.start_cluster, fat32_to_fat_attr(node->flags), node->size
-        );
-    }
-    else return ERR_FS_NOT_SUPPORTED;
-
-    if(!FS_NODE_IS_VALID(copied)) return ERR_FS_FAILED;
-
-    FS_ERR err;
-    if(node->fs->type == FS_FAT32)
-        err = fat32_remove_entry(node->parent_node, node, false); // do not delete the node content
-    else return ERR_FS_NOT_SUPPORTED;
-
-    if(err) return err;
-    *node = copied;
-    return ERR_FS_SUCCESS;
 }
 
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
@@ -206,6 +177,27 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
     // else return ERR_FS_NOT_SUPPORTED;
 
     return ERR_FS_SUCCESS;
+}
+
+// move a node to new parent
+// set new_name to NULL to reuse the old name
+FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
+    if(node->fs->type == new_parent->fs->type) {
+        switch(node->fs->type) {
+            case FS_FAT32:
+                return fat32_move(node, new_parent, new_name);
+            case FS_RAMFS:
+                return ramfs_move(node, new_parent, new_name);
+            default:
+                return ERR_FS_NOT_SUPPORTED;
+        }
+    }
+    else {
+        return ERR_FS_NOT_SUPPORTED;
+        // TODO:
+        // copy node to new_parent
+        // then delete the old node
+    }
 }
 
 FILE file_open(fs_node_t* node, int mode) {

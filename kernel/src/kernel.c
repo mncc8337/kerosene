@@ -345,6 +345,12 @@ void kmain() {
     
     if(shell_init()) puts("not enough memory for kshell.");
 
+    fs_node_t* root = &(vfs_getfs(RAMFS_DISK)->root_node);
+    fs_node_t ngu = fs_mkdir(root, "ngu");
+    fs_touch(&ngu, "a");
+    fs_touch(&ngu, "b");
+    fs_move(&ngu, root, "oc-heo");
+
     process_t* shell_proc = process_new((uint32_t)shell_start, 0, false);
     if(shell_proc) scheduler_add_process(shell_proc);
 
