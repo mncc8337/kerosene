@@ -33,6 +33,9 @@ bool vfs_init() {
     FS = (fs_t*)kmalloc(sizeof(fs_t) * MAX_FS);
     if(!FS) return true;
 
+    for(unsigned i = 0; i < MAX_FS; i++)
+        FS[i].type = FS_EMPTY;
+
     if(ramfs_init(&FS[RAMFS_DISK])) {
         kfree(FS);
         return true;
@@ -60,5 +63,5 @@ fs_t* vfs_getfs(int id) {
 
 bool vfs_is_fs_available(int id) {
     if(id >= MAX_FS) return false;
-    return FS_NODE_IS_VALID(FS[id].root_node);
+    return FS[id].type != FS_EMPTY;
 }

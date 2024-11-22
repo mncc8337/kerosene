@@ -85,8 +85,6 @@ static FS_ERR list_dir(fs_node_t* parent, int max_depth, bool show_hidden, int* 
     return ERR_FS_SUCCESS;
 }
 static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
-    FS_NODE_FLAG_UNSET(node, FS_FLAG_VALID);
-    
     *parent = *(node_stack_top());
 
     if(path[0] == '/') {
@@ -97,21 +95,23 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
 
     char* nodename = strtok(path, "/");
     while(nodename != NULL) {
-        if(FS_NODE_IS_VALID(*node)) *parent = *node;
         // root dir does not have the . and .. dir so we need to handle it differently
         if((strcmp(nodename, ".") || strcmp(nodename, ".."))
                 && parent->name[0] == '/')
             *node = node_stack[0];
-        else *node = fs_find(parent, nodename);
-        if(!FS_NODE_IS_VALID(*node)) {
-            memcpy(node->name, nodename, strlen(nodename)+1);
-            if(strtok(NULL, "/") != NULL)
-                return ERR_SHELL_NOT_FOUND;
-            return ERR_SHELL_TARGET_NOT_FOUND;
+        else {
+            FS_ERR find_err = fs_find(parent, nodename, node);
+            if(find_err) {
+                memcpy(node->name, nodename, strlen(nodename)+1);
+                if(strtok(NULL, "/") != NULL)
+                    return ERR_SHELL_NOT_FOUND;
+                return ERR_SHELL_TARGET_NOT_FOUND;
+            }
         }
         nodename = strtok(NULL, "/");
         if(nodename != NULL && !FS_NODE_IS_DIR(*node)) // this is illegal
             return ERR_SHELL_NOT_A_DIR;
+        *parent = *node;
     }
 
     return ERR_SHELL_SUCCESS;
@@ -349,9 +349,10 @@ static void cd(char* path) {
     while(nodename != NULL) {
         if(strcmp(nodename, "..")) node_stack_pop();
         else if(!strcmp(nodename, ".")) {
-            fs_node_t tmp = fs_find(node_stack_top(), nodename);
-            if(!FS_NODE_IS_VALID(tmp)) {
-                printf("no such directory '%s'\n", nodename);
+            fs_node_t tmp;
+            FS_ERR find_err = fs_find(node_stack_top(), nodename, &tmp);
+            if(find_err) {
+                printf("cannot find '%s', error %d\n", nodename, find_err);
                 return;
             }
             if(!FS_NODE_IS_DIR(tmp)) {
@@ -389,15 +390,21 @@ static void mkdir(char* path) {
 
     char* dirname = strtok(path, "/");
     while(dirname != NULL) {
-        fs_node_t node = fs_find(&_curr_node, dirname);
-        if(FS_NODE_IS_VALID(node)) {
+        fs_node_t node;
+        FS_ERR find_err = fs_find(&_curr_node, dirname, &node);
+        if(!find_err) {
             printf("a file or directory with name '%s' has already existed\n", dirname);
             return;
         }
+        if(find_err != ERR_FS_NOT_FOUND) {
+            printf("failed to search for '%s'. error %d\n", dirname, find_err);
+            return;
+        }
 
-        fs_node_t newdir = fs_mkdir(&_curr_node, dirname);
-        if(!FS_NODE_IS_VALID(newdir)) {
-            printf("failed to create directory '%s'\n", dirname);
+        fs_node_t newdir;
+        FS_ERR mkdir_err = fs_mkdir(&_curr_node, dirname, &newdir);
+        if(mkdir_err) {
+            printf("failed to create directory '%s', error %d\n", dirname, mkdir_err);
             return;
         }
         _curr_node = newdir;
@@ -453,8 +460,8 @@ static void touch(char* path) {
     // at this point the error should be ERR_SHELL_TARGET_NOT_FOUND
     // which is what we wanted
 
-    node = fs_touch(&node_parent, node.name);
-    if(!FS_NODE_IS_VALID(node)) printf("cannot create '%s', out of space\n", node.name);
+    FS_ERR touch_err =  fs_touch(&node_parent, node.name, &node);
+    if(touch_err) printf("cannot create '%s', error %d\n", path, touch_err);
 }
 
 static void write(char* path) {
@@ -474,9 +481,9 @@ static void write(char* path) {
     }
     if(err == ERR_SHELL_TARGET_NOT_FOUND) {
         // try to create one
-        node = fs_touch(&node_parent, node.name);
-        if(!FS_NODE_IS_VALID(node)) {
-            printf("cannot create file '%s', out of space\n", node.name);
+        FS_ERR touch_err = fs_touch(&node_parent, node.name, &node);
+        if(touch_err) {
+            printf("cannot create file '%s', error %d\n", path, touch_err);
             return;
         }
     }

@@ -35,50 +35,46 @@ FS_ERR fs_read_dir( directory_iterator_t* diriter, fs_node_t* ret_node) {
     }
 }
 
-fs_node_t fs_find(fs_node_t* parent, const char* nodename) {
+FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
     FS_ERR last_err;
-    fs_node_t ret_node; ret_node.flags = 0;
+    ret_node->flags = 0;
 
     directory_iterator_t diriter;
     FS_ERR diriter_err = fs_setup_directory_iterator(&diriter, parent);
-    if(diriter_err) return ret_node;
+    if(diriter_err) return diriter_err;
 
     bool (*cmpcmd)(const char*, const char*);
     if(parent->fs->type == FS_FAT32) cmpcmd = strcmp_case_insensitive;
     else cmpcmd = strcmp;
 
-    while(!(last_err = fs_read_dir(&diriter, &ret_node))) {
-        if(cmpcmd(nodename, ret_node.name))
-            return ret_node;
+    while(!(last_err = fs_read_dir(&diriter, ret_node))) {
+        if(cmpcmd(nodename, ret_node->name))
+            return ERR_FS_SUCCESS;
     }
 
-    if(last_err != ERR_FS_EOF) {
-        // TODO: handle error
-    }
+    if(last_err != ERR_FS_EOF)
+        return last_err;
 
-    ret_node.flags = 0;
-    return ret_node;
+    return ERR_FS_NOT_FOUND;
 }
 
 // make a directory in parent node
 // return invalid node when failed to find free cluster / fs not defined / directory already exists
-fs_node_t fs_mkdir(fs_node_t* parent, char* name) {
-    fs_node_t invalid_node;
-    invalid_node.flags = 0;
+FS_ERR fs_mkdir(fs_node_t* parent, char* name, fs_node_t* new_node) {
+    new_node->flags = 0;
 
     switch(parent->fs->type) {
         case FS_FAT32:
-            return fat32_mkdir(parent, name, 0);
+            return fat32_mkdir(parent, name, 0, new_node);
         case FS_RAMFS:
-            return ramfs_mkdir(parent, name, 0);
+            return ramfs_mkdir(parent, name, 0, new_node);
         default:
-            return invalid_node;
+            return ERR_FS_NOT_SUPPORTED;
     }
 }
 
-fs_node_t fs_touch(fs_node_t* parent, char* name) {
-    fs_node_t node;
-    node.flags = 0;
+FS_ERR fs_touch(fs_node_t* parent, char* name, fs_node_t* new_node) {
+    new_node->flags = 0;
 
     uint32_t file_cluster;
     ramfs_datanode_t* datanode_chain;
@@ -86,17 +82,15 @@ fs_node_t fs_touch(fs_node_t* parent, char* name) {
     switch(parent->fs->type) {
         case FS_FAT32:
             file_cluster = fat32_allocate_clusters(parent->fs, 1, false);
-            if(file_cluster == 0) return node;
-            node = fat32_add_entry(parent, name, file_cluster, 0, 0);
-            break;
+            if(!file_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
+            return fat32_add_entry(parent, name, file_cluster, 0, 0, new_node);
         case FS_RAMFS:
             datanode_chain = ramfs_allocate_datanodes(1, false);
-            node = ramfs_add_entry(parent, name, datanode_chain, 0, 0);
-            break;
-        default: break;
+            if(!datanode_chain) return ERR_FS_NOT_ENOUGH_SPACE;
+            return ramfs_add_entry(parent, name, datanode_chain, 0, 0, new_node);
+        default:
+            return ERR_FS_NOT_SUPPORTED;
     }
-
-    return node;
 }
 
 FS_ERR fs_rm(fs_node_t* node, fs_node_t* delete_node) {

@@ -492,7 +492,7 @@ FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
             parse_datetime(temp_dir->last_access_date, 0, &(ret_node->accessed_timestamp));
             parse_datetime(temp_dir->last_mod_date, temp_dir->last_mod_time, &(ret_node->modified_timestamp));
 
-            ret_node->flags = FS_FLAG_VALID;
+            ret_node->flags = 0;
             if(temp_dir->attr & FAT_ATTR_DIRECTORY)
                 ret_node->flags |= FS_FLAG_DIRECTORY;
             if(temp_dir->attr & FAT_ATTR_HIDDEN)
@@ -680,11 +680,8 @@ FS_ERR fat32_write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size
 }
 
 // add a new entry to parent
-// return valid node when success
-// return invalid node when cannot find a free cluster / an entry with the same name has already exists
-fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size) {
-    fs_node_t node;
-    node.flags = 0;
+FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size, fs_node_t* new_node) {
+    new_node->flags = 0;
 
     fat32_bootrecord_t* bootrec = &(parent->fs->fat32_info.bootrec);
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
@@ -737,7 +734,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
 
             // found duplication
             if(strcmp_case_insensitive(entry_name, name))
-                return node;
+                return ERR_FS_ENTRY_EXISTED;
 
             lfn_ready = false;
             found_last_LFN_entry = false;
@@ -749,7 +746,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
         if(FAT_val >= FAT_EOC) { // end of cluster
             // add a new cluster
             current_cluster = expand_cluster_chain(parent->fs, current_cluster, 1, true);
-            if(current_cluster == 0) return node;
+            if(current_cluster == 0) return ERR_FS_NOT_ENOUGH_SPACE;
             new_cluster_created = true;
             continue;
         }
@@ -770,10 +767,10 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     if(estimated_new_cluster_count > 0) {
         // try to expand
         uint32_t valid = expand_cluster_chain(parent->fs, current_cluster, estimated_new_cluster_count, true);
-        if(!valid) return node;
+        if(!valid) return ERR_FS_NOT_ENOUGH_SPACE;
     }
 
-    memcpy(node.name, name, namelen+1);
+    memcpy(new_node->name, name, namelen+1);
 
     char shortname[11]; memset(shortname, ' ', 11);
 
@@ -835,22 +832,22 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
     // generate checksum
     uint8_t checksum = gen_checksum(shortname);
 
-    node.parent_node = parent;
-    node.fs = parent->fs;
-    node.parent_node = parent;
-    node.fat_cluster.start_cluster = start_cluster;
-    node.size = size;
+    new_node->parent_node = parent;
+    new_node->fs = parent->fs;
+    new_node->parent_node = parent;
+    new_node->fat_cluster.start_cluster = start_cluster;
+    new_node->size = size;
 
-    node.flags = FS_FLAG_VALID;
+    new_node->flags = 0;
     if(attr & FAT_ATTR_DIRECTORY)
-        node.flags |= FS_FLAG_DIRECTORY;
+        new_node->flags |= FS_FLAG_DIRECTORY;
     if(attr & FAT_ATTR_HIDDEN)
-        node.flags |= FS_FLAG_HIDDEN;
+        new_node->flags |= FS_FLAG_HIDDEN;
 
-    node.creation_milisecond = (clock() % CLOCKS_PER_SEC) * 1000 / CLOCKS_PER_SEC;
-    node.creation_timestamp = time(NULL);
-    node.modified_timestamp = 0;
-    node.accessed_timestamp = 0;
+    new_node->creation_milisecond = (clock() % CLOCKS_PER_SEC) * 1000 / CLOCKS_PER_SEC;
+    new_node->creation_timestamp = time(NULL);
+    new_node->modified_timestamp = 0;
+    new_node->accessed_timestamp = 0;
 
     // add entries
     for(int i = lfn_entry_count; i >= 0; i--) {
@@ -883,28 +880,28 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
             fat_directory_entry_t* dir_entry = (fat_directory_entry_t*)(directory + start_index);
             memcpy(dir_entry->name, shortname, 11);
             dir_entry->attr = attr;
-            dir_entry->centisecond = node.creation_milisecond / 10;
+            dir_entry->centisecond = new_node->creation_milisecond / 10;
 
             uint16_t date_dump, time_dump;
 
-            parse_timestamp(&date_dump, &time_dump, gmtime(&(node.creation_timestamp)));
+            parse_timestamp(&date_dump, &time_dump, gmtime(&(new_node->creation_timestamp)));
             dir_entry->creation_time = time_dump;
             dir_entry->creation_date = date_dump;
 
-            parse_timestamp(&date_dump, &time_dump, gmtime(&(node.accessed_timestamp)));
+            parse_timestamp(&date_dump, &time_dump, gmtime(&(new_node->accessed_timestamp)));
             dir_entry->last_access_date = date_dump;
 
             dir_entry->first_cluster_number_high = start_cluster >> 16;
 
-            parse_timestamp(&date_dump, &time_dump, gmtime(&(node.modified_timestamp)));
+            parse_timestamp(&date_dump, &time_dump, gmtime(&(new_node->modified_timestamp)));
             dir_entry->last_mod_time = time_dump;
             dir_entry->last_mod_date = date_dump;
 
             dir_entry->first_cluster_number_low = start_cluster & 0xffff;
             dir_entry->size = size;
 
-            node.fat_cluster.parent_cluster = current_cluster;
-            node.fat_cluster.parent_cluster_index = start_index;
+            new_node->fat_cluster.parent_cluster = current_cluster;
+            new_node->fat_cluster.parent_cluster_index = start_index;
         }
         done_parsing_name:
 
@@ -929,7 +926,7 @@ fs_node_t fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster,
         ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
     }
 
-    return node;
+    return ERR_FS_SUCCESS;
 }
 
 // remove an entry from parent
@@ -1107,52 +1104,55 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
 // make a directory in parent node
 // return valid node when success
 // return invalid node when node with the same name has already exists / cannot find free cluster
-fs_node_t fat32_mkdir(fs_node_t* parent, char* name, uint8_t attr) {
-    fs_node_t created_dir; created_dir.flags = 0;
+FS_ERR fat32_mkdir(fs_node_t* parent, char* name, uint8_t attr, fs_node_t* new_node) {
+    new_node->flags = 0;
 
     uint32_t start_cluster = fat32_allocate_clusters(parent->fs, 1, true);
-    if(start_cluster == 0) return created_dir;
+    if(start_cluster == 0) return ERR_FS_NOT_ENOUGH_SPACE;
 
-    created_dir = fat32_add_entry(parent, name, start_cluster, attr | FAT_ATTR_DIRECTORY, 0);
-    if(!FS_NODE_IS_VALID(created_dir)) return created_dir;
+    FS_ERR add_entry_err = fat32_add_entry(parent, name, start_cluster, attr | FAT_ATTR_DIRECTORY, 0, new_node);
+    if(add_entry_err) return add_entry_err;
 
     // create the '..' and the '.' dir
-    fs_node_t dot_dir = fat32_add_entry(
-        &created_dir,
+    fs_node_t dot_dir;
+    FS_ERR dotdir_err = fat32_add_entry(
+        new_node,
         ".",
         start_cluster,
         FAT_ATTR_DIRECTORY | FAT_ATTR_HIDDEN,
-        0
+        0, &dot_dir
     );
-    if(!FS_NODE_IS_VALID(dot_dir)) return dot_dir;
+    if(dotdir_err) return dotdir_err;
 
-    fs_node_t dotdot_dir = fat32_add_entry(
-        &created_dir,
+    fs_node_t dotdot_dir;
+    FS_ERR dotdotdir_err = fat32_add_entry(
+        new_node,
         "..",
         parent->fat_cluster.start_cluster,
         FAT_ATTR_DIRECTORY | FAT_ATTR_HIDDEN,
-        0
+        0, &dotdot_dir
     );
-    if(!FS_NODE_IS_VALID(dotdot_dir)) return dotdot_dir;
+    if(dotdotdir_err) return dotdotdir_err;
 
-    return created_dir;
+    return ERR_FS_SUCCESS;
 }
 
 FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     if(!new_name) new_name = node->name;
 
-    fs_node_t copied = fat32_add_entry(
+    fs_node_t copied;
+    FS_ERR copy_err = fat32_add_entry(
         new_parent, new_name,
-        node->fat_cluster.start_cluster, fat32_to_fat_attr(node->flags), node->size
+        node->fat_cluster.start_cluster, fat32_to_fat_attr(node->flags), node->size,
+        &copied
     );
-
-    if(!FS_NODE_IS_VALID(copied)) return ERR_FS_FAILED;
+    if(copy_err) return copy_err;
 
     // remove the entry but not the content
-    FS_ERR err = fat32_remove_entry(node->parent_node, node, false);
-    if(err) {
+    FS_ERR remove_err = fat32_remove_entry(node->parent_node, node, false);
+    if(remove_err) {
         // TODO: revert adding entry
-        return err;
+        return remove_err;
     }
 
     *node = copied;
@@ -1192,7 +1192,7 @@ FS_ERR fat32_init(fs_t* fs, partition_entry_t part) {
     fs->root_node.fs = fs;
     fs->root_node.fat_cluster.start_cluster = bootrec->ebpb.rootdir_cluster;
     fs->root_node.parent_node = NULL;
-    fs->root_node.flags = FS_FLAG_VALID | FS_FLAG_DIRECTORY;
+    fs->root_node.flags = FS_FLAG_DIRECTORY;
     fs->root_node.name[0] = '/';
     fs->root_node.name[1] = '\0';
 

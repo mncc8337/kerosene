@@ -297,8 +297,12 @@ void load_elf_file(char* path) {
     fs_t* fs = vfs_getfs(0);
     if(!fs) return;
 
-    fs_node_t elf = fs_find(&fs->root_node, path);
-    if(!FS_NODE_IS_VALID(elf)) return;
+    fs_node_t elf;
+    FS_ERR find_err = fs_find(&fs->root_node, path, &elf);
+    if(find_err) {
+        printf("cannot find '%s', error %d\n", path, find_err);
+        return;
+    }
 
     printf("found %s\n", path);
 
@@ -344,12 +348,6 @@ void kmain() {
     print_debug(LT_OK, "done initialising\n");
     
     if(shell_init()) puts("not enough memory for kshell.");
-
-    fs_node_t* root = &(vfs_getfs(RAMFS_DISK)->root_node);
-    fs_node_t ngu = fs_mkdir(root, "ngu");
-    fs_touch(&ngu, "a");
-    fs_touch(&ngu, "b");
-    fs_move(&ngu, root, "oc-heo");
 
     process_t* shell_proc = process_new((uint32_t)shell_start, 0, false);
     if(shell_proc) scheduler_add_process(shell_proc);
