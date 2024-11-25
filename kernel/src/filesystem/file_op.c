@@ -194,67 +194,44 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     }
 }
 
-FILE file_open(fs_node_t* node, int mode) {
-    FILE file;
-    file.valid = false;
-    file.node = node;
-    file.mode = mode;
-    switch(mode) {
-        case FILE_WRITE:
-            file.valid = true;
-            file.position = 0;
-            file.fat32_current_cluster = node->fat_cluster.start_cluster;
-            break;
-        case FILE_READ:
-            file.valid = true;
-            file.position = 0;
-            file.fat32_current_cluster = node->fat_cluster.start_cluster;
-            break;
-        case FILE_APPEND:
-            file.valid = true;
-            file.position = node->size;
-            file.fat32_current_cluster = fat32_get_last_cluster_of_chain(node->fs, node->fat_cluster.start_cluster);
-            break;
-    }
-
-    if(file.valid)
-        node->accessed_timestamp = time(NULL);
-
-    return file;
-}
-
-FS_ERR file_write(FILE* file, uint8_t* data, size_t size) {
-    if(file->mode == FILE_READ) return ERR_FS_FAILED;
-
-    if(file->node->fs->type == FS_FAT32) {
-        fat32_bootrecord_t* bootrec = &(file->node->fs->fat32_info.bootrec);
-        int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
-
-        if(file->position == 0 && file->node->size > (unsigned)cluster_size) {
-            // the file may has some infomation before hand
-            // so we need to "delete" them first
-            FS_ERR err = fat32_cut_cluster_chain(file->node->fs, file->fat32_current_cluster);
-            if(err) return err;
-            // reset size since position is 0
-            file->node->size = 0;
-        }
-
-        int offset = file->position % cluster_size;
-        if(offset == 0 && file->position > 0) {
-            // send offset = 512 so we will know to change to the next cluster
-            offset = 512;
-        }
-        FS_ERR err = fat32_write_file(
-            file->node->fs,
-            &(file->fat32_current_cluster), data, size, offset
-        );
-        if(err) return err;
-    }
+#include "stdio.h"
+FS_ERR file_open(FILE* file, fs_node_t* node, int mode) {
+    file->node = node;
+    file->mode = mode;
+    if(mode == FILE_WRITE || mode == FILE_READ)
+        file->position = 0;
+    else if(mode == FILE_APPEND)
+        file->position = node->size;
     else return ERR_FS_NOT_SUPPORTED;
 
-    file->position += size;
-    file->node->size += size;
-    file->node->modified_timestamp = time(NULL);
+    switch(node->fs->type) {
+        case FS_FAT32:
+            if(mode == FILE_WRITE || mode == FILE_READ) {
+                file->fat32_current_cluster = node->fat_cluster.start_cluster;
+            }
+            else if(mode == FILE_APPEND) {
+                file->fat32_current_cluster = fat32_get_last_cluster_of_chain(
+                    node->fs,
+                    node->fat_cluster.start_cluster
+                );
+            }
+            break;
+        case FS_RAMFS:
+            if(mode == FILE_WRITE || mode == FILE_READ) {
+                file->ramfs_current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain;
+            }
+            else if(mode == FILE_APPEND) {
+                file->ramfs_current_datanode = (uint32_t)(ramfs_get_last_datanote_of_chain(
+                    ((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain)
+                );
+            }
+            break;
+        default:
+            return ERR_FS_NOT_SUPPORTED;
+    }
+
+    node->accessed_timestamp = time(NULL);
+
     return ERR_FS_SUCCESS;
 }
 
@@ -264,34 +241,57 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
     if(file->position == file->node->size) return ERR_FS_EOF;
 
     FS_ERR err;
-    if(file->node->fs->type == FS_FAT32) {
-        fat32_bootrecord_t* bootrec = &(file->node->fs->fat32_info.bootrec);
-        int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
-
-        int offset = file->position % cluster_size;
-        if(offset == 0 && file->position > 0) {
-            // send offset = 512 so we will know to change to the next cluster
-            offset = 512;
-        }
-        err = fat32_read_file(
-            file->node->fs,
-            &(file->fat32_current_cluster), buffer, size, offset
-        );
+    switch(file->node->fs->type) {
+        case FS_FAT32:
+            err = fat32_read(file, buffer, size);
+            break;
+        case FS_RAMFS:
+            err = ramfs_read(file, buffer, size);
+            break;
+        default:
+            return ERR_FS_NOT_SUPPORTED;
     }
-    else return ERR_FS_NOT_SUPPORTED;
+    if(err != ERR_FS_SUCCESS && err != ERR_FS_EOF) return err;
 
-    if(err) return err;
     file->position += size;
     if(file->position > file->node->size) file->position = file->node->size;
-    return ERR_FS_SUCCESS;
+    return err;
 
 }
 
-FS_ERR file_close(FILE* file) {
-    if(file->node->fs->type == FS_FAT32)
-        fat32_update_entry(file->node);
-    else return ERR_FS_NOT_SUPPORTED;
+FS_ERR file_write(FILE* file, uint8_t* buffer, size_t size) {
+    if(file->mode == FILE_READ) return ERR_FS_FAILED;
 
-    file->valid = false;
+    FS_ERR err;
+    switch(file->node->fs->type) {
+        case FS_FAT32:
+            err = fat32_write(file, buffer, size);
+            break;
+        case FS_RAMFS:
+            err = ramfs_write(file, buffer, size);
+            break;
+        default:
+            return ERR_FS_NOT_SUPPORTED;
+    }
+    if(err) return err;
+
+    file->position += size;
+    file->node->size += size;
+    file->node->modified_timestamp = time(NULL);
+    return ERR_FS_SUCCESS;
+}
+
+FS_ERR file_close(FILE* file) {
+    switch (file->node->fs->type) {
+        case FS_FAT32:
+            fat32_update_entry(file->node);
+            break;
+        case FS_RAMFS:
+            ramfs_update_entry(file->node);
+            break;
+        default:
+            break;
+    }
+
     return ERR_FS_SUCCESS;
 }

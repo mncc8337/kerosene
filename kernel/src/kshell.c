@@ -111,7 +111,8 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
         nodename = strtok(NULL, "/");
         if(nodename != NULL && !FS_NODE_IS_DIR(*node)) // this is illegal
             return ERR_SHELL_NOT_A_DIR;
-        *parent = *node;
+
+        if(nodename != NULL) *parent = *node;
     }
 
     return ERR_SHELL_SUCCESS;
@@ -193,7 +194,8 @@ static void run_sh(char* args) {
         return;
     }
 
-    FILE f = file_open(&node, FILE_READ);
+    FILE f;
+    file_open(&f, &node, FILE_READ);
     char chr;
     input_len = 0;
     input[0] = '\0';
@@ -318,7 +320,8 @@ static void read(char* path) {
         return;
     }
 
-    FILE f = file_open(&node, FILE_READ);
+    FILE f;
+    file_open(&f, &node, FILE_READ);
     char chr;
     FS_ERR last_err;
     while((last_err = file_read(&f, (uint8_t*)(&chr), 1)) == ERR_FS_SUCCESS) {
@@ -488,7 +491,8 @@ static void write(char* path) {
         }
     }
 
-    FILE f = file_open(&node, FILE_WRITE);
+    FILE f;
+    file_open(&f, &node, FILE_WRITE);
 
     input_len = 0;
     puts("writing mode. press ESC to exit");
@@ -636,9 +640,8 @@ static void stat(char* path) {
         return;
     }
 
-    printf("filesystem: %s\n", (node.fs->type == 1 ? "FAT32" : (node.fs->type == 2 ? "ext2" : "unknown")));
+    printf("filesystem: %s\n", (node.fs->type == 1 ? "FAT32" : (node.fs->type == 2 ? "ext2" : ( node.fs->type == 3 ? "ramfs" :"unknown"))));
     printf("parent: '%s'\n", node.parent_node->name);
-    printf("start cluster: 0x%x\n", node.fat_cluster.start_cluster);
     printf("type: %s\n", (FS_NODE_IS_DIR(node) ? "directory" : "file"));
     printf("hidden: %s\n", (FS_NODE_IS_HIDDEN(node) ? "true" : "false"));
     printf("size: %d bytes\n", node.size);
@@ -978,7 +981,8 @@ static void loadfont(char* path) {
         return;
     }
 
-    FILE f = file_open(&node, FILE_READ);
+    FILE f;
+    file_open(&f, &node, FILE_READ);
     FS_ERR read_err = file_read(&f, (uint8_t*)new_font, node.size);
     file_close(&f);
 

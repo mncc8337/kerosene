@@ -32,8 +32,9 @@ ELF_ERR elf_validate(elf_header_t* elf_header) {
 }
 
 ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry) {
-    FILE f = file_open(node, FILE_READ);
-    if(!f.valid) return ERR_ELF_FILE_ERROR;
+    FILE f;
+    FS_ERR fserr = file_open(&f, node, FILE_READ);
+    if(!fserr) return ERR_ELF_FILE_ERROR;
 
     FS_ERR fs_err = file_read(&f, addr, node->size);
     file_close(&f);

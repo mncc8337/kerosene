@@ -125,6 +125,106 @@ static void fix_empty_entries(ramfs_node_t* node) {
     start_node->next = NULL;
 }
 
+static FS_ERR read_file(ramfs_datanode_t** start_datanode, uint8_t* buffer, size_t size, int data_offset) {
+    // make sure that data_offset is less than RAMFS_DATANODE_SIZE
+    while(data_offset >= RAMFS_DATANODE_SIZE) {
+        if(!(*start_datanode)->next)
+            return ERR_FS_EOF;
+        *start_datanode = (*start_datanode)->next;
+
+        data_offset -= RAMFS_DATANODE_SIZE;
+    }
+
+    if(data_offset > 0) {
+        unsigned read_size = RAMFS_DATANODE_SIZE - data_offset;
+        bool read_all = (size <= read_size);
+
+        memcpy(buffer, (*start_datanode)->data + data_offset, read_all ? size : read_size);
+
+        if(read_all)
+            return ERR_FS_SUCCESS;
+
+        size -= RAMFS_DATANODE_SIZE - data_offset;
+        buffer += read_size;
+
+        if(!(*start_datanode)->next)
+            return ERR_FS_EOF;
+        *start_datanode = (*start_datanode)->next;
+    }
+    // now we can ignore data_offset
+
+    while(true) {
+        unsigned read_size = (size < RAMFS_DATANODE_SIZE) ? size : RAMFS_DATANODE_SIZE;
+        memcpy(buffer, (*start_datanode)->data, read_size);
+
+        size -= read_size;
+        buffer += read_size;
+        if(size == 0) break;
+
+        if(!(*start_datanode)->next)
+            return ERR_FS_EOF;
+        *start_datanode = (*start_datanode)->next;
+    }
+
+    return ERR_FS_SUCCESS;
+}
+
+static FS_ERR write_file(ramfs_datanode_t** start_datanode, uint8_t* buffer, size_t size, int data_offset) {
+    // basically the same as read_file
+    // but change the direction of memcpy
+    // and add more datanode when not enough
+
+    while(data_offset >= RAMFS_DATANODE_SIZE) {
+        if(!(*start_datanode)->next) {
+            (*start_datanode)->next = ramfs_allocate_datanodes(data_offset / RAMFS_DATANODE_SIZE, false);
+            if(!(*start_datanode)->next) return ERR_FS_NOT_ENOUGH_SPACE;
+        }
+        *start_datanode = (*start_datanode)->next;
+
+        data_offset -= RAMFS_DATANODE_SIZE;
+    }
+
+    if(data_offset > 0) {
+        unsigned write_size = RAMFS_DATANODE_SIZE - data_offset;
+        bool write_all = size <= write_size;
+
+        memcpy((*start_datanode)->data + data_offset, buffer, write_all ? size : write_size);
+
+        if(write_all)
+            return ERR_FS_SUCCESS;
+
+        size -= RAMFS_DATANODE_SIZE - data_offset;
+        buffer += RAMFS_DATANODE_SIZE - data_offset;
+
+        if(!(*start_datanode)->next)
+            return ERR_FS_EOF;
+        *start_datanode = (*start_datanode)->next;
+    }
+
+    int estimated_datanode = size / RAMFS_DATANODE_SIZE;
+    if(estimated_datanode > 0) {
+        (*start_datanode)->next = ramfs_allocate_datanodes(estimated_datanode, false);
+        if(!(*start_datanode)->next) return ERR_FS_NOT_ENOUGH_SPACE;
+        // *start_datanode = (*start_datanode)->next;
+    }
+
+    while(true) {
+        unsigned write_size = (size < RAMFS_DATANODE_SIZE) ? size : RAMFS_DATANODE_SIZE;
+        memcpy((*start_datanode)->data, buffer, write_size);
+
+        size -= write_size;
+        buffer += write_size;
+        if(size == 0) break;
+
+        // this should not happen
+        if(!(*start_datanode)->next)
+            return ERR_FS_EOF;
+        *start_datanode = (*start_datanode)->next;
+    }
+
+    return ERR_FS_SUCCESS;
+}
+
 ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear) {
     if(count == 0) return NULL;
 
@@ -147,6 +247,12 @@ ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear) {
     }
 
     return start_node;
+}
+
+ramfs_datanode_t* ramfs_get_last_datanote_of_chain(ramfs_datanode_t* datanode) {
+    while(datanode->next)
+        datanode = datanode->next;
+    return datanode;
 }
 
 FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
@@ -407,6 +513,35 @@ FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
 
     *node = copied;
     return ERR_FS_SUCCESS;
+}
+
+FS_ERR ramfs_seek(FILE* file, size_t pos) {
+}
+
+FS_ERR ramfs_read(FILE* file, uint8_t* buffer, size_t size) {
+    int offset = file->position % RAMFS_DATANODE_SIZE;
+    if(file->position != 0 && offset == 0)
+        offset = RAMFS_DATANODE_SIZE;
+
+    return read_file((ramfs_datanode_t**)&file->ramfs_current_datanode, buffer, size, offset);
+}
+
+FS_ERR ramfs_write(FILE* file, uint8_t* buffer, size_t size) {
+    if(file->position == 0) {
+        // reset file data
+        ramfs_datanode_t* datanode_chain = ((ramfs_node_t*)file->node->ramfs_node.node_addr)->datanode_chain;
+        remove_datanode_chain(datanode_chain->next);
+        datanode_chain->next = NULL;
+
+        // reset size because we are in write mode
+        file->node->size = 0;
+    }
+
+    int offset = file->position % RAMFS_DATANODE_SIZE;
+    if(file->position != 0 && offset == 0)
+        offset = RAMFS_DATANODE_SIZE;
+
+    return write_file((ramfs_datanode_t**)&file->ramfs_current_datanode, buffer, size, offset);
 }
 
 FS_ERR ramfs_init(fs_t* fs) {
