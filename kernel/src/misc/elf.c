@@ -31,15 +31,15 @@ ELF_ERR elf_validate(elf_header_t* elf_header) {
     return ERR_ELF_SUCCESS;
 }
 
-ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry) {
+ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry, FS_ERR* fserr) {
     FILE f;
-    FS_ERR fserr = file_open(&f, node, FILE_READ);
-    if(!fserr) return ERR_ELF_FILE_ERROR;
+    *fserr = file_open(&f, node, FILE_READ);
+    if(*fserr) return ERR_ELF_FILE_ERROR;
 
-    FS_ERR fs_err = file_read(&f, addr, node->size);
+    *fserr = file_read(&f, addr, node->size);
     file_close(&f);
 
-    if(fs_err != ERR_FS_SUCCESS && fs_err != ERR_FS_EOF) return ERR_ELF_FILE_ERROR;
+    if(*fserr != ERR_FS_SUCCESS && *fserr != ERR_FS_EOF) return ERR_ELF_FILE_ERROR;
 
     elf_header_t* elf_header = (elf_header_t*)addr;
     int elf_err = elf_validate(elf_header);

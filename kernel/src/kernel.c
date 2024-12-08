@@ -300,7 +300,7 @@ void load_elf_file(char* path) {
     fs_node_t elf;
     FS_ERR find_err = fs_find(&fs->root_node, path, &elf);
     if(find_err) {
-        printf("cannot find '%s', error %d\n", path, find_err);
+        printf("cannot find '%s', fs error %d\n", path, find_err);
         return;
     }
 
@@ -313,10 +313,13 @@ void load_elf_file(char* path) {
     }
 
     uint32_t entry;
-    ELF_ERR err = elf_load(&elf, addr, vmmngr_get_page_directory(), &entry);
+    FS_ERR fserr;
+    ELF_ERR err = elf_load(&elf, addr, vmmngr_get_page_directory(), &entry, &fserr);
     kfree(addr);
     if(err) {
-        printf("failed to load elf, err %d\n", err);
+        if(err == ERR_ELF_FILE_ERROR) printf("failed to load elf, fs err %d\n", err);
+        else printf("failed to load elf, elf err %d\n", err);
+
         return;
     }
     else puts("elf file loaded");
