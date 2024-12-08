@@ -203,6 +203,7 @@ FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
 FS_ERR ramfs_update_entry(fs_node_t* node);
 FS_ERR ramfs_mkdir(fs_node_t* parent, char* name, uint32_t flags, fs_node_t* new_node);
 FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
+FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 
 FS_ERR ramfs_seek(FILE* file, size_t pos);
 FS_ERR ramfs_read(FILE* file, uint8_t* buffer, size_t size);
@@ -211,11 +212,8 @@ FS_ERR ramfs_write(FILE* file, uint8_t* buffer, size_t size);
 FS_ERR ramfs_init(fs_t* fs);
 
 // fat32.c
-uint8_t fat32_to_fat_attr(uint32_t flags);
-
 uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count, bool clear);
 uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster);
-uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster);
 
 FS_ERR fat32_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
@@ -224,6 +222,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
 FS_ERR fat32_update_entry(fs_node_t* node);
 FS_ERR fat32_mkdir(fs_node_t* parent, char* name, uint8_t attr, fs_node_t* new_node);
 FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
+FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 
 FS_ERR fat32_seek(FILE* file, size_t pos);
 FS_ERR fat32_read(FILE* file, uint8_t* buffer, size_t size);

@@ -15,10 +15,10 @@
 
 FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
     switch(node->fs->type) {
-        case FS_FAT32:
-            return fat32_setup_directory_iterator(diriter, node);
         case FS_RAMFS:
             return ramfs_setup_directory_iterator(diriter, node);
+        case FS_FAT32:
+            return fat32_setup_directory_iterator(diriter, node);
         default:
             return ERR_FS_NOT_SUPPORTED;
     }
@@ -26,10 +26,10 @@ FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* nod
 
 FS_ERR fs_read_dir( directory_iterator_t* diriter, fs_node_t* ret_node) {
     switch(diriter->node->fs->type) {
-        case FS_FAT32:
-            return fat32_read_dir(diriter, ret_node);
         case FS_RAMFS:
             return ramfs_read_dir(diriter, ret_node);
+        case FS_FAT32:
+            return fat32_read_dir(diriter, ret_node);
         default:
             return ERR_FS_NOT_SUPPORTED;
     }
@@ -64,10 +64,10 @@ FS_ERR fs_mkdir(fs_node_t* parent, char* name, fs_node_t* new_node) {
     new_node->flags = 0;
 
     switch(parent->fs->type) {
-        case FS_FAT32:
-            return fat32_mkdir(parent, name, 0, new_node);
         case FS_RAMFS:
             return ramfs_mkdir(parent, name, 0, new_node);
+        case FS_FAT32:
+            return fat32_mkdir(parent, name, 0, new_node);
         default:
             return ERR_FS_NOT_SUPPORTED;
     }
@@ -80,14 +80,14 @@ FS_ERR fs_touch(fs_node_t* parent, char* name, fs_node_t* new_node) {
     ramfs_datanode_t* datanode_chain;
 
     switch(parent->fs->type) {
-        case FS_FAT32:
-            file_cluster = fat32_allocate_clusters(parent->fs, 1, false);
-            if(!file_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
-            return fat32_add_entry(parent, name, file_cluster, 0, 0, new_node);
         case FS_RAMFS:
             datanode_chain = ramfs_allocate_datanodes(1, false);
             if(!datanode_chain) return ERR_FS_NOT_ENOUGH_SPACE;
             return ramfs_add_entry(parent, name, datanode_chain, 0, 0, new_node);
+        case FS_FAT32:
+            file_cluster = fat32_allocate_clusters(parent->fs, 1, false);
+            if(!file_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
+            return fat32_add_entry(parent, name, file_cluster, 0, 0, new_node);
         default:
             return ERR_FS_NOT_SUPPORTED;
     }
@@ -95,10 +95,10 @@ FS_ERR fs_touch(fs_node_t* parent, char* name, fs_node_t* new_node) {
 
 FS_ERR fs_rm(fs_node_t* node, fs_node_t* delete_node) {
     switch(node->fs->type) {
-        case FS_FAT32:
-            return fat32_remove_entry(node, delete_node, true);
         case FS_RAMFS:
             return ramfs_remove_entry(node, delete_node, true);
+        case FS_FAT32:
+            return fat32_remove_entry(node, delete_node, true);
         default:
             return ERR_FS_NOT_SUPPORTED;
     }
@@ -125,25 +125,26 @@ FS_ERR fs_rm_recursive(fs_node_t* parent, fs_node_t* delete_node) {
 }
 
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
-    // if(new_parent->fs->type == FS_FAT32) {
-    //     uint32_t start_cluster = fat32_copy_cluster_chain(new_parent->fs, node->fat_cluster.start_cluster);
-    //     if(start_cluster == 0) return ERR_FS_FAILED;
-    //
-    //     *copied = fat32_add_entry(
-    //         new_parent,
-    //         new_name == NULL ? node->name : new_name,
-    //         start_cluster, fat32_to_fat_attr(node->flags), node->size
-    //     );
-    // }
-    // else return ERR_FS_NOT_SUPPORTED;
-    //
-    // if(!FS_NODE_IS_VALID(*copied)) return ERR_FS_FAILED;
-    return ERR_FS_SUCCESS;
+    if(node->fs->type == new_parent->fs->type) {
+        switch(node->fs->type) {
+            case FS_RAMFS:
+                return ERR_FS_NOT_SUPPORTED;
+            case FS_FAT32:
+                return fat32_copy(node, new_parent, copied, new_name);
+            default:
+                return ERR_FS_NOT_SUPPORTED;
+        }
+    }
+
+    // handle general case
+    return ERR_FS_NOT_SUPPORTED;
 }
 
 FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
-    // if(!FS_NODE_IS_DIR(*node)) return fs_copy(node, new_parent, copied, new_name);
-    //
+    if(!FS_NODE_IS_DIR(*node)) return fs_copy(node, new_parent, copied, new_name);
+
+    return ERR_FS_NOT_SUPPORTED;
+
     // // the node we need to copy is a directory at this point
     //
     // if(new_parent->fs->type == FS_FAT32) {
@@ -169,8 +170,6 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
     //     copy_current_dir = current_dir_bck;
     // }
     // else return ERR_FS_NOT_SUPPORTED;
-
-    return ERR_FS_SUCCESS;
 }
 
 // move a node to new parent
@@ -178,10 +177,10 @@ FS_ERR fs_copy_recursive(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copi
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     if(node->fs->type == new_parent->fs->type) {
         switch(node->fs->type) {
-            case FS_FAT32:
-                return fat32_move(node, new_parent, new_name);
             case FS_RAMFS:
                 return ramfs_move(node, new_parent, new_name);
+            case FS_FAT32:
+                return fat32_move(node, new_parent, new_name);
             default:
                 return ERR_FS_NOT_SUPPORTED;
         }
@@ -194,7 +193,6 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     }
 }
 
-#include "stdio.h"
 FS_ERR file_open(FILE* file, fs_node_t* node, int mode) {
     file->node = node;
     file->mode = mode;
@@ -205,6 +203,16 @@ FS_ERR file_open(FILE* file, fs_node_t* node, int mode) {
     else return ERR_FS_NOT_SUPPORTED;
 
     switch(node->fs->type) {
+        case FS_RAMFS:
+            if(mode == FILE_WRITE || mode == FILE_READ) {
+                file->ramfs_current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain;
+            }
+            else if(mode == FILE_APPEND) {
+                file->ramfs_current_datanode = (uint32_t)(ramfs_get_last_datanote_of_chain(
+                    ((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain)
+                );
+            }
+            break;
         case FS_FAT32:
             if(mode == FILE_WRITE || mode == FILE_READ) {
                 file->fat32_current_cluster = node->fat_cluster.start_cluster;
@@ -213,16 +221,6 @@ FS_ERR file_open(FILE* file, fs_node_t* node, int mode) {
                 file->fat32_current_cluster = fat32_get_last_cluster_of_chain(
                     node->fs,
                     node->fat_cluster.start_cluster
-                );
-            }
-            break;
-        case FS_RAMFS:
-            if(mode == FILE_WRITE || mode == FILE_READ) {
-                file->ramfs_current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain;
-            }
-            else if(mode == FILE_APPEND) {
-                file->ramfs_current_datanode = (uint32_t)(ramfs_get_last_datanote_of_chain(
-                    ((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain)
                 );
             }
             break;
@@ -242,11 +240,11 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
 
     FS_ERR err;
     switch(file->node->fs->type) {
-        case FS_FAT32:
-            err = fat32_read(file, buffer, size);
-            break;
         case FS_RAMFS:
             err = ramfs_read(file, buffer, size);
+            break;
+        case FS_FAT32:
+            err = fat32_read(file, buffer, size);
             break;
         default:
             return ERR_FS_NOT_SUPPORTED;
@@ -264,11 +262,11 @@ FS_ERR file_write(FILE* file, uint8_t* buffer, size_t size) {
 
     FS_ERR err;
     switch(file->node->fs->type) {
-        case FS_FAT32:
-            err = fat32_write(file, buffer, size);
-            break;
         case FS_RAMFS:
             err = ramfs_write(file, buffer, size);
+            break;
+        case FS_FAT32:
+            err = fat32_write(file, buffer, size);
             break;
         default:
             return ERR_FS_NOT_SUPPORTED;
@@ -283,11 +281,11 @@ FS_ERR file_write(FILE* file, uint8_t* buffer, size_t size) {
 
 FS_ERR file_close(FILE* file) {
     switch (file->node->fs->type) {
-        case FS_FAT32:
-            fat32_update_entry(file->node);
-            break;
         case FS_RAMFS:
             ramfs_update_entry(file->node);
+            break;
+        case FS_FAT32:
+            fat32_update_entry(file->node);
             break;
         default:
             break;

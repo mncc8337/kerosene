@@ -213,6 +213,40 @@ static FS_ERR cut_cluster_chain(fs_t* fs, uint32_t start_cluster) {
     return ERR_FS_SUCCESS;
 }
 
+// make a copy of a cluster chain
+static uint32_t copy_cluster_chain(fs_t* fs, uint32_t start_cluster) {
+    // allocate the first cluster
+    uint32_t copied_start_cluster = fat32_allocate_clusters(fs, 1, false);
+    if(copied_start_cluster == 0) return 0;
+
+    fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
+    uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
+    uint32_t first_data_sector = get_first_data_sector(bootrec);
+    uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
+
+    uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
+    uint8_t data[cluster_size];
+
+    uint32_t current_cluster = start_cluster;
+    uint32_t copied_current_cluster = copied_start_cluster;
+    while(true) {
+        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, data);
+
+        first_sector = ((copied_current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, data);
+
+        current_cluster = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
+        if(current_cluster >= FAT_EOC || current_cluster == FAT_BAD_CLUSTER)
+            break;
+
+        copied_current_cluster = expand_cluster_chain(fs, copied_current_cluster, 1, false);
+        // TODO: handle not enough space error of expand_cluster_chain
+    }
+
+    return copied_start_cluster;
+}
+
 static void fix_empty_entries(fs_t* fs, uint32_t start_cluster, uint32_t end_cluster) {
     fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
@@ -293,6 +327,16 @@ static void parse_timestamp(uint16_t* date, uint16_t* time, struct tm t) {
     *date = t.tm_mday;
     *date |= t.tm_mon << 5;
     *date |= (t.tm_year >= 1980 ? t.tm_year - 1980 : 0) << 9;
+}
+
+static uint8_t to_fat_attr(uint32_t flags) {
+    // TODO: expand
+
+    uint8_t attr = 0;
+    if(flags & FS_FLAG_DIRECTORY) attr |= FAT_ATTR_DIRECTORY;
+    if(flags & FS_FLAG_HIDDEN) attr |= FAT_ATTR_HIDDEN;
+
+    return attr;
 }
 
 static FS_ERR read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset) {
@@ -448,16 +492,6 @@ static FS_ERR write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, siz
     return ERR_FS_SUCCESS;
 }
 
-uint8_t fat32_to_fat_attr(uint32_t flags) {
-    // TODO: expand
-
-    uint8_t attr = 0;
-    if(flags & FS_FLAG_DIRECTORY) attr |= FAT_ATTR_DIRECTORY;
-    if(flags & FS_FLAG_HIDDEN) attr |= FAT_ATTR_HIDDEN;
-
-    return attr;
-}
-
 // find a free custers and make a chain from them
 // return start cluster address when success
 // return 0 when failed to read fsinfo / cannot find a free cluster / not enough free cluster
@@ -529,40 +563,6 @@ uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster) {
     }
 
     return current_cluster;
-}
-
-// make a copy of a cluster chain
-uint32_t fat32_copy_cluster_chain(fs_t* fs, uint32_t start_cluster) {
-    // allocate the first cluster
-    uint32_t copied_start_cluster = fat32_allocate_clusters(fs, 1, false);
-    if(copied_start_cluster == 0) return 0;
-
-    fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
-    uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
-    uint32_t first_data_sector = get_first_data_sector(bootrec);
-    uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
-
-    uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
-    uint8_t data[cluster_size];
-
-    uint32_t current_cluster = start_cluster;
-    uint32_t copied_current_cluster = copied_start_cluster;
-    while(true) {
-        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
-        ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, data);
-
-        first_sector = ((copied_current_cluster - 2) * sectors_per_cluster) + first_data_sector;
-        ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, data);
-
-        current_cluster = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
-        if(current_cluster >= FAT_EOC || current_cluster == FAT_BAD_CLUSTER)
-            break;
-
-        copied_current_cluster = expand_cluster_chain(fs, copied_current_cluster, 1, false);
-        // TODO: handle not enough space error of expand_cluster_chain
-    }
-
-    return copied_start_cluster;
 }
 
 FS_ERR fat32_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
@@ -1143,7 +1143,7 @@ FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     fs_node_t copied;
     FS_ERR copy_err = fat32_add_entry(
         new_parent, new_name,
-        node->fat_cluster.start_cluster, fat32_to_fat_attr(node->flags), node->size,
+        node->fat_cluster.start_cluster, to_fat_attr(node->flags), node->size,
         &copied
     );
     if(copy_err) return copy_err;
@@ -1159,8 +1159,24 @@ FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_seek(FILE* file, size_t pos) {
+FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
+    uint32_t start_cluster = copy_cluster_chain(new_parent->fs, node->fat_cluster.start_cluster);
+    if(start_cluster == 0) return ERR_FS_NOT_ENOUGH_SPACE;
+
+    FS_ERR err = fat32_add_entry(
+        new_parent,
+        new_name == NULL ? node->name : new_name,
+        start_cluster,
+        to_fat_attr(node->flags),
+        node->size,
+        copied
+    );
+    if(err) return err;
+    
+    return ERR_FS_SUCCESS;
 }
+
+FS_ERR fat32_seek(FILE* file, size_t pos);
 
 FS_ERR fat32_read(FILE* file, uint8_t* buffer, size_t size) {
     fat32_bootrecord_t* bootrec = &(file->node->fs->fat32_info.bootrec);
