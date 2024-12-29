@@ -126,6 +126,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - `print_debug` gives gliberrish result if put in many formats
 - global variable would cause conflict between processes (see ~~fat32.c~~ ~~file_op.c~~ strtok.c)
 - `video_vesa_print_char` sometime cause a pagefault
+- write a file until it exceeding 512 byte will cause the system to screw up and can only read the last written line
 ## Learning resources
 Note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
 ### Great tutorials

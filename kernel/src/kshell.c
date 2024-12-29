@@ -120,7 +120,7 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help clear . echo clocks cfs ls read cd mkdir rm touch write mv cp stat pwd datetime beep draw panic catproc sleep exit");
+        puts("help clear . echo clocks cfs ls read cd mkdir rm touch write append mv cp stat pwd datetime beep draw panic catproc sleep exit");
     }
     else {
         arg = strtok(arg, " ");
@@ -145,6 +145,7 @@ static void help(char* arg) {
         else if(strcmp(arg, "rm")) puts("remove a file or directory\nrm <path>");
         else if(strcmp(arg, "touch")) puts("make an empty file\ntouch <path>");
         else if(strcmp(arg, "write")) puts("write to a file\nwrite <path>");
+        else if(strcmp(arg, "append")) puts("append to a file\nappend <path>");
         else if(strcmp(arg, "mv")) puts("move a file or directory\nmv <source-path> <destination-path>");
         else if(strcmp(arg, "cp")) puts("copy a file or directory\ncp <source-path> <destination-path>");
         else if(strcmp(arg, "stat")) puts("print a file or directory stat\nstat <path>");
@@ -165,7 +166,7 @@ static void help(char* arg) {
         else if(strcmp(arg, "catproc")) puts("print all processes and their info\ncatproc <no-args>");
         else if(strcmp(arg, "sleep")) puts("halt for an ammount of time\nsleep <ticks>");
         else if(strcmp(arg, "loadfont")) puts("load new font\nloadfont <psf-file>");
-        else if(strcmp(arg, "exit")) puts("quit shell and continue to usermode\nexit <no-arg>");
+        else if(strcmp(arg, "exit")) puts("quit shell\nexit <no-arg>");
     }
 }
 
@@ -435,7 +436,7 @@ static void rm(char* path) {
         return;
     }
 
-    FS_ERR err = fs_rm_recursive(&node_parent, &node);
+    FS_ERR err = fs_rm(&node_parent, &node);
     if(err != ERR_FS_SUCCESS)
         printf("cannot remove '%s'. error code %d\n", node.name, err);
 }
@@ -493,6 +494,60 @@ static void write(char* path) {
 
     FILE f;
     file_open(&f, &node, FILE_WRITE);
+
+    input_len = 0;
+    puts("writing mode. press ESC to exit");
+
+    key_t current_key; current_key.keycode = 1;
+    while(current_key.keycode != KBD_KEYCODE_ESC) {
+        kbd_wait_key(&current_key);
+        if(current_key.released) continue;
+
+        if(current_key.mapped == '\0') continue;
+
+
+        if(current_key.mapped == '\b') {
+            if(input_len == 0) continue;
+            putchar(current_key.mapped);
+            input_len--;
+            continue;
+        }
+
+        putchar(current_key.mapped);
+        input[input_len++] = current_key.mapped;
+        if(current_key.mapped == '\n' || input_len >= MAX_INPUT - 10) {
+            file_write(&f, (uint8_t*)input, input_len);
+            input_len = 0;
+        }
+    }
+
+    if(input_len > 0)
+        file_write(&f, (uint8_t*)input, input_len);
+    file_close(&f);
+}
+
+static void append(char* path) {
+    if(path == NULL) {
+        puts("no name provided");
+        return;
+    }
+
+    path = strtok(path, " ");
+
+    fs_node_t node_parent;
+    fs_node_t node;
+    SHELL_ERR err = path_find_last_node(path, &node_parent, &node);
+    if(err == ERR_SHELL_NOT_FOUND || err == ERR_SHELL_NOT_A_DIR) {
+        printf("no such directory '%s'\n", node.name);
+        return;
+    }
+    if(err == ERR_SHELL_TARGET_NOT_FOUND) {
+        printf("no such file file '%s'\n", path);
+        return;
+    }
+
+    FILE f;
+    file_open(&f, &node, FILE_APPEND);
 
     input_len = 0;
     puts("writing mode. press ESC to exit");
@@ -615,7 +670,7 @@ static void cp(char* args) {
     }
 
     fs_node_t copied;
-    FS_ERR ferr = fs_copy_recursive(&source_node, &target_node_parent, &copied, target_node.name);
+    FS_ERR ferr = fs_copy(&source_node, &target_node_parent, &copied, target_node.name);
     if(ferr != ERR_FS_SUCCESS)
         printf("failed to copy %s to %s with name %s. error code %d\n", source_node.name, target_node_parent.name, target_node.name, ferr);
 }
@@ -645,6 +700,12 @@ static void stat(char* path) {
     printf("type: %s\n", (FS_NODE_IS_DIR(node) ? "directory" : "file"));
     printf("hidden: %s\n", (FS_NODE_IS_HIDDEN(node) ? "true" : "false"));
     printf("size: %d bytes\n", node.size);
+
+    printf("ram node addr: %x\n", node.ramfs_node.node_addr);
+    printf("ram datanode: %x\n", ((ramfs_node_t*)node.ramfs_node.node_addr)->datanode_chain);
+
+    printf("fat32 start cluster: %x\n", node.fat_cluster.start_cluster);
+    printf("fat32 parent cluster: %x\n", node.fat_cluster.parent_cluster);
 
     struct tm t_dump = gmtime(&(node.creation_timestamp));
     printf("creation timestamp: %d/%d/%d %d:%d:%d.%d\n",
@@ -1034,6 +1095,7 @@ void shell_process_prompt(char* prompts, unsigned prompts_len) {
         else if(strcmp(cmd_name, "rm")) rm(remain_arg);
         else if(strcmp(cmd_name, "touch")) touch(remain_arg);
         else if(strcmp(cmd_name, "write")) write(remain_arg);
+        else if(strcmp(cmd_name, "append")) append(remain_arg);
         else if(strcmp(cmd_name, "mv")) mv(remain_arg);
         else if(strcmp(cmd_name, "cp")) cp(remain_arg);
         else if(strcmp(cmd_name, "stat")) stat(remain_arg);

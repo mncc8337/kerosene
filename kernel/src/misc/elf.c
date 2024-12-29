@@ -38,7 +38,6 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
 
     *fserr = file_read(&f, addr, node->size);
     file_close(&f);
-
     if(*fserr != ERR_FS_SUCCESS && *fserr != ERR_FS_EOF) return ERR_ELF_FILE_ERROR;
 
     elf_header_t* elf_header = (elf_header_t*)addr;

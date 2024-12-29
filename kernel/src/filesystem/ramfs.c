@@ -36,13 +36,13 @@
 // TODO: check if `name` is overflow
 // TODO: make a separate heap
 
-static ramfs_node_t* create_new_node(char* name, uint32_t flags, ramfs_datanode_t* datanode_chain) {
+static ramfs_node_t* create_new_node(char* name, uint32_t flags, size_t size, ramfs_datanode_t* datanode_chain) {
     unsigned namelen = strlen(name);
 
     ramfs_node_t* node = (ramfs_node_t*)kmalloc(sizeof(ramfs_node_t) + namelen + 1);
     if(!node) return NULL;
 
-    node->size = 0;
+    node->size = size;
     node->creation_milisecond = (clock() % CLOCKS_PER_SEC) * 1000 / CLOCKS_PER_SEC;
     node->creation_timestamp = time(NULL);
     node->modified_timestamp = 0;
@@ -82,6 +82,29 @@ static void remove_datanode_chain(ramfs_datanode_t* node) {
         current_datanode = current_datanode->next;
         kfree((void*)saved);
     }
+}
+
+static ramfs_datanode_t* copy_datanode_chain(ramfs_datanode_t* datanode) {
+    ramfs_datanode_t* current_datanode = datanode;
+    ramfs_datanode_t* ret = 0;
+
+    ramfs_datanode_t* copied = 0;
+    while(current_datanode) {
+        if(copied) {
+            copied->next = (ramfs_datanode_t*)kmalloc(sizeof(ramfs_datanode_t));
+            copied = copied->next;
+        }
+        else {
+            copied = (ramfs_datanode_t*)kmalloc(sizeof(ramfs_datanode_t));
+            ret = copied;
+        }
+        if(!copied) return 0; // OOM
+
+        memcpy(copied->data, current_datanode->data, RAMFS_DATANODE_SIZE);
+        current_datanode = current_datanode->next;
+    }
+
+    return ret;
 }
 
 static void fix_empty_entries(ramfs_node_t* node) {
@@ -233,6 +256,12 @@ ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear) {
     if(clear) memset((void*)start_node->data, 0, RAMFS_DATANODE_SIZE);
     count--;
 
+    // special case
+    if(count == 0) {
+        start_node->next = 0;
+        return start_node;
+    }
+
     ramfs_datanode_t* current_node = start_node;
 
     while(count) {
@@ -243,6 +272,7 @@ ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear) {
         }
         if(clear) memset((void*)current_node->data, 0, RAMFS_DATANODE_SIZE);
         current_node = current_node->next;
+        current_node->next = 0;
         count--;
     }
 
@@ -256,8 +286,6 @@ ramfs_datanode_t* ramfs_get_last_datanote_of_chain(ramfs_datanode_t* datanode) {
 }
 
 FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
-    if(!FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_DIR;
-
     diriter->node = node;
     diriter->current_index = -1;
     diriter->ramfs.current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain;
@@ -298,7 +326,6 @@ FS_ERR ramfs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
 
 FS_ERR ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size, fs_node_t* new_node) {
     new_node->flags = 0;
-    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
 
     ramfs_node_t* parent_ramnode = (ramfs_node_t*)parent->ramfs_node.node_addr;
     unsigned empty_entry = 0;
@@ -332,7 +359,7 @@ FS_ERR ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode
         entry_list = (void*)parent_datanode->data;
     }
 
-    ramfs_node_t* ramnode = create_new_node(name, flags, datanode_chain);
+    ramfs_node_t* ramnode = create_new_node(name, flags, size, datanode_chain);
     if(!ramnode) return ERR_FS_NOT_ENOUGH_SPACE;
 
     // add ramnode entry
@@ -363,7 +390,6 @@ FS_ERR ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode
 }
 
 FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content) {
-    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
     if(strcmp(remove_node->name, ".") || strcmp(remove_node->name, ".."))
         return ERR_FS_FAILED;
 
@@ -393,7 +419,7 @@ FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
         }
     }
 
-    // find the removing node in parent_ramnode
+    // find the target node in parent_ramnode
     bool found = false;
     unsigned entry_id = 0;
     ramfs_datanode_t* parent_datanode = parent_ramnode->datanode_chain;
@@ -515,7 +541,25 @@ FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
+FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
+    if(!new_name) new_name = node->name;
+
+    ramfs_node_t* ramnode = (ramfs_node_t*)(node->ramfs_node.node_addr);
+    ramfs_datanode_t* copied_datanode = copy_datanode_chain(ramnode->datanode_chain);
+    if(!copied_datanode) return ERR_FS_NOT_ENOUGH_SPACE;
+
+    FS_ERR err = ramfs_add_entry(
+        new_parent,
+        new_name,
+        copied_datanode,
+        node->flags,
+        node->size,
+        copied
+    );
+    if(err) return err;
+
+    return ERR_FS_SUCCESS;
+}
 
 FS_ERR ramfs_seek(FILE* file, size_t pos);
 
@@ -549,7 +593,7 @@ FS_ERR ramfs_init(fs_t* fs) {
     ramfs_datanode_t* datanode_chain = ramfs_allocate_datanodes(1, true);
     if(!datanode_chain) return ERR_FS_FAILED;
 
-    ramfs_node_t* root_ramnode = create_new_node("/", FS_FLAG_DIRECTORY, datanode_chain);
+    ramfs_node_t* root_ramnode = create_new_node("/", FS_FLAG_DIRECTORY, 0, datanode_chain);
     if(!root_ramnode) return ERR_FS_FAILED;
 
     // fs->partition;

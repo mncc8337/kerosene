@@ -324,7 +324,7 @@ void load_elf_file(char* path) {
     }
     else puts("elf file loaded");
 
-    printf("jumping to entry (%x)\n", entry);
+    printf("jumping to entry (0x%x)\n", entry);
     int (*prog)(void) = (void*)entry;
     int exit_code = prog();
     printf("program exited with code %d\n", exit_code);

@@ -566,8 +566,6 @@ uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster) {
 }
 
 FS_ERR fat32_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
-    if(!FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_DIR;
-
     diriter->node = node;
     diriter->current_index = -32;
     diriter->fat32.current_cluster = node->fat_cluster.start_cluster;
@@ -931,7 +929,6 @@ FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, ui
 
 // remove an entry from parent
 FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content) {
-    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
     if(strcmp(remove_node->name, ".") || strcmp(remove_node->name, ".."))
         return ERR_FS_FAILED;
 
@@ -1161,7 +1158,7 @@ FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
 
 FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
     uint32_t start_cluster = copy_cluster_chain(new_parent->fs, node->fat_cluster.start_cluster);
-    if(start_cluster == 0) return ERR_FS_NOT_ENOUGH_SPACE;
+    if(!start_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
 
     FS_ERR err = fat32_add_entry(
         new_parent,
