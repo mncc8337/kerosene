@@ -99,6 +99,7 @@ static ramfs_datanode_t* copy_datanode_chain(ramfs_datanode_t* datanode) {
             ret = copied;
         }
         if(!copied) return 0; // OOM
+        copied->next = 0;
 
         memcpy(copied->data, current_datanode->data, RAMFS_DATANODE_SIZE);
         current_datanode = current_datanode->next;
