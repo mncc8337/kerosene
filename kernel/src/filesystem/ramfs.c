@@ -88,7 +88,7 @@ static ramfs_datanode_t* copy_datanode_chain(ramfs_datanode_t* datanode) {
     ramfs_datanode_t* current_datanode = datanode;
     ramfs_datanode_t* ret = 0;
 
-    ramfs_datanode_t* copied = 0;
+    ramfs_datanode_t* copied = NULL;
     while(current_datanode) {
         if(copied) {
             copied->next = (ramfs_datanode_t*)kmalloc(sizeof(ramfs_datanode_t));
@@ -99,7 +99,7 @@ static ramfs_datanode_t* copy_datanode_chain(ramfs_datanode_t* datanode) {
             ret = copied;
         }
         if(!copied) return 0; // OOM
-        copied->next = 0;
+        copied->next = NULL;
 
         memcpy(copied->data, current_datanode->data, RAMFS_DATANODE_SIZE);
         current_datanode = current_datanode->next;
@@ -259,7 +259,7 @@ ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear) {
 
     // special case
     if(count == 0) {
-        start_node->next = 0;
+        start_node->next = NULL;
         return start_node;
     }
 
@@ -273,7 +273,7 @@ ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear) {
         }
         if(clear) memset((void*)current_node->data, 0, RAMFS_DATANODE_SIZE);
         current_node = current_node->next;
-        current_node->next = 0;
+        current_node->next = NULL;
         count--;
     }
 
