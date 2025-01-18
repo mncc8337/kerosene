@@ -86,7 +86,7 @@ static void remove_datanode_chain(ramfs_datanode_t* node) {
 
 static ramfs_datanode_t* copy_datanode_chain(ramfs_datanode_t* datanode) {
     ramfs_datanode_t* current_datanode = datanode;
-    ramfs_datanode_t* ret = 0;
+    ramfs_datanode_t* ret = NULL;
 
     ramfs_datanode_t* copied = NULL;
     while(current_datanode) {
@@ -98,7 +98,7 @@ static ramfs_datanode_t* copy_datanode_chain(ramfs_datanode_t* datanode) {
             copied = (ramfs_datanode_t*)kmalloc(sizeof(ramfs_datanode_t));
             ret = copied;
         }
-        if(!copied) return 0; // OOM
+        if(!copied) return NULL; // OOM
         copied->next = NULL;
 
         memcpy(copied->data, current_datanode->data, RAMFS_DATANODE_SIZE);

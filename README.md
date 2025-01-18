@@ -1,15 +1,14 @@
 # Kerosene
-A hobby x86 monolithic OS written in C  
-This is an attempt of me to learn about osdev  
+A WIP hobby x86 monolithic OS written in C
 ## Features
 - PS/2 keyboard driver
 - ATA PIO mode
 - FAT32 filesystem support
-- basic VESA driver (i think)
+- basic framebuffer video driver
 ## Build and run
 ### Prerequisite
 - A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors.
-    + if you are lazy to install one, use `make all NO_CROSS_COMPILER=1` to compile using linux GCC (please do not report any errors if you use this option)
+    + if you are lazy to install one, use `make all NO_CROSS_COMPILER=1` to compile using linux GCC.
     + if you use a cross compiler then please check and correct the `CROSS_COMPILER_LOC` in `.env`
 - nasm
 - dosfstools
@@ -45,7 +44,7 @@ Files and directories in `fsfiles/` will be automatically copied into the disk i
 Note that scripts in `script/` will need sudo privilege to setup loopback device for the hard disk image.
 ### Running on real hardware
 You can either make an iso `./script/geniso.sh` and burn it to an usb or use `sudo dd if=disk.img of=/dev/sdX && sync` to burn the disk to an usb to run the OS. Note that ISO 9660 FS and usb driver are not implemented so the OS will perform filesystem commands on whatever partitions with FAT32 fs it found so just dont perform fs command and you will be fine.
-> [!NOTE]
+> [!Caution]
 > I am not responsible for any damage caused to your machine by the OS. Try this with your own risk!
 ## Progress
 ### Baby first step
@@ -128,7 +127,8 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - `video_vesa_print_char` sometime cause a pagefault
 - write a file until it exceeding 512 byte will cause the system to screw up and can only read the last written line
 ## Learning resources
-Note that anything related to osdev are on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
+> [!Tip]
+> Anything related to osdev is on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
 ### Great tutorials
 - https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
 - http://www.osdever.net/bkerndev/Docs/gettingstarted.htm
