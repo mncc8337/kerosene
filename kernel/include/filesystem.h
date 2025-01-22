@@ -182,7 +182,7 @@ FS_ERR fs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR fs_find(fs_node_t* parent, const char* path, fs_node_t* ret_node);
 FS_ERR fs_mkdir(fs_node_t* parent, char* name, fs_node_t* new_node);
 FS_ERR fs_touch(fs_node_t* parent, char* name, fs_node_t* new_node);
-FS_ERR fs_rm(fs_node_t* node, fs_node_t* delete_node);
+FS_ERR fs_remove(fs_node_t* node, fs_node_t* delete_node);
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
 

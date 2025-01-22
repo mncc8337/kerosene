@@ -89,7 +89,7 @@ FS_ERR fs_touch(fs_node_t* parent, char* name, fs_node_t* new_node) {
     }
 }
 
-FS_ERR fs_rm(fs_node_t* parent, fs_node_t* node) {
+FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node) {
     if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
 
     switch(parent->fs->type) {
@@ -126,7 +126,6 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
 // set new_name to NULL to reuse the old name
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     if(!FS_NODE_IS_DIR(*new_parent)) return ERR_FS_NOT_DIR;
-    if(FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_FILE;
 
     if(node->fs->type == new_parent->fs->type) {
         switch(node->fs->type) {

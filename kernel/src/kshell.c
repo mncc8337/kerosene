@@ -436,7 +436,7 @@ static void rm(char* path) {
         return;
     }
 
-    FS_ERR err = fs_rm(&node_parent, &node);
+    FS_ERR err = fs_remove(&node_parent, &node);
     if(err != ERR_FS_SUCCESS)
         printf("cannot remove '%s'. error code %d\n", node.name, err);
 }
