@@ -13,7 +13,7 @@
 #define MAX_FS 32
 #define RAMFS_DISK (MAX_FS-1)
 
-// this must be multiply of 4
+// this must be multiply of 4 and larger than 4
 #define RAMFS_DATANODE_SIZE 512
 
 #define FS_FLAG_DIRECTORY 1

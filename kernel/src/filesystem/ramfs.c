@@ -209,19 +209,21 @@ static FS_ERR write_file(ramfs_datanode_t** start_datanode, uint8_t* buffer, siz
     }
 
     if(data_offset > 0) {
-        unsigned write_size = RAMFS_DATANODE_SIZE - data_offset;
-        bool write_all = size <= write_size;
+        unsigned full_write_size = RAMFS_DATANODE_SIZE - data_offset;
+        unsigned write_size = (size <= full_write_size) ? size : full_write_size;
 
-        memcpy((*start_datanode)->data + data_offset, buffer, write_all ? size : write_size);
+        memcpy((*start_datanode)->data + data_offset, buffer, write_size);
 
-        if(write_all)
+        size -= write_size;
+        buffer += write_size;
+
+        if(size == 0)
             return ERR_FS_SUCCESS;
 
-        size -= RAMFS_DATANODE_SIZE - data_offset;
-        buffer += RAMFS_DATANODE_SIZE - data_offset;
-
-        if(!(*start_datanode)->next)
-            return ERR_FS_EOF;
+        if(!(*start_datanode)->next) {
+            (*start_datanode)->next = ramfs_allocate_datanodes(1, false);
+            if(!(*start_datanode)->next) return ERR_FS_NOT_ENOUGH_SPACE;
+        }
         *start_datanode = (*start_datanode)->next;
     }
 

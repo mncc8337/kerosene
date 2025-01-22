@@ -506,8 +506,7 @@ static void write(char* path) {
         if(current_key.mapped == '\0') continue;
 
 
-        if(current_key.mapped == '\b') {
-            if(input_len == 0) continue;
+        if(current_key.mapped == '\b' && input_len > 0) {
             putchar(current_key.mapped);
             input_len--;
             continue;
