@@ -58,26 +58,26 @@ void video_vga_init(uint8_t cols, uint8_t rows) {
             video_vga_print_char(preinit_buffer[i], -1, -1, -1, true);
     }
 }
-void video_vesa_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bpp) {
+void video_framebuffer_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bpp) {
     linear_graphics_mode = true;
 
-    video_set_attr      = video_vesa_set_attr;
-    video_get_size      = video_vesa_get_size;
-    video_rgb           = video_vesa_rgb;
-    video_get_cursor    = video_vesa_get_cursor;
-    video_set_cursor    = video_vesa_set_cursor;
-    video_cls           = video_vesa_cls;
-    video_print_char    = video_vesa_print_char;
+    video_set_attr      = video_framebuffer_set_attr;
+    video_get_size      = video_framebuffer_get_size;
+    video_rgb           = video_framebuffer_rgb;
+    video_get_cursor    = video_framebuffer_get_cursor;
+    video_set_cursor    = video_framebuffer_set_cursor;
+    video_cls           = video_framebuffer_cls;
+    video_print_char    = video_framebuffer_print_char;
 
-    video_vesa_set_size(pitch, bpp, width, height);
+    video_framebuffer_set_size(pitch, bpp, width, height);
 
     int font_width, font_height, font_bpg;
     psf_get_font_geometry(&font_width, &font_height, &font_bpg);
-    video_vesa_set_font_size(font_width, font_height, font_bpg);
+    video_framebuffer_set_font_size(font_width, font_height, font_bpg);
 
     if(preinit_buffer_len > 0) {
         for(unsigned i = 0; i < preinit_buffer_len; i++)
-            video_vesa_print_char(preinit_buffer[i], -1, -1, -1, true);
+            video_framebuffer_print_char(preinit_buffer[i], -1, -1, -1, true);
     }
 }
 

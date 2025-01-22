@@ -138,6 +138,7 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
         }
     }
     else {
+        if(FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_FILE;
         return ERR_FS_NOT_SUPPORTED;
         // TODO:
         // copy node to new_parent

@@ -50,24 +50,24 @@ static void scroll_screen(unsigned ammount) {
     );
 }
 
-void video_vesa_set_attr(int fg, int bg) {
+void video_framebuffer_set_attr(int fg, int bg) {
     current_fg = fg;
     current_bg = bg;
 }
 
-void video_vesa_set_size(int pitch, int bpp, int w, int h) {
+void video_framebuffer_set_size(int pitch, int bpp, int w, int h) {
     fb_pitch = pitch;
     fb_bpp = bpp;
     fb_width = w;
     fb_height = h;
 }
 
-void video_vesa_get_size(int* w, int* h) {
+void video_framebuffer_get_size(int* w, int* h) {
     *w = fb_width;
     *h = fb_height;
 }
 
-void video_vesa_set_font_size(int cw, int ch, int bpg) {
+void video_framebuffer_set_font_size(int cw, int ch, int bpg) {
     font_width = cw;
     font_height = ch;
     text_cols = fb_width / cw;
@@ -75,18 +75,18 @@ void video_vesa_set_font_size(int cw, int ch, int bpg) {
     font_bpg = bpg;
 }
 
-void video_vesa_get_font_size(int* w, int* h) {
+void video_framebuffer_get_font_size(int* w, int* h) {
     *w = font_width;
     *h = font_height;
 }
 
-bool video_vesa_set_font(char* font_data) {
+bool video_framebuffer_set_font(char* font_data) {
     bool res = psf_load(font_data);
     if(res) return true;
 
     int font_width, font_height, font_bpg;
     psf_get_font_geometry(&font_width, &font_height, &font_bpg);
-    video_vesa_set_font_size(font_width, font_height, font_bpg);
+    video_framebuffer_set_font_size(font_width, font_height, font_bpg);
 
     cursor_posx = 0;
     cursor_posy = 0;
@@ -94,12 +94,12 @@ bool video_vesa_set_font(char* font_data) {
     return false;
 }
 
-void video_vesa_get_rowcol(int* c, int* r) {
+void video_framebuffer_get_rowcol(int* c, int* r) {
     *c = text_cols;
     *r = text_rows;
 }
 
-void video_vesa_plot_pixel(unsigned x, unsigned y, int color) {
+void video_framebuffer_plot_pixel(unsigned x, unsigned y, int color) {
     // TODO: support other bpp
 
     if(x >= fb_width || y >= fb_height) return;
@@ -118,7 +118,7 @@ void video_vesa_plot_pixel(unsigned x, unsigned y, int color) {
     }
 }
 
-int video_vesa_get_pixel(unsigned x, unsigned y) {
+int video_framebuffer_get_pixel(unsigned x, unsigned y) {
     // TODO: support other bpp
 
     if(x >= fb_width || y >= fb_height) return 0;
@@ -144,7 +144,7 @@ int video_vesa_get_pixel(unsigned x, unsigned y) {
     return ret;
 }
 
-void video_vesa_fill_rectangle(int x0, int y0, int x1, int y1, int color) {
+void video_framebuffer_fill_rectangle(int x0, int y0, int x1, int y1, int color) {
     // TODO: support other bpp
 
     if((unsigned)x0 >= fb_width) x0 = fb_width-1;
@@ -195,7 +195,7 @@ static void draw_line_low(int x0, int y0, int x1, int y1, int color) {
     int y = y0;
 
     for(int x = x0; x <= x1; x++) {
-        video_vesa_plot_pixel(x, y, color);
+        video_framebuffer_plot_pixel(x, y, color);
         if(D > 0) {
             y += yi;
             D += 2 * (dy - dx);
@@ -216,7 +216,7 @@ static void draw_line_high(int x0, int y0, int x1, int y1, int color) {
     int x = x0;
 
     for(int y = y0; y <= y1; y++) {
-        video_vesa_plot_pixel(x, y, color);
+        video_framebuffer_plot_pixel(x, y, color);
         if(D > 0) {
             x += xi;
             D += 2 * (dx - dy);
@@ -224,7 +224,7 @@ static void draw_line_high(int x0, int y0, int x1, int y1, int color) {
         else D += 2 * dx;
     }
 }
-void video_vesa_draw_line(int x0, int y0, int x1, int y1, int color) {
+void video_framebuffer_draw_line(int x0, int y0, int x1, int y1, int color) {
     int dy = y1 - y0;
     if(y1 < y0) dy = y0 - y1;
 
@@ -241,15 +241,15 @@ void video_vesa_draw_line(int x0, int y0, int x1, int y1, int color) {
     }
 }
 
-void video_vesa_draw_circle(int x0, int y0, int r, int color) {
+void video_framebuffer_draw_circle(int x0, int y0, int r, int color) {
     int x = r;
     int y = 0;
 
-    video_vesa_plot_pixel(x + x0, y + y0, color);
+    video_framebuffer_plot_pixel(x + x0, y + y0, color);
 
-    video_vesa_plot_pixel(x + x0, -y + y0, color);
-    video_vesa_plot_pixel(y + x0, x + y0 , color);
-    video_vesa_plot_pixel(-y + x0, x + y0, color);
+    video_framebuffer_plot_pixel(x + x0, -y + y0, color);
+    video_framebuffer_plot_pixel(y + x0, x + y0 , color);
+    video_framebuffer_plot_pixel(-y + x0, x + y0, color);
 
     int P = 1 - r;
     while(x > y) {
@@ -262,20 +262,20 @@ void video_vesa_draw_circle(int x0, int y0, int r, int color) {
 
         if(x < y) break;
 
-        video_vesa_plot_pixel(x + x0, y + y0, color);
-        video_vesa_plot_pixel(-x + x0, y + y0, color);
-        video_vesa_plot_pixel(x + x0, -y + y0, color);
-        video_vesa_plot_pixel(-x + x0, -y + y0, color);
+        video_framebuffer_plot_pixel(x + x0, y + y0, color);
+        video_framebuffer_plot_pixel(-x + x0, y + y0, color);
+        video_framebuffer_plot_pixel(x + x0, -y + y0, color);
+        video_framebuffer_plot_pixel(-x + x0, -y + y0, color);
         if(x != y) {
-            video_vesa_plot_pixel(y + x0, x + y0, color);
-            video_vesa_plot_pixel(-y + x0, x + y0, color);
-            video_vesa_plot_pixel(y + x0, -x + y0, color);
-            video_vesa_plot_pixel(-y + x0, -x + y0, color);
+            video_framebuffer_plot_pixel(y + x0, x + y0, color);
+            video_framebuffer_plot_pixel(-y + x0, x + y0, color);
+            video_framebuffer_plot_pixel(y + x0, -x + y0, color);
+            video_framebuffer_plot_pixel(-y + x0, -x + y0, color);
         }
     }
 }
 
-int video_vesa_rgb(int r, int g, int b) {
+int video_framebuffer_rgb(int r, int g, int b) {
     // TODO: support other bpp mode
     return (r << 16) | (g << 8) | b;
 }
@@ -285,23 +285,23 @@ static void draw_cursor(bool load_buffer) {
     for(int y = 0; y < font_height; y++) {
         for(int x = 0; x < font_width; x++) {
             if(load_buffer)
-                video_vesa_plot_pixel(
+                video_framebuffer_plot_pixel(
                     x + cursor_buffer_posx * font_width,
                     y + cursor_buffer_posy * font_height,
                     cursor_buffer[y * font_width + x]
                 );
 
             // load new location to buffer
-            cursor_buffer[y * font_width + x] = video_vesa_get_pixel(
+            cursor_buffer[y * font_width + x] = video_framebuffer_get_pixel(
                 x + cursor_posx * font_width,
                 y + cursor_posy * font_height
             );
 
             // now draw the cursor
-            video_vesa_plot_pixel(
+            video_framebuffer_plot_pixel(
                 x + cursor_posx * font_width,
                 y + cursor_posy * font_height,
-                video_vesa_rgb(180, 170, 170)
+                video_framebuffer_rgb(180, 170, 170)
             );
         }
     }
@@ -311,21 +311,21 @@ static void draw_cursor(bool load_buffer) {
     cursor_buffer_posy = cursor_posy;
 }
 
-int video_vesa_get_cursor() {
+int video_framebuffer_get_cursor() {
     return cursor_posy * text_cols + cursor_posx;
 }
-void video_vesa_set_cursor(int offset) {
+void video_framebuffer_set_cursor(int offset) {
     cursor_posy = offset / text_cols;
     cursor_posx = offset % text_cols;
 }
 
-void video_vesa_cls(int bg) {
-    video_vesa_fill_rectangle(0, 0, fb_width-1, fb_height-1, bg);
+void video_framebuffer_cls(int bg) {
+    video_framebuffer_fill_rectangle(0, 0, fb_width-1, fb_height-1, bg);
     cursor_posy = 0;
     cursor_posx = 0;
 }
 
-void video_vesa_print_char(char chr, int offset, int fg, int bg, bool move) {
+void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool move) {
     if(chr == 0) return;
 
     int _cursor_posx = cursor_posx;
@@ -355,7 +355,7 @@ void video_vesa_print_char(char chr, int offset, int fg, int bg, bool move) {
         // manually delete the char
         for(int y = 0; y < font_height; y++)
             for(int x = 0; x < font_width; x++)
-                video_vesa_plot_pixel(
+                video_framebuffer_plot_pixel(
                     x + _cursor_posx * font_width,
                     y + _cursor_posy * font_height,
                     0x0
@@ -370,7 +370,7 @@ void video_vesa_print_char(char chr, int offset, int fg, int bg, bool move) {
             int remain_width = font_width - col;
             if(remain_width > 8) remain_width = 8;
             for(int j = 0; j < remain_width; j++) {
-                video_vesa_plot_pixel(
+                video_framebuffer_plot_pixel(
                     _cursor_posx * font_width + j + col,
                     _cursor_posy * font_height + line,
                     ((*(glyph+i) >> (7-j)) & 1) ? fg : bg

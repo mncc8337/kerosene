@@ -1,10 +1,12 @@
 # Kerosene
-A WIP hobby x86 monolithic OS written in C
+A WIP hobby x86 monolithic OS for learning purposes.
 ## Features
 - PS/2 keyboard driver
-- ATA PIO mode
-- FAT32 filesystem support
 - basic framebuffer video driver
+- PIT
+- ATA PIO mode
+- FAT32 filesystem
+- ramfs filesystem
 ## Build and run
 ### Prerequisite
 - A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors.
@@ -67,64 +69,58 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     + [x] get key scancode
     + [x] translate scancode to keycode
     + [x] LED indicating
+    + [ ] more here
 - [x] PIT
-    - [x] generate ticks
-    - [x] PC speaker (beep beep boop boop)
+    + [x] generate ticks
+    + [x] PC speaker (beep beep boop boop)
 - [x] memory manager
-    - [x] physical memory manager: bitmap allocator
-    - [x] virtual memory manager
-    - [x] the heap: first-fit allocator
+    + [x] physical memory manager: bitmap allocator
+    + [x] virtual memory manager
+    + [x] the heap: first-fit allocator
 - [ ] ATA
-    - [x] PIO mode
+    + [x] PIO mode
+    + [ ] more here
 - [x] CMOS and RTC: get datetime
 - [ ] APCI
 - [ ] APIC
 - [ ] HPET
 - [ ] PS/2 mouse driver
-- [x] VESA
-    - [x] plot pixel
-    - [x] render psf fonts
+- [x] framebuffer
+    + [x] plot pixel
+    + [x] render psf fonts
 - [ ] USB
 - [ ] sound
-- [ ] im not gonna touch networking
+- [ ] networking
 ### Filesystem
 - [x] MBR support
 - [ ] GPT support
 - [x] FAT32 fs
-    - [x] detect
-    - [x] list
-    - [x] make dir
-    - [x] remove dir
-    - [x] touch files
-    - [x] read
-    - [x] write file
-    - [x] move
-    - [x] copy
 - [ ] ext2 fs
+- [x] ramfs
 - [ ] vfs
 ### Userland
 - [x] TSS setup
 - [x] enter usermode
 - [ ] syscall
-    - [x] putchar
-    - [x] current time
-    - [x] terminate process
-    - [x] sleep()
-    - [ ] read file
-    - [ ] write file
+    + [x] putchar
+    + [x] current time
+    + [x] terminate process
+    + [x] sleep()
+    + [ ] read file
+    + [ ] write file
 - [ ] process manager
-    - [x] load process
-    - [x] load and save process state
-    - [x] basic process scheduling
-    - [x] process terminate
-    - [x] spinlock
-    - [ ] semaphore
+    + [x] load process
+    + [x] load and save process state
+    + [x] basic process scheduling
+    + [x] process terminate
+    + [x] spinlock
+    + [ ] semaphore
 - [x] load and run ELF file
 ## Known bugs
-- ATA PIO mode initialization some time failed (very rare): address mark not found
+- ATA PIO mode initialization occasionally failed: address mark not found
 - `print_debug` gives gliberrish result if put in many formats
 - global variable would cause conflict between processes (see ~~fat32.c~~ ~~file_op.c~~ strtok.c)
-- `video_vesa_print_char` sometime cause a pagefault
+- `video_framebuffer_print_char` sometime cause a pagefault
 ## Learning resources
 > [!Tip]
 > Anything related to osdev is on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)

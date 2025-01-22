@@ -106,7 +106,7 @@ void video_init(multiboot_info_t* mbd) {
     for(unsigned i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
         vmmngr_map(NULL, video_addr + i, VIDEO_START + i, PTE_WRITABLE);
     if(using_framebuffer) {
-        video_vesa_init(
+        video_framebuffer_init(
             video_width, video_height,
             video_pitch, video_bpp
         );
@@ -334,7 +334,7 @@ void kernel_proc1() {
     int ret;
     while(true) {
         SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
-        video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_GREEN));
+        video_framebuffer_fill_rectangle(20, 20, 40, 40, video_framebuffer_rgb(VIDEO_GREEN));
     }
     // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
 }
@@ -342,7 +342,7 @@ void kernel_proc2() {
     int ret;
     while(true) {
         SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
-        video_vesa_fill_rectangle(20, 20, 40, 40, video_vesa_rgb(VIDEO_RED));
+        video_framebuffer_fill_rectangle(20, 20, 40, 40, video_framebuffer_rgb(VIDEO_RED));
     }
     // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
 }

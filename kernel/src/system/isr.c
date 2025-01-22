@@ -89,7 +89,7 @@ static void* exception_handlers[] = {
 
 // default exception handler
 static void exception_handler(regs_t* r) {
-    video_vesa_set_cursor(0);
+    video_framebuffer_set_cursor(0);
     video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
     printf("Exception: ");
     video_set_attr(video_rgb(VIDEO_LIGHT_RED), video_rgb(VIDEO_BLACK));

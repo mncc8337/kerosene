@@ -848,7 +848,7 @@ static void draw(char* arg) {
             return;
         }
 
-        if(color_str == NULL) color = video_vesa_rgb(255, 255, 255);
+        if(color_str == NULL) color = video_framebuffer_rgb(255, 255, 255);
         else {
             int r, g, b;
             _color(color_str, &r, &g, &b);
@@ -857,7 +857,7 @@ static void draw(char* arg) {
                 return;
             }
 
-            color = video_vesa_rgb(r, g, b);
+            color = video_framebuffer_rgb(r, g, b);
         }
 
         x0 = atoi(x0_str);
@@ -865,7 +865,7 @@ static void draw(char* arg) {
         x1 = atoi(x1_str);
         y1 = atoi(y1_str);
 
-        video_vesa_draw_line(x0, y0, x1, y1, color);
+        video_framebuffer_draw_line(x0, y0, x1, y1, color);
     }
     else if(strcmp(mode, "rect")) {
         char* x0_str = strtok(NULL, " ");
@@ -893,7 +893,7 @@ static void draw(char* arg) {
             return;
         }
 
-        if(color_str == NULL) color = video_vesa_rgb(255, 255, 255);
+        if(color_str == NULL) color = video_framebuffer_rgb(255, 255, 255);
         else {
             int r, g, b;
             _color(color_str, &r, &g, &b);
@@ -902,7 +902,7 @@ static void draw(char* arg) {
                 return;
             }
 
-            color = video_vesa_rgb(r, g, b);
+            color = video_framebuffer_rgb(r, g, b);
         }
 
         x0 = atoi(x0_str);
@@ -910,7 +910,7 @@ static void draw(char* arg) {
         x1 = atoi(x1_str);
         y1 = atoi(y1_str);
 
-        video_vesa_fill_rectangle(x0, y0, x1, y1, color);
+        video_framebuffer_fill_rectangle(x0, y0, x1, y1, color);
     }
     else if(strcmp(mode, "circ")) {
         char* x_str = strtok(NULL, " ");
@@ -933,7 +933,7 @@ static void draw(char* arg) {
             return;
         }
 
-        if(color_str == NULL) color = video_vesa_rgb(255, 255, 255);
+        if(color_str == NULL) color = video_framebuffer_rgb(255, 255, 255);
         else {
             int r, g, b;
             _color(color_str, &r, &g, &b);
@@ -942,14 +942,14 @@ static void draw(char* arg) {
                 return;
             }
 
-            color = video_vesa_rgb(r, g, b);
+            color = video_framebuffer_rgb(r, g, b);
         }
 
         x = atoi(x_str);
         y = atoi(y_str);
         r = atoi(r_str);
 
-        video_vesa_draw_circle(x, y, r, color);
+        video_framebuffer_draw_circle(x, y, r, color);
     }
     else {
         puts("mode not recognised");
@@ -1051,7 +1051,7 @@ static void loadfont(char* path) {
         return;
     }
 
-    bool font_err = video_vesa_set_font(new_font);
+    bool font_err = video_framebuffer_set_font(new_font);
     if(font_err) {
         printf("failed to load font %s\n", node.name);
         kfree(new_font);
@@ -1118,7 +1118,7 @@ static void print_prompt() {
     if(!shell_running) return;
 
     int w, h;
-    if(video_using_framebuffer()) video_vesa_get_rowcol(&w, &h);
+    if(video_using_framebuffer()) video_framebuffer_get_rowcol(&w, &h);
     else video_get_size(&w, &h);
     if(video_get_cursor() % w != 0)
         putchar('\n');
