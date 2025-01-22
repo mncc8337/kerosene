@@ -205,7 +205,7 @@ static FS_ERR write_file(ramfs_datanode_t** start_datanode, uint8_t* buffer, siz
         }
         *start_datanode = (*start_datanode)->next;
 
-        data_offset -= RAMFS_DATANODE_SIZE;
+        data_offset -= RAMFS_DATANODE_SIZE * (unsigned)(data_offset / RAMFS_DATANODE_SIZE);
     }
 
     if(data_offset > 0) {

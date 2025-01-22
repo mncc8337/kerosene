@@ -701,7 +701,6 @@ static void stat(char* path) {
     printf("size: %d bytes\n", node.size);
 
     printf("ram node addr: %x\n", node.ramfs_node.node_addr);
-    printf("ram datanode: %x\n", ((ramfs_node_t*)node.ramfs_node.node_addr)->datanode_chain);
 
     printf("fat32 start cluster: %x\n", node.fat_cluster.start_cluster);
     printf("fat32 parent cluster: %x\n", node.fat_cluster.parent_cluster);

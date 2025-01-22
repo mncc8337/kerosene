@@ -430,15 +430,20 @@ static FS_ERR write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, siz
         // get next cluster
         uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
 
-        // TODO: add more cluster if reached end of file
+        if(FAT_val >= FAT_EOC) {
+            // add more clusters
+            uint32_t new_cluster = expand_cluster_chain(fs, current_cluster, cluster_offset / cluster_size, false);
+            if(!new_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
 
-        if(FAT_val >= FAT_EOC)
-            return ERR_FS_EOF;
-        if(FAT_val == FAT_BAD_CLUSTER)
+            current_cluster = new_cluster;
+            cluster_offset -= cluster_size * (int)(cluster_offset / cluster_size);
+        }
+        else if(FAT_val == FAT_BAD_CLUSTER)
             return ERR_FS_BAD_CLUSTER;
-
-        current_cluster = FAT_val;
-        cluster_offset -= cluster_size;
+        else {
+            current_cluster = FAT_val;
+            cluster_offset -= cluster_size;
+        }
     }
 
     if(cluster_offset > 0) {
@@ -485,8 +490,6 @@ static FS_ERR write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, siz
         write_time++;
         size -= cluster_size;
     }
-
-    if(cluster_offset > 0) buffer -= cluster_size - cluster_offset;
 
     *start_cluster = current_cluster;
     return ERR_FS_SUCCESS;

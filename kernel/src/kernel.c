@@ -351,10 +351,10 @@ void kmain() {
     print_debug(LT_OK, "done initialising\n");
 
     if(shell_init()) puts("not enough memory for kshell.");
-    
+
     process_t* shell_proc = process_new((uint32_t)shell_start, 0, false);
     if(shell_proc) scheduler_add_process(shell_proc);
-    
+
     process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
     process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
     if(proc1) scheduler_add_process(proc1);
