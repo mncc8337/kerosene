@@ -56,10 +56,10 @@ cd mnt/
 ```
 Files and directories in `fsfiles/` will be automatically copied into the disk image after running `make all`.
 ### Running on real hardware
+You can either make an iso `./script/geniso.sh` and burn it to an usb or use `sudo dd if=disk.img of=/dev/sdX && sync` to burn the disk to an usb to run the OS.
 > [!Caution]
 > - I am not responsible for any damage caused to your machine by the OS. Try this with your own risk!
 > - I do not test the runability of the OS on every commits so don't expect it to run normaly. Also i do not own many pc to test properly so it maybe only works on my pc.
-You can either make an iso `./script/geniso.sh` and burn it to an usb or use `sudo dd if=disk.img of=/dev/sdX && sync` to burn the disk to an usb to run the OS.
 ## Progress
 ### Baby first step
 - [x] basic bootloader
