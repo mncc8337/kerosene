@@ -9,18 +9,24 @@ A WIP hobby x86 monolithic OS for learning purposes.
 - ramfs filesystem
 ## Build and run
 ### Prerequisite
-- A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although a preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors.
+- A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors.
     + if you are lazy to install one, use `make all NO_CROSS_COMPILER=1` to compile using linux GCC.
-    + if you use a cross compiler then please check and correct the `CROSS_COMPILER_LOC` in `.env`
+    + if you have cross compiling tools then please check and correct the `CROSS_COMPILER_LOC` in `.env`
 - nasm
 - dosfstools
 - grub (and xorriso to gen iso image)
 - qemu
 ### Build and run
+> [!Note]
+> - This project is only built and tested on a linux machine (arch btw). Maybe on Windows with WSL or other OS will build and run just fine, though it is not guaranteed.
+> - scripts in `script/` will need sudo privilege to setup loopback device for the hard disk image.
+```
+# make sure to source enviroment vars before doing anything. makefile and shell scripts depend heavily on them.
+source .env
+```
 ```
 # build
 chmod +x script/*.sh
-source .env
 make all
 ```
 ```
@@ -33,21 +39,27 @@ make all
 ```
 ```
 # editing the disk files
+
+# first mount the disk device
 ./script/mount-device.sh
 cd mnt/
-## do some stuffs here
-./script/umount-device.sh # you also want to run this if you ever encountered errors like disk image is in use or whatever
+
+# then do some stuffs here
+
+# finally unmount
+# you also want to run this if you ever encountered errors like disk image is in use or whatever
+./script/umount-device.sh
 ```
 ```
 # if you want to copy some files/dirs and dont want to run mount-device and then umount-device
 ./script/cpyfile.sh file/or/directory/in/somewhere ./mnt/some/DIRECTORY/in/the/disk
 ```
-Files and directories in `fsfiles/` will be automatically copied into the disk image after running `make all`.  
-Note that scripts in `script/` will need sudo privilege to setup loopback device for the hard disk image.
+Files and directories in `fsfiles/` will be automatically copied into the disk image after running `make all`.
 ### Running on real hardware
-You can either make an iso `./script/geniso.sh` and burn it to an usb or use `sudo dd if=disk.img of=/dev/sdX && sync` to burn the disk to an usb to run the OS. Note that ISO 9660 FS and usb driver are not implemented so the OS will perform filesystem commands on whatever partitions with FAT32 fs it found so just dont perform fs command and you will be fine.
 > [!Caution]
-> I am not responsible for any damage caused to your machine by the OS. Try this with your own risk!
+> - I am not responsible for any damage caused to your machine by the OS. Try this with your own risk!
+> - I do not test the runability of the OS on every commits so don't expect it to run normaly. Also i do not own many pc to test properly so it maybe only works on my pc.
+You can either make an iso `./script/geniso.sh` and burn it to an usb or use `sudo dd if=disk.img of=/dev/sdX && sync` to burn the disk to an usb to run the OS.
 ## Progress
 ### Baby first step
 - [x] basic bootloader
