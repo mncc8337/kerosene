@@ -18,6 +18,7 @@
 
 typedef enum {
     ERR_SHELL_SUCCESS,
+    ERR_SHELL_NO_FS,
     ERR_SHELL_NOT_FOUND,
     ERR_SHELL_TARGET_NOT_FOUND,
     ERR_SHELL_NOT_A_DIR
@@ -87,7 +88,32 @@ static FS_ERR list_dir(fs_node_t* parent, int max_depth, bool show_hidden, int* 
 static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
     *parent = *(node_stack_top());
 
+    unsigned org_fs = fsid;
+
+    if(path[0] == '(') {
+        // disk specified
+        char diskid_string[6];
+        for(unsigned i = 0; i < 5; i++) {
+            if(path[i + 1] != ')') {
+                diskid_string[i] = path[i + 1];
+            }
+            else {
+                diskid_string[i] = '\0';
+                break;
+            }
+        }
+
+        unsigned diskid = atoi(diskid_string);
+        if(vfs_is_fs_available(diskid)) {
+            shell_set_fs(diskid);
+        }
+        else return ERR_SHELL_NO_FS;
+        *node = node_stack[0];
+        *parent = node_stack[0];
+        path += strlen(diskid_string) + 2;
+    }
     if(path[0] == '/') {
+        // root specified
         *node = node_stack[0];
         *parent = node_stack[0];
         path++;
@@ -103,24 +129,30 @@ static int path_find_last_node(char* path, fs_node_t* parent, fs_node_t* node) {
             FS_ERR find_err = fs_find(parent, nodename, node);
             if(find_err) {
                 memcpy(node->name, nodename, strlen(nodename)+1);
-                if(strtok(NULL, "/") != NULL)
+                if(strtok(NULL, "/") != NULL) {
+                    shell_set_fs(org_fs);
                     return ERR_SHELL_NOT_FOUND;
+                }
+                shell_set_fs(org_fs);
                 return ERR_SHELL_TARGET_NOT_FOUND;
             }
         }
         nodename = strtok(NULL, "/");
-        if(nodename != NULL && !FS_NODE_IS_DIR(*node)) // this is illegal
+        if(nodename != NULL && !FS_NODE_IS_DIR(*node)) { // this is illegal
+            shell_set_fs(org_fs);
             return ERR_SHELL_NOT_A_DIR;
+        }
 
         if(nodename != NULL) *parent = *node;
     }
 
+    shell_set_fs(org_fs);
     return ERR_SHELL_SUCCESS;
 }
 
 static void help(char* arg) {
     if(arg == NULL) {
-        puts("help clear . echo clocks cfs ls read cd mkdir rm touch write append mv cp stat pwd datetime beep draw panic catproc sleep exit");
+        puts("help clear . echo clocks ls read cd mkdir rm touch write append mv cp stat pwd datetime beep draw panic catproc sleep exit");
     }
     else {
         arg = strtok(arg, " ");
@@ -129,7 +161,6 @@ static void help(char* arg) {
         else if(strcmp(arg, ".")) puts("execute file content as shell command\n. <path>");
         else if(strcmp(arg, "echo")) puts("print string\necho <string>");
         else if(strcmp(arg, "clocks")) puts("print current clocks\nclocks <no-args>");
-        else if(strcmp(arg, "cfs")) puts("change filesystem\ncfs <disk-id>");
         else if(strcmp(arg, "ls")) {
             puts(
                 "list directory contents\n"
@@ -194,6 +225,10 @@ static void run_sh(char* args) {
         printf("no such file '%s'\n", node.name);
         return;
     }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
+        return;
+    }
 
     FILE f;
     file_open(&f, &node, FILE_READ);
@@ -232,21 +267,6 @@ static void echo(char* args) {
 static void clocks(char* args) {
     (void)(args);
     printf("%d\n", clock());
-}
-
-static void cfs(char* disk) {
-    if(disk == NULL) {
-        puts("no filesystem provided");
-        return;
-    }
-
-    int diskid = atoi(disk);
-    if(!vfs_is_fs_available(diskid)) {
-        puts("disk not available");
-        return;
-    }
-
-    shell_set_fs(diskid);
 }
 
 static void ls(char* args) {
@@ -296,6 +316,10 @@ static void ls(char* args) {
             printf("no such directory '%s'\n", node.name);
             return;
         }
+        if(err == ERR_SHELL_NO_FS) {
+            puts("invalid fs");
+            return;
+        }
 
         list_dir(&node, max_depth, show_hidden, &indent_level);
     }
@@ -320,12 +344,16 @@ static void read(char* path) {
         printf("no such file '%s'\n", node.name);
         return;
     }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
+        return;
+    }
 
     FILE f;
     file_open(&f, &node, FILE_READ);
     char chr;
     FS_ERR last_err;
-    while((last_err = file_read(&f, (uint8_t*)(&chr), 1)) == ERR_FS_SUCCESS) {
+    while((last_err = file_read(&f, (uint8_t*)&chr, 1)) == ERR_FS_SUCCESS) {
         putchar(chr);
     }
     file_close(&f);
@@ -343,6 +371,29 @@ static void cd(char* path) {
 
     path = strtok(path, " ");
 
+    if(path[0] == '(') {
+        // disk specified
+        char diskid_string[6];
+        for(unsigned i = 0; i < 5; i++) {
+            if(path[i + 1] != ')') {
+                diskid_string[i] = path[i + 1];
+            }
+            else {
+                diskid_string[i] = '\0';
+                break;
+            }
+        }
+
+        unsigned diskid = atoi(diskid_string);
+        if(vfs_is_fs_available(diskid)) {
+            shell_set_fs(diskid);
+        }
+        else {
+            printf("no such fs %s\n", diskid_string);
+            return;
+        }
+        path += strlen(diskid_string) + 2;
+    }
     if(path[0] == '/') {
         // to rootdir
         node_stack_offset = 0;
@@ -435,6 +486,10 @@ static void rm(char* path) {
         printf("no such file or directory '%s'\n", node.name);
         return;
     }
+    if(serr == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
+        return;
+    }
 
     FS_ERR err = fs_remove(&node_parent, &node);
     if(err != ERR_FS_SUCCESS)
@@ -459,6 +514,10 @@ static void touch(char* path) {
     if(err == ERR_SHELL_SUCCESS) {
         // we dont want it to find a valid node
         printf("a file or directory with name '%s' has already existed\n", path);
+        return;
+    }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
         return;
     }
     // at this point the error should be ERR_SHELL_TARGET_NOT_FOUND
@@ -490,6 +549,10 @@ static void write(char* path) {
             printf("cannot create file '%s', error %d\n", path, touch_err);
             return;
         }
+    }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
+        return;
     }
 
     FILE f;
@@ -542,6 +605,10 @@ static void append(char* path) {
     }
     if(err == ERR_SHELL_TARGET_NOT_FOUND) {
         printf("no such file file '%s'\n", path);
+        return;
+    }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
         return;
     }
 
@@ -602,6 +669,10 @@ static void mv(char* args) {
         printf("no such file or directory '%s'\n", source_node.name);
         return;
     }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
+        return;
+    }
 
     fs_node_t target_node_parent;
     fs_node_t target_node;
@@ -619,6 +690,10 @@ static void mv(char* args) {
             target_node_parent = target_node;
             memcpy(target_node.name, source_node.name, strlen(source_node.name)+1);
         }
+    }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
+        return;
     }
 
     FS_ERR ferr = fs_move(&source_node, &target_node_parent, target_node.name);
@@ -649,6 +724,10 @@ static void cp(char* args) {
         printf("no such file or directory '%s'\n", source_node.name);
         return;
     }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
+        return;
+    }
 
     fs_node_t target_node_parent;
     fs_node_t target_node;
@@ -666,6 +745,10 @@ static void cp(char* args) {
             target_node_parent = target_node;
             memcpy(target_node.name, source_node.name, strlen(source_node.name)+1);
         }
+    }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
+        return;
     }
 
     fs_node_t copied;
@@ -691,6 +774,10 @@ static void stat(char* path) {
     }
     if(err == ERR_SHELL_TARGET_NOT_FOUND) {
         printf("no such file '%s'\n", node.name);
+        return;
+    }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
         return;
     }
 
@@ -1033,6 +1120,10 @@ static void loadfont(char* path) {
         printf("no such file '%s'\n", node.name);
         return;
     }
+    if(err == ERR_SHELL_NO_FS) {
+        puts("invalid fs");
+        return;
+    }
 
     char* new_font = kmalloc(node.size);
     if(!new_font) {
@@ -1085,7 +1176,6 @@ void shell_process_prompt(char* prompts, unsigned prompts_len) {
         else if(strcmp(cmd_name, ".")) run_sh(remain_arg);
         else if(strcmp(cmd_name, "echo")) echo(remain_arg);
         else if(strcmp(cmd_name, "clocks")) clocks(remain_arg);
-        else if(strcmp(cmd_name, "cfs")) cfs(remain_arg);
         else if(strcmp(cmd_name, "ls")) ls(remain_arg);
         else if(strcmp(cmd_name, "read")) read(remain_arg);
         else if(strcmp(cmd_name, "cd")) cd(remain_arg);

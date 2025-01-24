@@ -2,6 +2,42 @@
 
 #include "string.h"
 
+#define COPY_SIZE 512
+
+static FS_ERR general_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
+    FS_ERR touch_err = fs_touch(new_parent, new_name, copied);
+    if(touch_err) return touch_err;
+
+    FILE src_file;
+    FS_ERR src_open_err = file_open(&src_file, node, FILE_READ);
+    if(src_open_err) return src_open_err;
+
+    FILE dst_file;
+    FS_ERR dst_open_err = file_open(&dst_file, copied, FILE_WRITE);
+    if(dst_open_err) return dst_open_err;
+
+    FS_ERR final_err = ERR_FS_SUCCESS;
+
+    unsigned remain_size = node->size;
+    uint8_t buffer[COPY_SIZE];
+    while(remain_size) {
+        unsigned write_size = (remain_size >= COPY_SIZE) ? COPY_SIZE : remain_size;
+        final_err = file_read(&src_file, buffer, write_size);
+        if(final_err != ERR_FS_SUCCESS && final_err != ERR_FS_EOF)
+            break;
+        if((final_err = file_write(&dst_file, buffer, write_size)))
+            break;
+
+        remain_size -= write_size;
+    }
+
+    file_close(&src_file);
+    file_close(&dst_file);
+    if(final_err) return final_err;
+
+    return ERR_FS_SUCCESS;
+}
+
 FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
     if(!FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_DIR;
 
@@ -102,11 +138,14 @@ FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node) {
     }
 }
 
+// set new_name to NULL to reuse the old name
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
     if(!FS_NODE_IS_DIR(*new_parent)) return ERR_FS_NOT_DIR;
     if(FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_FILE;
 
-    if(node->fs->type == new_parent->fs->type) {
+    if(!new_name) new_name = node->name;
+
+    if(node->fs == new_parent->fs) {
         switch(node->fs->type) {
             case FS_RAMFS:
                 return ramfs_copy(node, new_parent, copied, new_name);
@@ -118,31 +157,25 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
     }
 
     // handle general case
-    return ERR_FS_NOT_SUPPORTED;
+    return general_copy(node, new_parent, copied, new_name);
 }
 
 // move a node to a new parent
-// will handle special cases that fs_copy is slower
+// only works when moving to the same disk
 // set new_name to NULL to reuse the old name
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     if(!FS_NODE_IS_DIR(*new_parent)) return ERR_FS_NOT_DIR;
+    if(node->fs != new_parent->fs) return ERR_FS_NOT_SUPPORTED;
 
-    if(node->fs->type == new_parent->fs->type) {
-        switch(node->fs->type) {
-            case FS_RAMFS:
-                return ramfs_move(node, new_parent, new_name);
-            case FS_FAT32:
-                return fat32_move(node, new_parent, new_name);
-            default:
-                return ERR_FS_NOT_SUPPORTED;
-        }
-    }
-    else {
-        if(FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_FILE;
-        return ERR_FS_NOT_SUPPORTED;
-        // TODO:
-        // copy node to new_parent
-        // then delete the old node
+    if(!new_name) new_name = node->name;
+
+    switch(node->fs->type) {
+        case FS_RAMFS:
+            return ramfs_move(node, new_parent, new_name);
+        case FS_FAT32:
+            return fat32_move(node, new_parent, new_name);
+        default:
+            return ERR_FS_NOT_SUPPORTED;
     }
 }
 

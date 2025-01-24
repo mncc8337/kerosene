@@ -339,79 +339,89 @@ static uint8_t to_fat_attr(uint32_t flags) {
     return attr;
 }
 
-static FS_ERR read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset) {
+static FS_ERR read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, unsigned cluster_offset) {
     fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = get_first_data_sector(bootrec);
     uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
 
-    uint32_t current_cluster = *start_cluster;
+    uint32_t* current_cluster = start_cluster;
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t ext_buffer[cluster_size];
 
-    while((unsigned)cluster_offset >= cluster_size) {
+    while(cluster_offset >= cluster_size) {
         // get next cluster
-        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
+        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, *current_cluster);
         if(FAT_val == FAT_BAD_CLUSTER)
             return ERR_FS_BAD_CLUSTER;
-
-        current_cluster = FAT_val;
-        cluster_offset -= cluster_size;
-
-        // if we need to iterate more but there is no cluster then return
-        if(FAT_val >= FAT_EOC && (unsigned)current_cluster >= cluster_size)
+        if(FAT_val >= FAT_EOC)
             return ERR_FS_EOF;
+
+        *current_cluster = FAT_val;
+        cluster_offset -= cluster_size;
     }
 
     if(cluster_offset > 0) {
         // align buffer to cluster size
-        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        uint32_t first_sector = (((*current_cluster) - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, ext_buffer);
 
-        memcpy(buffer, ext_buffer + cluster_offset, (cluster_size - cluster_offset > size ? size : cluster_size - cluster_offset));
-        if(size <= cluster_size - cluster_offset) return ERR_FS_SUCCESS;
+        unsigned remain_size = cluster_size - cluster_offset;
+        memcpy(buffer, ext_buffer + cluster_offset, remain_size > size ? size : remain_size);
 
-        size -= cluster_size - cluster_offset;
-        buffer += cluster_size - cluster_offset;
+        if(size <= remain_size) return ERR_FS_SUCCESS;
+
+        size -= remain_size;
+        buffer += remain_size;
 
         // get next cluster
-        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
+        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, *current_cluster);
 
         if(FAT_val >= FAT_EOC)
             return ERR_FS_EOF;
         if(FAT_val == FAT_BAD_CLUSTER)
             return ERR_FS_BAD_CLUSTER;
 
-        current_cluster = FAT_val;
+        *current_cluster = FAT_val;
     }
 
-    unsigned int read_time = 0;
-    while(size > 0) {
-        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+    while(true) {
+        uint32_t first_sector = (((*current_cluster) - 2) * sectors_per_cluster) + first_data_sector;
 
-        if((unsigned)size >= cluster_size)
-            ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, buffer + read_time * cluster_size);
+        if((unsigned)size >= cluster_size) {
+            ata_pio_LBA28_access(
+                true,
+                fs->partition.LBA_start + first_sector,
+                sectors_per_cluster,
+                buffer
+            );
+        }
         else {
-            ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, ext_buffer);
-            memcpy(buffer + read_time * cluster_size, ext_buffer, size);
+            ata_pio_LBA28_access(
+                true,
+                fs->partition.LBA_start + first_sector,
+                sectors_per_cluster,
+                ext_buffer
+            );
+            memcpy(buffer, ext_buffer, size);
             break;
         }
 
+        size -= cluster_size;
+        buffer += cluster_size;
+
+        if(size == 0) break;
+
         // get next cluster
-        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
+        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, *current_cluster);
 
         if(FAT_val >= FAT_EOC)
             return ERR_FS_EOF;
         if(FAT_val == FAT_BAD_CLUSTER)
             return ERR_FS_BAD_CLUSTER;
 
-        current_cluster = FAT_val;
-        read_time++;
-        size -= cluster_size;
+        *current_cluster = FAT_val;
     }
-    if(cluster_offset > 0) buffer -= cluster_size - cluster_offset;
-
-    *start_cluster = current_cluster;
 
     return ERR_FS_SUCCESS;
 }
@@ -422,76 +432,90 @@ static FS_ERR write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, siz
     uint32_t first_data_sector = get_first_data_sector(bootrec);
     uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
 
-    uint32_t current_cluster = *start_cluster;
+    uint32_t* current_cluster = start_cluster;
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t ext_buffer[cluster_size];
 
     while((unsigned)cluster_offset >= cluster_size) {
         // get next cluster
-        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
+        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, *current_cluster);
 
         if(FAT_val >= FAT_EOC) {
             // add more clusters
-            uint32_t new_cluster = expand_cluster_chain(fs, current_cluster, cluster_offset / cluster_size, false);
+            uint32_t new_cluster = expand_cluster_chain(fs, *current_cluster, cluster_offset / cluster_size, false);
             if(!new_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
 
-            current_cluster = new_cluster;
+            *current_cluster = new_cluster;
             cluster_offset -= cluster_size * (int)(cluster_offset / cluster_size);
         }
         else if(FAT_val == FAT_BAD_CLUSTER)
             return ERR_FS_BAD_CLUSTER;
         else {
-            current_cluster = FAT_val;
+            *current_cluster = FAT_val;
             cluster_offset -= cluster_size;
         }
     }
 
     if(cluster_offset > 0) {
         // align buffer to cluster size
-        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        uint32_t first_sector = (((*current_cluster) - 2) * sectors_per_cluster) + first_data_sector;
         ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, ext_buffer);
 
-        memcpy(ext_buffer + cluster_offset, buffer, (cluster_size - cluster_offset > size ? size : cluster_size - cluster_offset));
+        unsigned remain_size =  cluster_size - cluster_offset;
+        memcpy(ext_buffer + cluster_offset, buffer, remain_size > size ? size : remain_size);
         ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, ext_buffer);
-        if(size <= cluster_size - cluster_offset) return ERR_FS_SUCCESS;
 
-        size -= cluster_size - cluster_offset;
-        buffer += cluster_size - cluster_offset;
+        if(size <= remain_size) return ERR_FS_SUCCESS;
+
+        size -= remain_size;
+        buffer += remain_size;
     }
 
     int estimated_clusters = size / cluster_size;
     if(estimated_clusters > 0) {
-        uint32_t new_cluster = expand_cluster_chain(fs, current_cluster, estimated_clusters, false);
+        uint32_t new_cluster = expand_cluster_chain(fs, *current_cluster, estimated_clusters, false);
         if(!new_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
     }
 
-    int write_time = 0;
-    while(size > 0) {
-        uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+    while(true) {
+        uint32_t first_sector = (((*current_cluster) - 2) * sectors_per_cluster) + first_data_sector;
         // write
-        if(size >= cluster_size)
-            ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, buffer + write_time * cluster_size);
+        if(size >= cluster_size) {
+            ata_pio_LBA28_access(
+                false,
+                fs->partition.LBA_start + first_sector,
+                sectors_per_cluster,
+                buffer
+            );
+        }
         else {
             memcpy(ext_buffer, buffer, size);
             memset(ext_buffer + size, 0, cluster_size - size);
-            ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, ext_buffer);
+            ata_pio_LBA28_access(
+                false,
+                fs->partition.LBA_start +
+                first_sector, sectors_per_cluster,
+                ext_buffer
+            );
             break;
         }
 
+        size -= cluster_size;
+        buffer += cluster_size;
+
+        if(size == 0) break;
+
         // get next cluster
-        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
+        uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, *current_cluster);
 
         if(FAT_val >= FAT_EOC)
             break;
         if(FAT_val == FAT_BAD_CLUSTER)
             return ERR_FS_BAD_CLUSTER;
 
-        current_cluster = FAT_val;
-        write_time++;
-        size -= cluster_size;
+        *current_cluster = FAT_val;
     }
 
-    *start_cluster = current_cluster;
     return ERR_FS_SUCCESS;
 }
 
@@ -1138,8 +1162,6 @@ FS_ERR fat32_mkdir(fs_node_t* parent, char* name, uint8_t attr, fs_node_t* new_n
 }
 
 FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
-    if(!new_name) new_name = node->name;
-
     fs_node_t copied;
     FS_ERR copy_err = fat32_add_entry(
         new_parent, new_name,
@@ -1165,7 +1187,7 @@ FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, cha
 
     FS_ERR err = fat32_add_entry(
         new_parent,
-        new_name == NULL ? node->name : new_name,
+        new_name,
         start_cluster,
         to_fat_attr(node->flags),
         node->size,
@@ -1184,8 +1206,8 @@ FS_ERR fat32_read(FILE* file, uint8_t* buffer, size_t size) {
 
     int offset = file->position % cluster_size;
     if(offset == 0 && file->position > 0) {
-        // set offset to 512 to change to the next cluster
-        offset = 512;
+        // set offset to cluster_size to change to the next cluster
+        offset = cluster_size;
     }
     return read_file(
         file->node->fs,
@@ -1209,8 +1231,8 @@ FS_ERR fat32_write(FILE* file, uint8_t* data, size_t size) {
 
     int offset = file->position % cluster_size;
     if(offset == 0 && file->position > 0) {
-        // set offset to 512 to change to the next cluster
-        offset = 512;
+        // set offset to cluster_size to change to the next cluster
+        offset = cluster_size;
     }
 
     return write_file(

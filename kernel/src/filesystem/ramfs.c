@@ -522,8 +522,6 @@ FS_ERR ramfs_mkdir(fs_node_t* parent, char* name, uint32_t flags, fs_node_t* new
 }
 
 FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
-    if(!new_name) new_name = node->name;
-
     fs_node_t copied;
     FS_ERR copy_err = ramfs_add_entry(
         new_parent, new_name,
@@ -545,8 +543,6 @@ FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
 }
 
 FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
-    if(!new_name) new_name = node->name;
-
     ramfs_node_t* ramnode = (ramfs_node_t*)(node->ramfs_node.node_addr);
     ramfs_datanode_t* copied_datanode = copy_datanode_chain(ramnode->datanode_chain);
     if(!copied_datanode) return ERR_FS_NOT_ENOUGH_SPACE;
