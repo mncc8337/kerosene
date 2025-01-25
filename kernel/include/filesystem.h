@@ -202,6 +202,7 @@ FS_ERR ramfs_update_entry(fs_node_t* node);
 FS_ERR ramfs_mkdir(fs_node_t* parent, char* name, uint32_t flags, fs_node_t* new_node);
 FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
 FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
+FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 
 FS_ERR ramfs_seek(FILE* file, size_t pos);
 FS_ERR ramfs_read(FILE* file, uint8_t* buffer, size_t size);

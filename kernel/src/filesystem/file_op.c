@@ -4,7 +4,7 @@
 
 #define COPY_SIZE 512
 
-static FS_ERR general_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
+static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
     FS_ERR touch_err = fs_touch(new_parent, new_name, copied);
     if(touch_err) return touch_err;
 
@@ -156,8 +156,9 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
         }
     }
 
-    // handle general case
-    return general_copy(node, new_parent, copied, new_name);
+    if(node->fs->type == FS_RAMFS)
+        return ramfs_universal_copy(node, new_parent, copied, new_name);
+    return universal_copy(node, new_parent, copied, new_name);
 }
 
 // move a node to a new parent

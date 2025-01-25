@@ -560,6 +560,32 @@ FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, cha
     return ERR_FS_SUCCESS;
 }
 
+FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
+    FS_ERR touch_err = fs_touch(new_parent, new_name, copied);
+    if(touch_err) return touch_err;
+
+    FILE dst_file;
+    FS_ERR dst_open_err = file_open(&dst_file, copied, FILE_WRITE);
+    if(dst_open_err) return dst_open_err;
+
+    ramfs_node_t* ramnode = (ramfs_node_t*)node->ramfs_node.node_addr;
+    ramfs_datanode_t* current_datanode = ramnode->datanode_chain;
+
+    while(current_datanode) {
+        unsigned size = RAMFS_DATANODE_SIZE;
+        if(!current_datanode->next) size = ramnode->size % RAMFS_DATANODE_SIZE;
+
+        FS_ERR write_err = file_write(&dst_file, current_datanode->data, size);
+        if(write_err && write_err != ERR_FS_EOF) return write_err;
+
+        current_datanode = current_datanode->next;
+    }
+
+    file_close(&dst_file);
+
+    return ERR_FS_SUCCESS;
+}
+
 FS_ERR ramfs_seek(FILE* file, size_t pos);
 
 FS_ERR ramfs_read(FILE* file, uint8_t* buffer, size_t size) {
