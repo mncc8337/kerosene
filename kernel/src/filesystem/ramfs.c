@@ -33,11 +33,15 @@
 
 #define DIRECTORY_ENTRY_COUNT (RAMFS_DATANODE_SIZE / sizeof(uint32_t))
 
-// TODO: check if `name` is overflow
 // TODO: make a separate heap
 
 static ramfs_node_t* create_new_node(char* name, uint32_t flags, size_t size, ramfs_datanode_t* datanode_chain) {
     unsigned namelen = strlen(name);
+
+    if(namelen + 1 > FILENAME_LIMIT) {
+        namelen = FILENAME_LIMIT - 1;
+        name[FILENAME_LIMIT] = '\0';
+    }
 
     ramfs_node_t* node = (ramfs_node_t*)kmalloc(sizeof(ramfs_node_t) + namelen + 1);
     if(!node) return NULL;
