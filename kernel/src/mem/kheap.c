@@ -5,7 +5,7 @@ static heap_t* kheap;
 bool kheap_init() {
     kheap = heap_new(
         KHEAP_START,
-        KHEAP_INITAL_SIZE,
+        KHEAP_INITIAL_SIZE,
         KHEAP_MAX_SIZE,
         HEAP_SUPERVISOR
     );

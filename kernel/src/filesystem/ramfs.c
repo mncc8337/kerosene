@@ -33,7 +33,11 @@
 
 #define DIRECTORY_ENTRY_COUNT (RAMFS_DATANODE_SIZE / sizeof(uint32_t))
 
-// TODO: make a separate heap
+static heap_t* rheap;
+
+static void* rmalloc(size_t size) {
+    return heap_alloc(rheap, size, false);
+}
 
 static ramfs_node_t* create_new_node(char* name, uint32_t flags, size_t size, ramfs_datanode_t* datanode_chain) {
     unsigned namelen = strlen(name);
@@ -43,7 +47,7 @@ static ramfs_node_t* create_new_node(char* name, uint32_t flags, size_t size, ra
         name[FILENAME_LIMIT] = '\0';
     }
 
-    ramfs_node_t* node = (ramfs_node_t*)kmalloc(sizeof(ramfs_node_t) + namelen + 1);
+    ramfs_node_t* node = (ramfs_node_t*)rmalloc(sizeof(ramfs_node_t) + namelen + 1);
     if(!node) return NULL;
 
     node->size = size;
@@ -95,11 +99,11 @@ static ramfs_datanode_t* copy_datanode_chain(ramfs_datanode_t* datanode) {
     ramfs_datanode_t* copied = NULL;
     while(current_datanode) {
         if(copied) {
-            copied->next = (ramfs_datanode_t*)kmalloc(sizeof(ramfs_datanode_t));
+            copied->next = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
             copied = copied->next;
         }
         else {
-            copied = (ramfs_datanode_t*)kmalloc(sizeof(ramfs_datanode_t));
+            copied = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
             ret = copied;
         }
         if(!copied) return NULL; // OOM
@@ -258,7 +262,7 @@ static FS_ERR write_file(ramfs_datanode_t** start_datanode, uint8_t* buffer, siz
 ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear) {
     if(count == 0) return NULL;
 
-    ramfs_datanode_t* start_node = (ramfs_datanode_t*)kmalloc(sizeof(ramfs_datanode_t));
+    ramfs_datanode_t* start_node = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
     if(!start_node) return NULL;
     if(clear) memset((void*)start_node->data, 0, RAMFS_DATANODE_SIZE);
     count--;
@@ -272,7 +276,7 @@ ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear) {
     ramfs_datanode_t* current_node = start_node;
 
     while(count) {
-        current_node->next = (ramfs_datanode_t*)kmalloc(sizeof(ramfs_datanode_t));
+        current_node->next = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
         if(!current_node->next) {
             remove_datanode_chain(start_node);
             return 0;
@@ -379,7 +383,7 @@ FS_ERR ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode
             entry_list[empty_entry + 1] = END_ENTRY;
         else {
             // create a new datanode and clear it
-            ramfs_datanode_t* new_datanode = (ramfs_datanode_t*)kmalloc(sizeof(ramfs_datanode_t));
+            ramfs_datanode_t* new_datanode = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
             if(!new_datanode) {
                 kfree((void*)ramnode);
                 return ERR_FS_NOT_ENOUGH_SPACE;
@@ -619,11 +623,20 @@ FS_ERR ramfs_write(FILE* file, uint8_t* buffer, size_t size) {
 }
 
 FS_ERR ramfs_init(fs_t* fs) {
+    rheap = heap_new(
+        RHEAP_START,
+        RHEAP_INITIAL_SIZE,
+        RHEAP_MAX_SIZE,
+        HEAP_SUPERVISOR
+    );
+
+    if(!rheap) return ERR_FS_NOT_ENOUGH_SPACE;
+
     ramfs_datanode_t* datanode_chain = ramfs_allocate_datanodes(1, true);
-    if(!datanode_chain) return ERR_FS_FAILED;
+    if(!datanode_chain) return ERR_FS_NOT_ENOUGH_SPACE;
 
     ramfs_node_t* root_ramnode = create_new_node("/", FS_FLAG_DIRECTORY, 0, datanode_chain);
-    if(!root_ramnode) return ERR_FS_FAILED;
+    if(!root_ramnode) return ERR_FS_NOT_ENOUGH_SPACE;
 
     // fs->partition;
     fs->type = FS_RAMFS;
