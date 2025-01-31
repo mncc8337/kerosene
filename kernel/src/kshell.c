@@ -231,7 +231,7 @@ static void run_sh(char* args) {
     }
 
     FILE f;
-    file_open(&f, &node, FILE_READ);
+    file_open(&f, &node, "r");
     char chr;
     input_len = 0;
     input[0] = '\0';
@@ -350,7 +350,7 @@ static void read(char* path) {
     }
 
     FILE f;
-    file_open(&f, &node, FILE_READ);
+    file_open(&f, &node, "r");
     char chr;
     FS_ERR last_err;
     while((last_err = file_read(&f, (uint8_t*)&chr, 1)) == ERR_FS_SUCCESS) {
@@ -556,7 +556,7 @@ static void write(char* path) {
     }
 
     FILE f;
-    file_open(&f, &node, FILE_WRITE);
+    file_open(&f, &node, "w");
 
     input_len = 0;
     puts("writing mode. press ESC to exit");
@@ -613,7 +613,7 @@ static void append(char* path) {
     }
 
     FILE f;
-    file_open(&f, &node, FILE_APPEND);
+    file_open(&f, &node, "a");
 
     input_len = 0;
     puts("writing mode. press ESC to exit");
@@ -787,10 +787,10 @@ static void stat(char* path) {
     printf("hidden: %s\n", (FS_NODE_IS_HIDDEN(node) ? "true" : "false"));
     printf("size: %d bytes\n", node.size);
 
-    printf("ram node addr: %x\n", node.ramfs_node.node_addr);
+    printf("ram node addr: %x\n", node.ramfs.node_addr);
 
-    printf("fat32 start cluster: %x\n", node.fat_cluster.start_cluster);
-    printf("fat32 parent cluster: %x\n", node.fat_cluster.parent_cluster);
+    printf("fat32 start cluster: %x\n", node.fat32.start_cluster);
+    printf("fat32 parent cluster: %x\n", node.fat32.parent_cluster);
 
     struct tm t_dump = gmtime(&(node.creation_timestamp));
     printf("creation timestamp: %d/%d/%d %d:%d:%d.%d\n",
@@ -1132,7 +1132,7 @@ static void loadfont(char* path) {
     }
 
     FILE f;
-    file_open(&f, &node, FILE_READ);
+    file_open(&f, &node, "r");
     FS_ERR read_err = file_read(&f, (uint8_t*)new_font, node.size);
     file_close(&f);
 

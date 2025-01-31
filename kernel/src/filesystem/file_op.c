@@ -9,11 +9,11 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
     if(touch_err) return touch_err;
 
     FILE src_file;
-    FS_ERR src_open_err = file_open(&src_file, node, FILE_READ);
+    FS_ERR src_open_err = file_open(&src_file, node, "r");
     if(src_open_err) return src_open_err;
 
     FILE dst_file;
-    FS_ERR dst_open_err = file_open(&dst_file, copied, FILE_WRITE);
+    FS_ERR dst_open_err = file_open(&dst_file, copied, "w");
     if(dst_open_err) return dst_open_err;
 
     FS_ERR final_err = ERR_FS_SUCCESS;
@@ -180,36 +180,67 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     }
 }
 
-FS_ERR file_open(FILE* file, fs_node_t* node, int mode) {
+FS_ERR file_reset(fs_node_t* node) {
+    switch(node->fs->type) {
+        case FS_RAMFS:
+            return ramfs_file_reset(node);
+        case FS_FAT32:
+            return fat32_file_reset(node);
+        default:
+            return ERR_FS_NOT_SUPPORTED;
+    }
+}
+
+FS_ERR file_open(FILE* file, fs_node_t* node, char* modestr) {
     if(FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_FILE;
+
+    int mode = 0;
+
+    if(modestr[0] == 'w') {
+        mode = FILE_WRITE;
+        file_reset(node);
+    }
+    else if(modestr[0] == 'r') {
+        mode = FILE_READ;
+    }
+    else if(modestr[0] == 'a') {
+        mode = FILE_APPEND;
+    }
+    else return ERR_FS_FAILED;
+
+    if(modestr[1] != '\0') {
+        if(modestr[1] == '+') {
+            if(mode != FILE_READ)
+                mode |= FILE_READ;
+            else
+                mode |= FILE_WRITE;
+        }
+        else return ERR_FS_FAILED;
+    }
 
     file->node = node;
     file->mode = mode;
-    if(mode == FILE_WRITE || mode == FILE_READ)
-        file->position = 0;
-    else if(mode == FILE_APPEND)
-        file->position = node->size;
-    else return ERR_FS_NOT_SUPPORTED;
+    file->position = 0;
 
     switch(node->fs->type) {
         case FS_RAMFS:
-            if(mode == FILE_WRITE || mode == FILE_READ) {
-                file->ramfs_current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain;
+            if(mode & FILE_WRITE || mode & FILE_READ) {
+                file->ramfs.current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain;
             }
-            else if(mode == FILE_APPEND) {
-                file->ramfs_current_datanode = (uint32_t)(ramfs_get_last_datanote_of_chain(
-                    ((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain)
+            if(mode & FILE_APPEND) {
+                file->ramfs.last_datanode = (uint32_t)(ramfs_get_last_datanote_of_chain(
+                    ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain)
                 );
             }
             break;
         case FS_FAT32:
-            if(mode == FILE_WRITE || mode == FILE_READ) {
-                file->fat32_current_cluster = node->fat_cluster.start_cluster;
+            if(mode & FILE_WRITE || mode & FILE_READ) {
+                file->fat32.current_cluster = node->fat32.start_cluster;
             }
-            else if(mode == FILE_APPEND) {
-                file->fat32_current_cluster = fat32_get_last_cluster_of_chain(
+            if(mode & FILE_APPEND) {
+                file->fat32.last_cluster = fat32_get_last_cluster_of_chain(
                     node->fs,
-                    node->fat_cluster.start_cluster
+                    node->fat32.start_cluster
                 );
             }
             break;
@@ -222,8 +253,22 @@ FS_ERR file_open(FILE* file, fs_node_t* node, int mode) {
     return ERR_FS_SUCCESS;
 }
 
+FS_ERR file_seek(FILE* file, size_t pos) {
+    if(file->mode & FILE_APPEND)
+        return ERR_FS_FAILED;
+
+    switch(file->node->fs->type) {
+        case FS_RAMFS:
+            return ramfs_seek(file, pos);
+        case FS_FAT32:
+            return fat32_seek(file, pos);
+        default:
+            return ERR_FS_NOT_SUPPORTED;
+    }
+}
+
 FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
-    if(file->mode != FILE_READ) return ERR_FS_FAILED;
+    if(!(file->mode & FILE_READ)) return ERR_FS_FAILED;
 
     if(file->position == file->node->size) return ERR_FS_EOF;
 
@@ -247,7 +292,8 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
 }
 
 FS_ERR file_write(FILE* file, uint8_t* buffer, size_t size) {
-    if(file->mode == FILE_READ) return ERR_FS_FAILED;
+    if(!(file->mode & FILE_WRITE) && !(file->mode & FILE_APPEND))
+        return ERR_FS_FAILED;
 
     FS_ERR err;
     switch(file->node->fs->type) {
@@ -262,8 +308,14 @@ FS_ERR file_write(FILE* file, uint8_t* buffer, size_t size) {
     }
     if(err) return err;
 
-    file->position += size;
-    file->node->size += size;
+    if(file->mode & FILE_APPEND) {
+        file->node->size += size;
+    }
+    else {
+        file->position += size;
+        if(file->position > file->node->size)
+            file->node->size = file->position;
+    }
     file->node->modified_timestamp = time(NULL);
     return ERR_FS_SUCCESS;
 }
@@ -271,14 +323,10 @@ FS_ERR file_write(FILE* file, uint8_t* buffer, size_t size) {
 FS_ERR file_close(FILE* file) {
     switch (file->node->fs->type) {
         case FS_RAMFS:
-            ramfs_update_entry(file->node);
-            break;
+            return ramfs_update_entry(file->node);
         case FS_FAT32:
-            fat32_update_entry(file->node);
-            break;
+            return fat32_update_entry(file->node);
         default:
-            break;
+            return ERR_FS_SUCCESS;
     }
-
-    return ERR_FS_SUCCESS;
 }

@@ -49,9 +49,9 @@ typedef enum {
 } fs_type_t;
 
 typedef enum {
-    FILE_WRITE,
-    FILE_APPEND,
-    FILE_READ
+    FILE_WRITE = 0b001,
+    FILE_APPEND = 0b010,
+    FILE_READ = 0b100,
 } FILE_OP;
 
 typedef struct {
@@ -110,12 +110,11 @@ typedef struct fs_node {
             uint32_t start_cluster;
             uint32_t parent_cluster;
             uint32_t parent_cluster_index;
-        } fat_cluster;
+        } fat32;
 
         struct {
             uint32_t node_addr;
-            uint32_t a[2]; // placeholder
-        } ramfs_node;
+        } ramfs;
     };
 } fs_node_t;
 
@@ -155,12 +154,18 @@ typedef struct fs {
 typedef struct {
     fs_node_t* node;
     int mode;
-    unsigned int position;
+    unsigned position;
 
     // fs depended field
     union {
-        uint32_t fat32_current_cluster;
-        uint32_t ramfs_current_datanode;
+        struct {
+            uint32_t current_cluster;
+            uint32_t last_cluster;
+        } fat32;
+        struct {
+            uint32_t current_datanode;
+            uint32_t last_datanode;
+        } ramfs;
     };
 
     // TODO: add more thing here
@@ -186,7 +191,8 @@ FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node);
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
 
-FS_ERR file_open(FILE* file, fs_node_t* node, int mode);
+FS_ERR file_open(FILE* file, fs_node_t* node, char* modestr);
+FS_ERR file_seek(FILE* file, size_t pos);
 FS_ERR file_write(FILE* file, uint8_t* buffer, size_t size);
 FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size);
 FS_ERR file_close(FILE* file);
@@ -204,6 +210,7 @@ FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
 FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 
+FS_ERR ramfs_file_reset(fs_node_t* node);
 FS_ERR ramfs_seek(FILE* file, size_t pos);
 FS_ERR ramfs_read(FILE* file, uint8_t* buffer, size_t size);
 FS_ERR ramfs_write(FILE* file, uint8_t* buffer, size_t size);
@@ -223,6 +230,7 @@ FS_ERR fat32_mkdir(fs_node_t* parent, char* name, uint8_t attr, fs_node_t* new_n
 FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
 FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 
+FS_ERR fat32_file_reset(fs_node_t* node);
 FS_ERR fat32_seek(FILE* file, size_t pos);
 FS_ERR fat32_read(FILE* file, uint8_t* buffer, size_t size);
 FS_ERR fat32_write(FILE* file, uint8_t* buffer, size_t size);

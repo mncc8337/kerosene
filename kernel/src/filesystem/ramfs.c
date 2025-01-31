@@ -79,7 +79,7 @@ static void to_fs_node(ramfs_node_t* ramnode, fs_node_t* parent, fs_node_t* node
     node->accessed_timestamp = ramnode->accessed_timestamp;
     node->size = ramnode->size;
     
-    node->ramfs_node.node_addr = (uint32_t)ramnode;
+    node->ramfs.node_addr = (uint32_t)ramnode;
 }
 
 static void remove_datanode_chain(ramfs_datanode_t* node) {
@@ -239,7 +239,6 @@ static FS_ERR write_file(ramfs_datanode_t** start_datanode, uint8_t* buffer, siz
     if(estimated_datanode > 0) {
         (*start_datanode)->next = ramfs_allocate_datanodes(estimated_datanode, false);
         if(!(*start_datanode)->next) return ERR_FS_NOT_ENOUGH_SPACE;
-        // *start_datanode = (*start_datanode)->next;
     }
 
     while(true) {
@@ -299,7 +298,7 @@ ramfs_datanode_t* ramfs_get_last_datanote_of_chain(ramfs_datanode_t* datanode) {
 FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
     diriter->node = node;
     diriter->current_index = -1;
-    diriter->ramfs.current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain;
+    diriter->ramfs.current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain;
 
     return ERR_FS_SUCCESS;
 }
@@ -338,7 +337,7 @@ FS_ERR ramfs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
 FS_ERR ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size, fs_node_t* new_node) {
     new_node->flags = 0;
 
-    ramfs_node_t* parent_ramnode = (ramfs_node_t*)parent->ramfs_node.node_addr;
+    ramfs_node_t* parent_ramnode = (ramfs_node_t*)parent->ramfs.node_addr;
     unsigned empty_entry = 0;
     ramfs_datanode_t* empty_entry_datanode = 0;
 
@@ -404,8 +403,8 @@ FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
     if(strcmp(remove_node->name, ".") || strcmp(remove_node->name, ".."))
         return ERR_FS_FAILED;
 
-    ramfs_node_t* parent_ramnode = (ramfs_node_t*)parent->ramfs_node.node_addr;
-    ramfs_node_t* remove_ramnode = (ramfs_node_t*)remove_node->ramfs_node.node_addr;
+    ramfs_node_t* parent_ramnode = (ramfs_node_t*)parent->ramfs.node_addr;
+    ramfs_node_t* remove_ramnode = (ramfs_node_t*)remove_node->ramfs.node_addr;
 
     // check if the dir is empty
     if(FS_NODE_IS_DIR(*remove_node) && remove_content) {
@@ -487,7 +486,7 @@ FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
 }
 
 FS_ERR ramfs_update_entry(fs_node_t* node) {
-    ramfs_node_t* ramnode = (ramfs_node_t*)node->ramfs_node.node_addr;
+    ramfs_node_t* ramnode = (ramfs_node_t*)node->ramfs.node_addr;
 
     ramnode->flags = node->flags;
     ramnode->accessed_timestamp = node->accessed_timestamp;
@@ -511,7 +510,7 @@ FS_ERR ramfs_mkdir(fs_node_t* parent, char* name, uint32_t flags, fs_node_t* new
     fs_node_t dotdir;
     FS_ERR dotdir_err = ramfs_add_entry(
         new_node, ".",
-        ((ramfs_node_t*)new_node->ramfs_node.node_addr)->datanode_chain,
+        ((ramfs_node_t*)new_node->ramfs.node_addr)->datanode_chain,
         FS_FLAG_DIRECTORY | FS_FLAG_HIDDEN, 0,
         &dotdir
     );
@@ -520,7 +519,7 @@ FS_ERR ramfs_mkdir(fs_node_t* parent, char* name, uint32_t flags, fs_node_t* new
     fs_node_t dotdotdir;
     FS_ERR dotdotdir_err = ramfs_add_entry(
         new_node, "..",
-        ((ramfs_node_t*)parent->ramfs_node.node_addr)->datanode_chain,
+        ((ramfs_node_t*)parent->ramfs.node_addr)->datanode_chain,
         FS_FLAG_DIRECTORY | FS_FLAG_HIDDEN, 0,
         &dotdotdir
     );
@@ -533,7 +532,7 @@ FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     fs_node_t copied;
     FS_ERR copy_err = ramfs_add_entry(
         new_parent, new_name,
-        ((ramfs_node_t*)node->ramfs_node.node_addr)->datanode_chain,
+        ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain,
         node->flags, node->size,
         &copied
     );
@@ -551,7 +550,7 @@ FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
 }
 
 FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
-    ramfs_node_t* ramnode = (ramfs_node_t*)(node->ramfs_node.node_addr);
+    ramfs_node_t* ramnode = (ramfs_node_t*)(node->ramfs.node_addr);
     ramfs_datanode_t* copied_datanode = copy_datanode_chain(ramnode->datanode_chain);
     if(!copied_datanode) return ERR_FS_NOT_ENOUGH_SPACE;
 
@@ -573,10 +572,10 @@ FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* c
     if(touch_err) return touch_err;
 
     FILE dst_file;
-    FS_ERR dst_open_err = file_open(&dst_file, copied, FILE_WRITE);
+    FS_ERR dst_open_err = file_open(&dst_file, copied, "w");
     if(dst_open_err) return dst_open_err;
 
-    ramfs_node_t* ramnode = (ramfs_node_t*)node->ramfs_node.node_addr;
+    ramfs_node_t* ramnode = (ramfs_node_t*)node->ramfs.node_addr;
     ramfs_datanode_t* current_datanode = ramnode->datanode_chain;
 
     while(current_datanode) {
@@ -594,32 +593,71 @@ FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* c
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR ramfs_seek(FILE* file, size_t pos);
+FS_ERR ramfs_file_reset(fs_node_t* node) {
+    ramfs_datanode_t* datanode_chain = ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain;
+    remove_datanode_chain(datanode_chain->next);
+    datanode_chain->next = NULL;
+
+    node->size = 0;
+    return ERR_FS_SUCCESS;
+}
+
+FS_ERR ramfs_seek(FILE* file, size_t pos) {
+    ramfs_datanode_t* current_datanode = ((ramfs_node_t*)file->node->ramfs.node_addr)->datanode_chain;
+    size_t current_size = 0;
+
+    if(file->position < pos) {
+        current_datanode = (ramfs_datanode_t*)file->ramfs.current_datanode;
+        current_size = file->position - (file->position % RAMFS_DATANODE_SIZE);
+    }
+
+    while(true) {
+        current_size += RAMFS_DATANODE_SIZE;
+        if(current_size >= pos) {
+            current_size -= RAMFS_DATANODE_SIZE;
+            break;
+        }
+        if(current_datanode->next)
+            current_datanode = current_datanode->next;
+        else break;
+    }
+
+    if(current_size + RAMFS_DATANODE_SIZE < pos)
+        file->position = file->node->size;
+    else
+        file->position = pos;
+
+    file->ramfs.current_datanode = (uint32_t)current_datanode;
+
+    return ERR_FS_SUCCESS;
+}
 
 FS_ERR ramfs_read(FILE* file, uint8_t* buffer, size_t size) {
     int offset = file->position % RAMFS_DATANODE_SIZE;
     if(file->position != 0 && offset == 0)
         offset = RAMFS_DATANODE_SIZE;
 
-    return read_file((ramfs_datanode_t**)&file->ramfs_current_datanode, buffer, size, offset);
+    return read_file((ramfs_datanode_t**)&file->ramfs.current_datanode, buffer, size, offset);
 }
 
 FS_ERR ramfs_write(FILE* file, uint8_t* buffer, size_t size) {
-    if(file->position == 0) {
-        // reset file data
-        ramfs_datanode_t* datanode_chain = ((ramfs_node_t*)file->node->ramfs_node.node_addr)->datanode_chain;
-        remove_datanode_chain(datanode_chain->next);
-        datanode_chain->next = NULL;
-
-        // reset size because we are in write mode
-        file->node->size = 0;
+    int position = file->position;
+    ramfs_datanode_t** datanode_ptr = (ramfs_datanode_t**)&file->ramfs.current_datanode;
+    if(file->mode & FILE_APPEND) {
+        position = file->node->size;
+        datanode_ptr = (ramfs_datanode_t**)&file->ramfs.last_datanode;
     }
 
-    int offset = file->position % RAMFS_DATANODE_SIZE;
-    if(file->position != 0 && offset == 0)
+    int offset = position % RAMFS_DATANODE_SIZE;
+    if(position != 0 && offset == 0)
         offset = RAMFS_DATANODE_SIZE;
 
-    return write_file((ramfs_datanode_t**)&file->ramfs_current_datanode, buffer, size, offset);
+    return write_file(
+        datanode_ptr,
+        buffer,
+        size,
+        offset
+    );
 }
 
 FS_ERR ramfs_init(fs_t* fs) {
@@ -641,7 +679,7 @@ FS_ERR ramfs_init(fs_t* fs) {
     // fs->partition;
     fs->type = FS_RAMFS;
     fs->root_node.fs = fs;
-    fs->root_node.ramfs_node.node_addr = (uint32_t)root_ramnode;
+    fs->root_node.ramfs.node_addr = (uint32_t)root_ramnode;
     fs->root_node.parent_node = NULL;
     fs->root_node.flags = FS_FLAG_DIRECTORY;
     fs->root_node.name[0] = '/';
