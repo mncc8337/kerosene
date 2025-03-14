@@ -8,11 +8,11 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
     FS_ERR touch_err = fs_touch(new_parent, new_name, copied);
     if(touch_err) return touch_err;
 
-    FILE src_file;
+    file_descriptor_entry_t src_file;
     FS_ERR src_open_err = file_open(&src_file, node, "r");
     if(src_open_err) return src_open_err;
 
-    FILE dst_file;
+    file_descriptor_entry_t dst_file;
     FS_ERR dst_open_err = file_open(&dst_file, copied, "w");
     if(dst_open_err) return dst_open_err;
 
@@ -191,7 +191,7 @@ FS_ERR file_reset(fs_node_t* node) {
     }
 }
 
-FS_ERR file_open(FILE* file, fs_node_t* node, char* modestr) {
+FS_ERR file_open(file_descriptor_entry_t* file, fs_node_t* node, char* modestr) {
     if(FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_FILE;
 
     int mode = 0;
@@ -253,7 +253,7 @@ FS_ERR file_open(FILE* file, fs_node_t* node, char* modestr) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR file_seek(FILE* file, size_t pos) {
+FS_ERR file_seek(file_descriptor_entry_t* file, size_t pos) {
     if(file->mode & FILE_APPEND)
         return ERR_FS_FAILED;
 
@@ -267,7 +267,7 @@ FS_ERR file_seek(FILE* file, size_t pos) {
     }
 }
 
-FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
+FS_ERR file_read(file_descriptor_entry_t* file, uint8_t* buffer, size_t size) {
     if(!(file->mode & FILE_READ)) return ERR_FS_FAILED;
 
     if(file->position == file->node->size) return ERR_FS_EOF;
@@ -291,7 +291,7 @@ FS_ERR file_read(FILE* file, uint8_t* buffer, size_t size) {
 
 }
 
-FS_ERR file_write(FILE* file, uint8_t* buffer, size_t size) {
+FS_ERR file_write(file_descriptor_entry_t* file, uint8_t* buffer, size_t size) {
     if(!(file->mode & FILE_WRITE) && !(file->mode & FILE_APPEND))
         return ERR_FS_FAILED;
 
@@ -320,7 +320,7 @@ FS_ERR file_write(FILE* file, uint8_t* buffer, size_t size) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR file_close(FILE* file) {
+FS_ERR file_close(file_descriptor_entry_t* file) {
     switch (file->node->fs->type) {
         case FS_RAMFS:
             return ramfs_update_entry(file->node);
