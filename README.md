@@ -19,39 +19,39 @@ A WIP hobby x86 monolithic OS for learning purposes.
 ### Build and run
 > [!Note]
 > - This project is only built and tested on a linux machine (arch btw). Maybe on Windows with WSL or other OS will build and run just fine, though it is not guaranteed.
-> - scripts in `script/` will need sudo privilege to setup loopback device for the hard disk image.
+> - some scripts in `script/` will need sudo privilege to setup loopback device for the hard disk image.
+
+make sure to source enviroment vars before doing anything. makefile and shell scripts depend heavily on them.
 ```
-# make sure to source enviroment vars before doing anything. makefile and shell scripts depend heavily on them.
+cp example.env .env
 source .env
 ```
+#### build
 ```
-# build
 chmod +x script/*.sh
 make all
 ```
+#### run
 ```
-# run
-./script/run.sh # or make run
+make run
 ```
+#### make iso
 ```
-# make iso
 ./script/geniso.sh
 ```
+#### edit the fs files
+- first mount the disk device
 ```
-# editing the disk files
-
-# first mount the disk device
 ./script/mount-device.sh
 cd mnt/
-
-# then do some stuffs here
-
-# finally unmount
-# you also want to run this if you ever encountered errors like disk image is in use or whatever
+```
+- then do some stuffs in `mnt/`
+- finally unmount. you also want to run this if you ever encounter errors like disk image is in use or whatever
+```
 ./script/umount-device.sh
 ```
+- if you want to copy some files/dirs and dont want to run mount-device and then umount-device
 ```
-# if you want to copy some files/dirs and dont want to run mount-device and then umount-device
 ./script/cpyfile.sh file/or/directory/in/somewhere ./mnt/some/DIRECTORY/in/the/disk
 ```
 Files and directories in `fsfiles/` will be automatically copied into the disk image after running `make all`.
@@ -100,6 +100,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [x] framebuffer
     + [x] plot pixel
     + [x] render psf fonts
+    + [ ] more here
 - [ ] USB
 - [ ] sound
 - [ ] networking

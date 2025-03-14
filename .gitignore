@@ -9,7 +9,7 @@ compile_commands.json
 
 # dotfiles
 .*
-!.env
+.env
 
 # various bins
 bin/
