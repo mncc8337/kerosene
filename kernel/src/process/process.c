@@ -1,4 +1,5 @@
 #include "process.h"
+#include "filesystem.h"
 #include "system.h"
 #include "mem.h"
 
@@ -20,6 +21,8 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     proc->state = PROCESS_STATE_READY;
     proc->alive_ticks = 0;
     proc->sleep_ticks = 0;
+    proc->next = NULL;
+
     if(!is_user) proc->page_directory = vmmngr_get_kernel_page_directory();
     else {
         // only users need to have a separate page directory
@@ -28,9 +31,27 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
             kfree(proc);
             return NULL;
         }
-    }
-    proc->next = NULL;
 
+    }
+
+    if(!is_user) {
+        proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
+        proc->file_count = vfs_get_kernel_file_count();
+        proc->cwd = &vfs_getfs(RAMFS_DISK)->root_node;
+    }
+    else {
+        // create a file descriptor table
+        void* fdt = kmalloc(sizeof(file_descriptor_entry_t) * MAX_FILE);
+        if(!fdt) {
+            vmmngr_free_page_directory(proc->page_directory);
+            kfree(proc);
+            return NULL;
+        }
+        proc->file_descriptor_table = fdt;
+        proc->file_count = 0;
+        // TODO: set cwd
+        proc->cwd = NULL;
+    }
 
     regs_t* regs = &proc->regs;
     regs->eip = eip;
@@ -44,6 +65,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
         if(!heap) {
             vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
             vmmngr_free_page_directory(proc->page_directory);
+            kfree(proc->file_descriptor_table);
             kfree(proc);
             return NULL;
         }
@@ -81,8 +103,11 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
 }
 
 void process_delete(process_t* proc) {
-    // all kernel process use the same page directory so do not touch it
-    if(is_user_proc(proc)) vmmngr_free_page_directory(proc->page_directory);
+    // kernel resources are shared so dont touch them
+    if(is_user_proc(proc)) {
+        // TODO: close all opended files
+        vmmngr_free_page_directory(proc->page_directory);
+    }
 
     kfree(proc);
 }

@@ -364,7 +364,10 @@ void kmain() {
     SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
     // load_elf_file("hi.elf");
 
-    shell_process_prompt("cp (0)/test.txt (31)/a", 22);
+    shell_process_prompt("cp (0)/test.txt (31)/test.txt", 22);
+
+    SYSCALL_2P(SYSCALL_OPEN, ret, "test.txt", "r");
+    printf("got file descriptor %d\n", ret);
 
     while(true);
 }

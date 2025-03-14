@@ -13,6 +13,8 @@
 #define MAX_FS 32
 #define RAMFS_DISK (MAX_FS-1)
 
+#define MAX_FILE 128
+
 // this must be multiply of 4 and larger than 4
 #define RAMFS_DATANODE_SIZE 512
 
@@ -180,6 +182,8 @@ bool vfs_init();
 fs_type_t vfs_detectfs(partition_entry_t* part);
 fs_t* vfs_getfs(int id);
 bool vfs_is_fs_available(int id);
+file_descriptor_entry_t* vfs_get_kernel_file_descriptor_table();
+unsigned* vfs_get_kernel_file_count();
 
 // file_op.c
 FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
