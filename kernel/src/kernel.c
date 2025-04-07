@@ -23,6 +23,7 @@
 
 uint32_t kernel_size;
 
+void kmain();
 process_t* kernel_process = 0;
 
 void mem_init(void* mmap_addr, uint32_t mmap_length) {
@@ -170,7 +171,6 @@ void disk_init() {
     }
 }
 
-void kmain();
 void kinit(multiboot_info_t* mbd) {
     extern char kernel_start;
     extern char kernel_end;
@@ -366,8 +366,20 @@ void kmain() {
 
     shell_process_prompt("cp (0)/test.txt (31)/test.txt", 22);
 
-    SYSCALL_2P(SYSCALL_OPEN, ret, "test.txt", "r");
-    printf("got file descriptor %d\n", ret);
+    int fd1, fd2, fd3;
+    SYSCALL_2P(SYSCALL_OPEN, fd1, "test.txt", "r");
+    printf("got file descriptor %d\n", fd1);
+    SYSCALL_2P(SYSCALL_OPEN, fd2, "test.txt", "r");
+    printf("got file descriptor %d\n", fd2);
+    SYSCALL_2P(SYSCALL_OPEN, fd3, "test.txt", "r");
+    printf("got file descriptor %d\n", fd3);
+
+    SYSCALL_1P(SYSCALL_CLOSE, ret, fd1);
+    printf("closed file descriptor %d\n", fd1);
+    SYSCALL_1P(SYSCALL_CLOSE, ret, fd2);
+    printf("closed file descriptor %d\n", fd2);
+    SYSCALL_1P(SYSCALL_CLOSE, ret, fd3);
+    printf("closed file descriptor %d\n", fd3);
 
     while(true);
 }

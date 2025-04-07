@@ -47,7 +47,7 @@ static int open(char* path, char* modestr) {
     if(file_descriptor == -1) {
         // no hole found, add a new entry
 
-        if(*proc->file_count == MAX_FILE) {
+        if(*proc->file_count >= MAX_FILE) {
             kfree(node);
             return -1;
         }
@@ -60,14 +60,30 @@ static int open(char* path, char* modestr) {
     FS_ERR open_err = file_open(fde, node, modestr);
     if(open_err) {
         if((unsigned)file_descriptor == *proc->file_count - 1) {
-            fde->node = NULL;
             *proc->file_count -= 1;
         }
+        fde->node = NULL;
         kfree(node);
         return -1;
     }
 
     return file_descriptor;
+}
+
+static void close(int file_descriptor) {
+    process_t* proc = scheduler_get_current_process();
+
+    if(file_descriptor < 0 || (unsigned)file_descriptor >= *(proc->file_count))
+        return;
+
+    file_descriptor_entry_t* fde = &proc->file_descriptor_table[file_descriptor];
+
+    if(fde->node == NULL)
+        return;
+
+    file_close(fde);
+    kfree(fde->node);
+    fde->node = NULL;
 }
 
 static void syscall_dispatcher(regs_t* regs) {
@@ -127,6 +143,7 @@ void syscall_init() {
     ADD_SYSCALL(SYSCALL_SLEEP, proc_sleep);
 
     ADD_SYSCALL(SYSCALL_OPEN, open);
+    ADD_SYSCALL(SYSCALL_CLOSE, close);
 
     isr_new_interrupt(0x80, syscall_dispatcher, 0xee);
 }

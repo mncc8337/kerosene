@@ -321,7 +321,7 @@ FS_ERR file_write(file_descriptor_entry_t* file, uint8_t* buffer, size_t size) {
 }
 
 FS_ERR file_close(file_descriptor_entry_t* file) {
-    switch (file->node->fs->type) {
+    switch(file->node->fs->type) {
         case FS_RAMFS:
             return ramfs_update_entry(file->node);
         case FS_FAT32:
