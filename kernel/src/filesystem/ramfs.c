@@ -571,7 +571,7 @@ FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* c
     FS_ERR touch_err = fs_touch(new_parent, new_name, copied);
     if(touch_err) return touch_err;
 
-    file_descriptor_entry_t dst_file;
+    file_description_t dst_file;
     FS_ERR dst_open_err = file_open(&dst_file, copied, "w");
     if(dst_open_err) return dst_open_err;
 
@@ -602,7 +602,7 @@ FS_ERR ramfs_file_reset(fs_node_t* node) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR ramfs_seek(file_descriptor_entry_t* file, size_t pos) {
+FS_ERR ramfs_seek(file_description_t* file, size_t pos) {
     ramfs_datanode_t* current_datanode = ((ramfs_node_t*)file->node->ramfs.node_addr)->datanode_chain;
     size_t current_size = 0;
 
@@ -632,7 +632,7 @@ FS_ERR ramfs_seek(file_descriptor_entry_t* file, size_t pos) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR ramfs_read(file_descriptor_entry_t* file, uint8_t* buffer, size_t size) {
+FS_ERR ramfs_read(file_description_t* file, uint8_t* buffer, size_t size) {
     int offset = file->position % RAMFS_DATANODE_SIZE;
     if(file->position != 0 && offset == 0)
         offset = RAMFS_DATANODE_SIZE;
@@ -640,7 +640,7 @@ FS_ERR ramfs_read(file_descriptor_entry_t* file, uint8_t* buffer, size_t size) {
     return read_file((ramfs_datanode_t**)&file->ramfs.current_datanode, buffer, size, offset);
 }
 
-FS_ERR ramfs_write(file_descriptor_entry_t* file, uint8_t* buffer, size_t size) {
+FS_ERR ramfs_write(file_description_t* file, uint8_t* buffer, size_t size) {
     int position = file->position;
     ramfs_datanode_t** datanode_ptr = (ramfs_datanode_t**)&file->ramfs.current_datanode;
     if(file->mode & FILE_APPEND) {

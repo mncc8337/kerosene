@@ -41,7 +41,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     }
     else {
         // create a file descriptor table
-        void* fdt = kmalloc(sizeof(file_descriptor_entry_t) * MAX_FILE);
+        void* fdt = kmalloc(sizeof(file_description_t) * MAX_FILE);
         if(!fdt) {
             vmmngr_free_page_directory(proc->page_directory);
             kfree(proc);

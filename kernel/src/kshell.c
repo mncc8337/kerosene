@@ -230,7 +230,7 @@ static void run_sh(char* args) {
         return;
     }
 
-    file_descriptor_entry_t f;
+    file_description_t f;
     file_open(&f, &node, "r");
     char chr;
     input_len = 0;
@@ -349,7 +349,7 @@ static void read(char* path) {
         return;
     }
 
-    file_descriptor_entry_t f;
+    file_description_t f;
     file_open(&f, &node, "r");
     char chr;
     FS_ERR last_err;
@@ -555,7 +555,7 @@ static void write(char* path) {
         return;
     }
 
-    file_descriptor_entry_t f;
+    file_description_t f;
     file_open(&f, &node, "w");
 
     input_len = 0;
@@ -612,7 +612,7 @@ static void append(char* path) {
         return;
     }
 
-    file_descriptor_entry_t f;
+    file_description_t f;
     file_open(&f, &node, "a");
 
     input_len = 0;
@@ -1131,7 +1131,7 @@ static void loadfont(char* path) {
         return;
     }
 
-    file_descriptor_entry_t f;
+    file_description_t f;
     file_open(&f, &node, "r");
     FS_ERR read_err = file_read(&f, (uint8_t*)new_font, node.size);
     file_close(&f);

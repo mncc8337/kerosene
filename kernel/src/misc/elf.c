@@ -32,7 +32,7 @@ ELF_ERR elf_validate(elf_header_t* elf_header) {
 }
 
 ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry, FS_ERR* fserr) {
-    file_descriptor_entry_t f;
+    file_description_t f;
     *fserr = file_open(&f, node, "r");
     if(*fserr) return ERR_ELF_FILE_ERROR;
 

@@ -33,7 +33,7 @@ static int open(char* path, char* modestr) {
     }
 
     int file_descriptor = -1;
-    file_descriptor_entry_t* fde;
+    file_description_t* fde;
 
     // find hole to insert new file descriptor
     for(unsigned i = 0; i < (*proc->file_count); i++) {
@@ -76,7 +76,7 @@ static void close(int file_descriptor) {
     if(file_descriptor < 0 || (unsigned)file_descriptor >= *(proc->file_count))
         return;
 
-    file_descriptor_entry_t* fde = &proc->file_descriptor_table[file_descriptor];
+    file_description_t* fde = &proc->file_descriptor_table[file_descriptor];
 
     if(fde->node == NULL)
         return;

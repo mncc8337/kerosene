@@ -1226,7 +1226,7 @@ FS_ERR fat32_file_reset(fs_node_t* node) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_seek(file_descriptor_entry_t* file, size_t pos) {
+FS_ERR fat32_seek(file_description_t* file, size_t pos) {
     if(file->position == pos)
         return ERR_FS_SUCCESS;
 
@@ -1269,7 +1269,7 @@ FS_ERR fat32_seek(file_descriptor_entry_t* file, size_t pos) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_read(file_descriptor_entry_t* file, uint8_t* buffer, size_t size) {
+FS_ERR fat32_read(file_description_t* file, uint8_t* buffer, size_t size) {
     fat32_bootrecord_t* bootrec = &(file->node->fs->fat32_info.bootrec);
     int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
 
@@ -1284,7 +1284,7 @@ FS_ERR fat32_read(file_descriptor_entry_t* file, uint8_t* buffer, size_t size) {
     );
 }
 
-FS_ERR fat32_write(file_descriptor_entry_t* file, uint8_t* data, size_t size) {
+FS_ERR fat32_write(file_description_t* file, uint8_t* data, size_t size) {
     fat32_bootrecord_t* bootrec = &(file->node->fs->fat32_info.bootrec);
     int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
 

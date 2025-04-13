@@ -26,7 +26,7 @@ typedef struct process {
     uint32_t stack_addr;
     regs_t regs;
     
-    file_descriptor_entry_t* file_descriptor_table;
+    file_description_t* file_descriptor_table;
     unsigned* file_count;
     fs_node_t* cwd;
 

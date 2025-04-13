@@ -3,7 +3,7 @@
 #include "mem.h"
 
 static fs_t* FS;
-static file_descriptor_entry_t KERNEL_FDT[MAX_FILE];
+static file_description_t KERNEL_FDT[MAX_FILE];
 static unsigned KERNEL_FILE_COUNT = 0;
 
 static bool fat32_check(uint8_t* sect) {
@@ -68,7 +68,7 @@ bool vfs_is_fs_available(int id) {
     return FS[id].type != FS_EMPTY;
 }
 
-file_descriptor_entry_t* vfs_get_kernel_file_descriptor_table() {
+file_description_t* vfs_get_kernel_file_descriptor_table() {
     return KERNEL_FDT;
 }
 
