@@ -23,7 +23,12 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     proc->sleep_ticks = 0;
     proc->next = NULL;
 
-    if(!is_user) proc->page_directory = vmmngr_get_kernel_page_directory();
+    if(!is_user) {
+        proc->page_directory = vmmngr_get_kernel_page_directory();
+        proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
+        proc->file_count = vfs_get_kernel_file_count();
+        proc->cwd = &vfs_getfs(RAMFS_DISK)->root_node;
+    }
     else {
         // only users need to have a separate page directory
         proc->page_directory = vmmngr_alloc_page_directory();
@@ -32,14 +37,6 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
             return NULL;
         }
 
-    }
-
-    if(!is_user) {
-        proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
-        proc->file_count = vfs_get_kernel_file_count();
-        proc->cwd = &vfs_getfs(RAMFS_DISK)->root_node;
-    }
-    else {
         // create a file descriptor table
         void* fdt = kmalloc(sizeof(file_description_t) * MAX_FILE);
         if(!fdt) {

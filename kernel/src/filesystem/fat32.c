@@ -676,7 +676,9 @@ FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
             memcpy(ret_node->name, entry_name, namelen);
 
             ret_node->fs = diriter->node->fs;
-            ret_node->parent_node = diriter->node;
+            ret_node->parent = diriter->node;
+            ret_node->children = NULL;
+            ret_node->next_sibling = NULL;
             ret_node->fat32.start_cluster = (uint32_t)temp_dir->first_cluster_number_high << 16
                                 | temp_dir->first_cluster_number_low;
             if(ret_node->fat32.start_cluster == 0 && strcmp(ret_node->name, "..")) {
@@ -697,6 +699,8 @@ FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
                 ret_node->flags |= FS_FLAG_HIDDEN;
 
             ret_node->size = temp_dir->size;
+            ret_node->refcount = 0;
+
             ret_node->fat32.parent_cluster = current_cluster;
             ret_node->fat32.parent_cluster_index = i;
 
@@ -877,11 +881,14 @@ FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, ui
     // generate checksum
     uint8_t checksum = gen_checksum(shortname);
 
-    new_node->parent_node = parent;
+    new_node->parent = parent;
     new_node->fs = parent->fs;
-    new_node->parent_node = parent;
+    new_node->parent = parent;
+    new_node->children = NULL;
+    new_node->next_sibling = NULL;
     new_node->fat32.start_cluster = start_cluster;
     new_node->size = size;
+    new_node->refcount = 0;
 
     new_node->flags = 0;
     if(attr & FAT_ATTR_DIRECTORY)
@@ -1191,7 +1198,7 @@ FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     if(copy_err) return copy_err;
 
     // remove the entry but not the content
-    FS_ERR remove_err = fat32_remove_entry(node->parent_node, node, false);
+    FS_ERR remove_err = fat32_remove_entry(node->parent, node, false);
     if(remove_err) {
         // TODO: revert adding entry
         return remove_err;
@@ -1342,10 +1349,13 @@ FS_ERR fat32_init(fs_t* fs, partition_entry_t part) {
 
     fs->root_node.fs = fs;
     fs->root_node.fat32.start_cluster = bootrec->ebpb.rootdir_cluster;
-    fs->root_node.parent_node = NULL;
+    fs->root_node.parent = NULL;
+    fs->root_node.children = NULL;
+    fs->root_node.next_sibling = NULL;
     fs->root_node.flags = FS_FLAG_DIRECTORY;
     fs->root_node.name[0] = '/';
     fs->root_node.name[1] = '\0';
+    fs->root_node.refcount = 0;
 
     return ERR_FS_SUCCESS;
 }

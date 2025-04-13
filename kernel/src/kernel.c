@@ -17,8 +17,6 @@
 #include "string.h"
 #include "debug.h"
 
-#include "kshell.h"
-
 #include "misc/elf.h"
 
 uint32_t kernel_size;
@@ -79,7 +77,7 @@ void video_init(multiboot_info_t* mbd) {
         video_pitch = mbd->framebuffer_pitch;
         video_bpp = mbd->framebuffer_bpp;
        
-        switch(mbd->framebuffer_type) {
+       switch(mbd->framebuffer_type) {
             case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED:
                 using_framebuffer = false;
                 // very rare, not likely to happend
@@ -92,7 +90,7 @@ void video_init(multiboot_info_t* mbd) {
             case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
                 using_framebuffer = false;
                 break;
-        }
+       }
     }
     else {
         using_framebuffer = false;
@@ -157,7 +155,7 @@ void disk_init() {
             case FS_FAT32:
                 err = fat32_init(vfs_getfs(fs_count), part);
                 if(err)
-                    print_debug(LT_ER, "failed to initialize FAT32 filesystem on partition %d. error code %d\n", i+1, err);
+                    print_debug(LT_ER, "failed to initialise FAT32 filesystem on partition %d. error code %d\n", i+1, err);
                 else {
                     print_debug(LT_OK, "initialised FAT32 filesystem on partition %d", i+1);
                     printf(" on fs (%d)\n", fs_count);
@@ -336,7 +334,7 @@ void kernel_proc1() {
         SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
         video_framebuffer_fill_rectangle(20, 20, 40, 40, video_framebuffer_rgb(VIDEO_GREEN));
     }
-    // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
+    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
 }
 void kernel_proc2() {
     int ret;
@@ -344,42 +342,34 @@ void kernel_proc2() {
         SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
         video_framebuffer_fill_rectangle(20, 20, 40, 40, video_framebuffer_rgb(VIDEO_RED));
     }
-    // SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
+    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
 }
 
 void kmain() {
-    print_debug(LT_OK, "done initialising\n");
+    print_debug(LT_OK, "successfully jumped into main kernel process\n");
+    print_debug(LT_IF, "done initialising\n");
 
-    if(shell_init()) puts("not enough memory for kshell.");
-
-    process_t* shell_proc = process_new((uint32_t)shell_start, 0, false);
-    if(shell_proc) scheduler_add_process(shell_proc);
+    int ret;
+    // SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
     process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
     if(proc1) scheduler_add_process(proc1);
     if(proc2) scheduler_add_process(proc2);
 
-    int ret;
-    SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
     // load_elf_file("hi.elf");
 
-    shell_process_prompt("cp (0)/test.txt (31)/test.txt", 22);
+    // shell_process_prompt("cp (0)/test.txt (31)/test.txt", 22);
 
-    int fd1, fd2, fd3;
+    int fd1;
     SYSCALL_2P(SYSCALL_OPEN, fd1, "test.txt", "r");
     printf("got file descriptor %d\n", fd1);
-    SYSCALL_2P(SYSCALL_OPEN, fd2, "test.txt", "r");
-    printf("got file descriptor %d\n", fd2);
-    SYSCALL_2P(SYSCALL_OPEN, fd3, "test.txt", "r");
-    printf("got file descriptor %d\n", fd3);
 
     SYSCALL_1P(SYSCALL_CLOSE, ret, fd1);
     printf("closed file descriptor %d\n", fd1);
-    SYSCALL_1P(SYSCALL_CLOSE, ret, fd2);
-    printf("closed file descriptor %d\n", fd2);
-    SYSCALL_1P(SYSCALL_CLOSE, ret, fd3);
-    printf("closed file descriptor %d\n", fd3);
 
-    while(true);
+    puts("main kernel process exited. halting");
+
+    key_t key;
+    while(true) kbd_wait_key(&key);
 }

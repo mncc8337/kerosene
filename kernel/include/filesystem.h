@@ -98,13 +98,17 @@ typedef struct {
 typedef struct fs_node {
     char name[FILENAME_LIMIT];
     struct fs* fs;
-    struct fs_node* parent_node;
+    struct fs_node* parent;
+    struct fs_node* children;
+    struct fs_node* next_sibling;
     uint32_t flags;
     uint16_t creation_milisecond;
     time_t creation_timestamp;
     time_t modified_timestamp;
     time_t accessed_timestamp;
     uint32_t size;
+
+    uint32_t refcount;
 
     // fs depended field
     union {

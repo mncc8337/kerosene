@@ -51,7 +51,7 @@ FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* nod
     }
 }
 
-FS_ERR fs_read_dir( directory_iterator_t* diriter, fs_node_t* ret_node) {
+FS_ERR fs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
     switch(diriter->node->fs->type) {
         case FS_RAMFS:
             return ramfs_read_dir(diriter, ret_node);

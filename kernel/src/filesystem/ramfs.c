@@ -71,13 +71,16 @@ static void to_fs_node(ramfs_node_t* ramnode, fs_node_t* parent, fs_node_t* node
     char* name = (void*)ramnode + sizeof(ramfs_node_t);
     memcpy(node->name, name, ramnode->name_length + 1);
     node->fs = parent->fs;
-    node->parent_node = parent;
+    node->parent = parent;
+    node->children = NULL;
+    node->next_sibling = NULL;
     node->flags = ramnode->flags;
     node->creation_milisecond = ramnode->creation_milisecond;
     node->creation_timestamp = ramnode->creation_timestamp;
     node->modified_timestamp = ramnode->modified_timestamp;
     node->accessed_timestamp = ramnode->accessed_timestamp;
     node->size = ramnode->size;
+    node->refcount = 0;
     
     node->ramfs.node_addr = (uint32_t)ramnode;
 }
@@ -539,7 +542,7 @@ FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     if(copy_err) return copy_err;
 
     // remove the entry but not the content
-    FS_ERR remove_err = ramfs_remove_entry(node->parent_node, node, false);
+    FS_ERR remove_err = ramfs_remove_entry(node->parent, node, false);
     if(remove_err) {
         // TODO: revert adding entry
         return remove_err;
@@ -680,10 +683,13 @@ FS_ERR ramfs_init(fs_t* fs) {
     fs->type = FS_RAMFS;
     fs->root_node.fs = fs;
     fs->root_node.ramfs.node_addr = (uint32_t)root_ramnode;
-    fs->root_node.parent_node = NULL;
+    fs->root_node.parent = NULL;
+    fs->root_node.children = NULL;
+    fs->root_node.next_sibling = NULL;
     fs->root_node.flags = FS_FLAG_DIRECTORY;
     fs->root_node.name[0] = '/';
     fs->root_node.name[1] = '\0';
+    fs->root_node.refcount = 0;
 
     return ERR_FS_SUCCESS;
 }

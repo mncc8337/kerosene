@@ -6,6 +6,8 @@ static fs_t* FS;
 static file_description_t KERNEL_FDT[MAX_FILE];
 static unsigned KERNEL_FILE_COUNT = 0;
 
+fs_node_t* FS_ROOT_NODE;
+
 static bool fat32_check(uint8_t* sect) {
     fat32_bootrecord_t* fat32_bootrec = (fat32_bootrecord_t*)sect;
 
@@ -42,6 +44,8 @@ bool vfs_init() {
         kfree(FS);
         return true;
     }
+
+    FS_ROOT_NODE = &FS[RAMFS_DISK].root_node;
 
     return false;
 }

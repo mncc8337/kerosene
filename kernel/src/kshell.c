@@ -782,7 +782,7 @@ static void stat(char* path) {
     }
 
     printf("filesystem: %s\n", (node.fs->type == 1 ? "FAT32" : (node.fs->type == 2 ? "ext2" : ( node.fs->type == 3 ? "ramfs" :"unknown"))));
-    printf("parent: '%s'\n", node.parent_node->name);
+    printf("parent: '%s'\n", node.parent->name);
     printf("type: %s\n", (FS_NODE_IS_DIR(node) ? "directory" : "file"));
     printf("hidden: %s\n", (FS_NODE_IS_HIDDEN(node) ? "true" : "false"));
     printf("size: %d bytes\n", node.size);
