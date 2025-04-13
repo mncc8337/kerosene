@@ -11,6 +11,7 @@
 #define FILENAME_LIMIT 256
 
 #define MAX_FS 32
+#define MAX_DISK_ID_STRLEN 2
 #define RAMFS_DISK (MAX_FS-1)
 
 #define MAX_FILE 128
@@ -34,6 +35,7 @@ typedef enum {
     ERR_FS_ENTRY_EXISTED,
     ERR_FS_BAD_CLUSTER,
     ERR_FS_NOT_FOUND,
+    ERR_FS_TARGET_NOT_FOUND,
     ERR_FS_DIR_NOT_EMPTY,
     ERR_FS_INVALID_FSINFO,
     ERR_FS_NOT_ENOUGH_SPACE,
@@ -108,7 +110,7 @@ typedef struct fs_node {
     time_t accessed_timestamp;
     uint32_t size;
 
-    uint32_t refcount;
+    int32_t refcount;
 
     // fs depended field
     union {
@@ -189,16 +191,22 @@ bool vfs_is_fs_available(int id);
 file_description_t* vfs_get_kernel_file_descriptor_table();
 unsigned* vfs_get_kernel_file_count();
 
-// file_op.c
+// vfs_op.c
+FS_ERR vfs_find(char* path, fs_node_t* cwd, fs_node_t** ret_node);
+int vfs_open(char* path, char* modestr);
+void vfs_close(int file_descriptor);
+
+// fs_op.c
 FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR fs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
-FS_ERR fs_find(fs_node_t* parent, const char* path, fs_node_t* ret_node);
+FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node);
 FS_ERR fs_mkdir(fs_node_t* parent, char* name, fs_node_t* new_node);
 FS_ERR fs_touch(fs_node_t* parent, char* name, fs_node_t* new_node);
 FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node);
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
 
+// file_op.c
 FS_ERR file_open(file_description_t* file, fs_node_t* node, char* modestr);
 FS_ERR file_seek(file_description_t* file, size_t pos);
 FS_ERR file_write(file_description_t* file, uint8_t* buffer, size_t size);

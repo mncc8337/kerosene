@@ -22,70 +22,6 @@ static void proc_sleep(unsigned ticks) {
     scheduler_set_sleep(&regs_copy, ticks);
 }
 
-static int open(char* path, char* modestr) {
-    process_t* proc = scheduler_get_current_process();
-
-    fs_node_t* node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-    FS_ERR find_err = fs_find(proc->cwd, path, node);
-    if(find_err) {
-        kfree(node);
-        return -1;
-    }
-
-    int file_descriptor = -1;
-    file_description_t* fde;
-
-    // find hole to insert new file descriptor
-    for(unsigned i = 0; i < (*proc->file_count); i++) {
-        if(proc->file_descriptor_table[i].node == NULL) {
-            fde = proc->file_descriptor_table + i;
-            file_descriptor = i;
-            break;
-        }
-    }
-
-    if(file_descriptor == -1) {
-        // no hole found, add a new entry
-
-        if(*proc->file_count >= MAX_FILE) {
-            kfree(node);
-            return -1;
-        }
-
-        fde = proc->file_descriptor_table + (*proc->file_count);
-        file_descriptor = *proc->file_count;
-        *proc->file_count += 1;
-    }
-
-    FS_ERR open_err = file_open(fde, node, modestr);
-    if(open_err) {
-        if((unsigned)file_descriptor == *proc->file_count - 1) {
-            *proc->file_count -= 1;
-        }
-        fde->node = NULL;
-        kfree(node);
-        return -1;
-    }
-
-    return file_descriptor;
-}
-
-static void close(int file_descriptor) {
-    process_t* proc = scheduler_get_current_process();
-
-    if(file_descriptor < 0 || (unsigned)file_descriptor >= *(proc->file_count))
-        return;
-
-    file_description_t* fde = &proc->file_descriptor_table[file_descriptor];
-
-    if(fde->node == NULL)
-        return;
-
-    file_close(fde);
-    kfree(fde->node);
-    fde->node = NULL;
-}
-
 static void syscall_dispatcher(regs_t* regs) {
     if(regs->eax >= MAX_SYSCALL) return;
 
@@ -142,8 +78,8 @@ void syscall_init() {
     ADD_SYSCALL(SYSCALL_KILL_PROCESS, proc_kill);
     ADD_SYSCALL(SYSCALL_SLEEP, proc_sleep);
 
-    ADD_SYSCALL(SYSCALL_OPEN, open);
-    ADD_SYSCALL(SYSCALL_CLOSE, close);
+    ADD_SYSCALL(SYSCALL_OPEN, vfs_open);
+    ADD_SYSCALL(SYSCALL_CLOSE, vfs_close);
 
     isr_new_interrupt(0x80, syscall_dispatcher, 0xee);
 }

@@ -681,7 +681,7 @@ FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
             ret_node->next_sibling = NULL;
             ret_node->fat32.start_cluster = (uint32_t)temp_dir->first_cluster_number_high << 16
                                 | temp_dir->first_cluster_number_low;
-            if(ret_node->fat32.start_cluster == 0 && strcmp(ret_node->name, "..")) {
+            if(ret_node->fat32.start_cluster == 0 && !strcmp(ret_node->name, "..")) {
                 // in linux the .. dir of a root's child directory is pointed to cluster 0
                 // we need to fix it because root directory is in cluster 2
                 // else we would destroy cluster 0 which contain filesystem infomation
@@ -742,7 +742,7 @@ FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, ui
     uint8_t directory[cluster_size];
 
     // is this entry is a . or .. entry
-    bool dotdot_entry = strcmp(name, ".") || strcmp(name, "..");
+    bool dotdot_entry = !strcmp(name, ".") || !strcmp(name, "..");
 
     bool lfn_ready = false;
     char entry_name[FILENAME_LIMIT];
@@ -782,7 +782,7 @@ FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, ui
             }
 
             // found duplication
-            if(strcmp_case_insensitive(entry_name, name))
+            if(!strcmp_case_insensitive(entry_name, name))
                 return ERR_FS_ENTRY_EXISTED;
 
             lfn_ready = false;
@@ -983,7 +983,7 @@ FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, ui
 
 // remove an entry from parent
 FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content) {
-    if(strcmp(remove_node->name, ".") || strcmp(remove_node->name, ".."))
+    if(!strcmp(remove_node->name, ".") || !strcmp(remove_node->name, ".."))
         return ERR_FS_FAILED;
 
     fat32_bootrecord_t* bootrec = &(parent->fs->fat32_info.bootrec);
@@ -1012,7 +1012,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
             // at this point this entry should be a SFN
             PROCESS_SFN_ENTRY(entry_name, namelen, temp_dir)
             // if it is not . or .. entry then there is a child entry
-            if(!strcmp(entry_name, ".") && !strcmp(entry_name, ".."))
+            if(strcmp(entry_name, ".") && strcmp(entry_name, ".."))
                 return ERR_FS_DIR_NOT_EMPTY;
         }
     }

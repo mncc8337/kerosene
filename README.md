@@ -132,7 +132,6 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 ## Known bugs
 - ATA PIO mode initialization occasionally failed: address mark not found
 - `print_debug` gives gliberrish result if put in many formats
-- global variable would cause conflict between processes (see ~~fat32.c~~ ~~file_op.c~~ strtok.c)
 - `video_framebuffer_print_char` sometime cause a pagefault
 ## Learning resources
 > [!Tip]

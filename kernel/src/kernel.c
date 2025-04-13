@@ -226,11 +226,11 @@ void kinit(multiboot_info_t* mbd) {
         elf_section_header_t* sh = (elf_section_header_t*)(elf_sec->addr + KERNEL_START) + i;
         char* sec_name = shstrtab + sh->name;
 
-        if(strcmp(sec_name, ".symtab")) {
+        if(!strcmp(sec_name, ".symtab")) {
             print_debug(LT_IF, "found .symtab section\n");
             kernel_set_symtab_sh_ptr((uint32_t)sh);
         }
-        else if(strcmp(sec_name, ".strtab")) {
+        else if(!strcmp(sec_name, ".strtab")) {
             print_debug(LT_IF, "found .strtab section\n");
             kernel_set_strtab_ptr(sh->addr + KERNEL_START);
         }
@@ -362,7 +362,7 @@ void kmain() {
     // shell_process_prompt("cp (0)/test.txt (31)/test.txt", 22);
 
     int fd1;
-    SYSCALL_2P(SYSCALL_OPEN, fd1, "test.txt", "r");
+    SYSCALL_2P(SYSCALL_OPEN, fd1, "(0)/test.txt", "r");
     printf("got file descriptor %d\n", fd1);
 
     SYSCALL_1P(SYSCALL_CLOSE, ret, fd1);

@@ -361,7 +361,7 @@ FS_ERR ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode
             }
 
             char* current_ramnode_name = (void*)entry_list[entry_id] + sizeof(ramfs_node_t);
-            if(strcmp(current_ramnode_name, name)) return ERR_FS_ENTRY_EXISTED;
+            if(!strcmp(current_ramnode_name, name)) return ERR_FS_ENTRY_EXISTED;
         }
 
         // to next ramnode
@@ -403,7 +403,7 @@ FS_ERR ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode
 }
 
 FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content) {
-    if(strcmp(remove_node->name, ".") || strcmp(remove_node->name, ".."))
+    if(!strcmp(remove_node->name, ".") || !strcmp(remove_node->name, ".."))
         return ERR_FS_FAILED;
 
     ramfs_node_t* parent_ramnode = (ramfs_node_t*)parent->ramfs.node_addr;
@@ -420,7 +420,7 @@ FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
 
                 ramfs_node_t* ramnode = (ramfs_node_t*)entry_list[entry_id];
                 char* name = (void*)ramnode + sizeof(ramfs_node_t);
-                if(!strcmp(name, ".") && !strcmp(name, ".."))
+                if(strcmp(name, ".") && strcmp(name, ".."))
                     return ERR_FS_DIR_NOT_EMPTY;
             }
 

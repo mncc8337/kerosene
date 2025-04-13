@@ -2,8 +2,9 @@
 
 #include "string.h"
 
-#define COPY_SIZE 512
+#define UNIVERSAL_COPY_SIZE 512
 
+// copy file from any filesystem to another filesystem
 static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
     FS_ERR touch_err = fs_touch(new_parent, new_name, copied);
     if(touch_err) return touch_err;
@@ -19,9 +20,9 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
     FS_ERR final_err = ERR_FS_SUCCESS;
 
     unsigned remain_size = node->size;
-    uint8_t buffer[COPY_SIZE];
+    uint8_t buffer[UNIVERSAL_COPY_SIZE];
     while(remain_size) {
-        unsigned write_size = (remain_size >= COPY_SIZE) ? COPY_SIZE : remain_size;
+        unsigned write_size = (remain_size >= UNIVERSAL_COPY_SIZE) ? UNIVERSAL_COPY_SIZE : remain_size;
         final_err = file_read(&src_file, buffer, write_size);
         if(final_err != ERR_FS_SUCCESS && final_err != ERR_FS_EOF)
             break;
@@ -72,12 +73,11 @@ FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
     FS_ERR diriter_err = fs_setup_directory_iterator(&diriter, parent);
     if(diriter_err) return diriter_err;
 
-    bool (*cmpcmd)(const char*, const char*);
+    int (*cmpcmd)(const char*, const char*) = strcmp;
     if(parent->fs->type == FS_FAT32) cmpcmd = strcmp_case_insensitive;
-    else cmpcmd = strcmp;
 
     while(!(last_err = fs_read_dir(&diriter, ret_node))) {
-        if(cmpcmd(nodename, ret_node->name))
+        if(!cmpcmd(nodename, ret_node->name))
             return ERR_FS_SUCCESS;
     }
 
