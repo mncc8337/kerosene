@@ -350,7 +350,6 @@ void kmain() {
     print_debug(LT_IF, "done initialising\n");
 
     int ret;
-    // SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
     process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
@@ -359,14 +358,25 @@ void kmain() {
 
     // load_elf_file("hi.elf");
 
-    // shell_process_prompt("cp (0)/test.txt (31)/test.txt", 22);
-
-    int fd1;
+    int fd1, fd2, fd3;
     SYSCALL_2P(SYSCALL_OPEN, fd1, "(0)/test.txt", "r");
     printf("got file descriptor %d\n", fd1);
+    SYSCALL_2P(SYSCALL_OPEN, fd2, "(0)/testdir/testdir-level2/file.txt", "r");
+    printf("got file descriptor %d\n", fd2);
+    SYSCALL_2P(SYSCALL_OPEN, fd3, "(0)/testdir/testdir.txt", "r");
+    printf("got file descriptor %d\n", fd3);
+
+    vfs_printtree();
+    SYSCALL_1P(SYSCALL_SLEEP, ret, 10000);
 
     SYSCALL_1P(SYSCALL_CLOSE, ret, fd1);
     printf("closed file descriptor %d\n", fd1);
+    SYSCALL_1P(SYSCALL_CLOSE, ret, fd2);
+    printf("closed file descriptor %d\n", fd2);
+    SYSCALL_1P(SYSCALL_CLOSE, ret, fd3);
+    printf("closed file descriptor %d\n", fd3);
+
+    vfs_printtree();
 
     puts("main kernel process exited. halting");
 

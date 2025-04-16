@@ -689,7 +689,7 @@ FS_ERR ramfs_init(fs_t* fs) {
     fs->root_node.flags = FS_FLAG_DIRECTORY;
     fs->root_node.name[0] = '/';
     fs->root_node.name[1] = '\0';
-    fs->root_node.refcount = 0;
+    fs->root_node.refcount = 69420;
 
     return ERR_FS_SUCCESS;
 }

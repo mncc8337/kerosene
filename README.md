@@ -111,6 +111,10 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [ ] ext2 fs
 - [x] ramfs
 - [ ] vfs
+    + [x] node tree
+    + [x] find node in tree
+    + [x] unused node clean up
+    + [ ] more here
 ### Userland
 - [x] TSS setup
 - [x] enter usermode
@@ -119,8 +123,10 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     + [x] current time
     + [x] terminate process
     + [x] sleep()
+    + [x] open file
     + [ ] read file
     + [ ] write file
+    + [x] close file
 - [ ] process manager
     + [x] load process
     + [x] load and save process state

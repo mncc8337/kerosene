@@ -195,6 +195,7 @@ unsigned* vfs_get_kernel_file_count();
 FS_ERR vfs_find(char* path, fs_node_t* cwd, fs_node_t** ret_node);
 int vfs_open(char* path, char* modestr);
 void vfs_close(int file_descriptor);
+void vfs_printtree();
 
 // fs_op.c
 FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);

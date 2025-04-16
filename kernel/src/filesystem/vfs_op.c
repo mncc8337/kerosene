@@ -7,7 +7,31 @@
 extern fs_t* FS;
 
 static void cleanup_node_tree(fs_node_t* start_node) {
-    // TODO: implement this
+    if(start_node->refcount > 0)
+        return;
+    if(start_node->children)
+        return;
+    // now it is safe to delete this node
+    
+    // remove node from tree
+    fs_node_t* parent_node = start_node->parent;
+    if(parent_node->children == start_node) {
+        if(start_node->next_sibling)
+            parent_node->children = start_node->next_sibling;
+        else {
+            parent_node->children = NULL;
+            // parent directory maybe unused at this point
+            cleanup_node_tree(parent_node);
+        }
+    }
+    else {
+        fs_node_t* current_node = parent_node->children;
+        while(current_node->next_sibling != start_node)
+            current_node = current_node->next_sibling;
+        current_node->next_sibling = start_node->next_sibling;
+    }
+
+    kfree(start_node);
 }
 
 FS_ERR vfs_find(char* path, fs_node_t* cwd, fs_node_t** ret_node) {
@@ -64,7 +88,7 @@ FS_ERR vfs_find(char* path, fs_node_t* cwd, fs_node_t** ret_node) {
 
         if(current_node == NULL) {
             // the node we need to find does not in the node tree yet
-            // so we find it in the disk
+            // so we need to find it in the disk
             fs_node_t* new_node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
             if(!new_node) {
                 for(unsigned i = 0; i < allocated_counter; i++)
@@ -176,9 +200,33 @@ void vfs_close(int file_descriptor) {
     file_close(fde);
 
     fde->node->refcount--;
-    if(fde->node->refcount <= 0)
-        cleanup_node_tree(fde->node);
+    cleanup_node_tree(fde->node);
 
     fde->node = NULL;
 }
 
+// delete later
+#include "stdio.h"
+static void printnode(fs_node_t* node, int level) {
+    for(int i = 0; i < level; i++)
+        printf("  ");
+    puts(node->name);
+
+    if(node->children)
+        printnode(node->children, level + 1);
+
+    fs_node_t* sibling = node->next_sibling;
+    while(sibling) {
+        printnode(sibling, level);
+        sibling = sibling->next_sibling;
+    }
+}
+void vfs_printtree() {
+    for(unsigned i = 0; i < MAX_FS; i++) {
+        if(FS[i].type == FS_EMPTY) continue;
+
+        printf("(%d)\n", i);
+
+        printnode(&FS[i].root_node, 1);
+    }
+}
