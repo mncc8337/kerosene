@@ -291,6 +291,10 @@ void kinit(multiboot_info_t* mbd) {
     while(true);
 }
 
+void idle_process() {
+    while(true);
+}
+
 void load_elf_file(char* path) {
     fs_t* fs = vfs_getfs(0);
     if(!fs) return;
@@ -347,6 +351,16 @@ void kernel_proc2() {
 
 void kmain() {
     print_debug(LT_OK, "successfully jumped into main kernel process\n");
+
+    // there must be a idle process so that sleep()
+    // in other processes could work
+    process_t* idle_proc = process_new((uint32_t)idle_process, 999, false);
+    if(idle_proc) {
+        scheduler_add_process(idle_proc);
+        print_debug(LT_OK, "created idle process\n");
+    }
+    else print_debug(LT_WN, "failed to create idle process. sleep() may not work in some processes\n");
+
     print_debug(LT_IF, "done initialising\n");
 
     int ret;
@@ -367,7 +381,7 @@ void kmain() {
     printf("got file descriptor %d\n", fd3);
 
     vfs_printtree();
-    SYSCALL_1P(SYSCALL_SLEEP, ret, 10000);
+    SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
 
     SYSCALL_1P(SYSCALL_CLOSE, ret, fd1);
     printf("closed file descriptor %d\n", fd1);
