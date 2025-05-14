@@ -3,6 +3,7 @@
 
 #include "stdlib.h"
 #include "string.h"
+#include "stdio.h"
 
 extern fs_t* FS;
 
@@ -34,7 +35,7 @@ static void cleanup_node_tree(fs_node_t* start_node) {
     kfree(start_node);
 }
 
-FS_ERR vfs_find(char* path, fs_node_t* cwd, fs_node_t** ret_node) {
+static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_node, bool create_node) {
     fs_node_t* current_node = cwd;
     fs_node_t* parent_node = current_node->parent;
     if(!parent_node) parent_node = current_node;
@@ -73,6 +74,7 @@ FS_ERR vfs_find(char* path, fs_node_t* cwd, fs_node_t** ret_node) {
 
     char* old = path;
     char* current_name = strtok(path, "/", &old);
+    bool create_file_flag = false;
     while(current_name) {
         if(!strcmp(current_name, "."))
             goto skip;
@@ -102,8 +104,13 @@ FS_ERR vfs_find(char* path, fs_node_t* cwd, fs_node_t** ret_node) {
                 for(unsigned i = 0; i < allocated_counter; i++)
                     kfree(allocated[i]);
                 // we should clarify wether the target is not found or the dir in the middle is not found
-                if(find_err == ERR_FS_NOT_FOUND && strtok(NULL, "/", &old) == NULL)
+                if(find_err == ERR_FS_NOT_FOUND && strtok(NULL, "/", &old) == NULL) {
+                    if(create_node) {
+                        create_file_flag = true;
+                        break;
+                    }
                     return ERR_FS_TARGET_NOT_FOUND;
+                }
                 return find_err;
             }
 
@@ -126,6 +133,32 @@ FS_ERR vfs_find(char* path, fs_node_t* cwd, fs_node_t** ret_node) {
         current_name = strtok(NULL, "/", &old);
     }
 
+    if(create_file_flag) {
+        fs_node_t* new_node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
+        if(!new_node)
+            return ERR_FS_NOT_ENOUGH_SPACE;
+
+        FS_ERR touch_err = fs_touch(parent_node, current_name, new_node);
+        if(touch_err) {
+            kfree(new_node);
+            return touch_err;
+        }
+        // link the new node to the tree
+        if(!parent_node->children) {
+            parent_node->children = new_node;
+        }
+        else {
+            fs_node_t* current_sibling = parent_node->children;
+            while(current_sibling->next_sibling)
+                current_sibling = current_sibling->next_sibling;
+            current_sibling->next_sibling = new_node;
+        }
+        new_node->next_sibling = NULL;
+
+        current_node = new_node;
+        puts("create a file!");
+    }
+
     // we should found the node and added it to the tree at this point
     *ret_node = current_node;
 
@@ -137,14 +170,9 @@ int vfs_open(char* path, char* modestr) {
 
     // NOTE: make sure that proc->cwd has been in the node tree already
     fs_node_t* node;
-    FS_ERR find_err = vfs_find(path, proc->cwd, &node);
-    if(find_err) {
-        if(find_err == ERR_FS_TARGET_NOT_FOUND) {
-            // TODO: create a new file
-            return -1;
-        }
-        else return -1;
-    }
+    FS_ERR find_err = find_and_create_node(path, proc->cwd, &node, true);
+    if(find_err)
+        return -1;
 
     int file_descriptor = -1;
     file_description_t* fde;
@@ -206,7 +234,6 @@ void vfs_close(int file_descriptor) {
 }
 
 // delete later
-#include "stdio.h"
 static void printnode(fs_node_t* node, int level) {
     for(int i = 0; i < level; i++)
         printf("  ");

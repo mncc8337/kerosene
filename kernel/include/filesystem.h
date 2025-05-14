@@ -192,7 +192,6 @@ file_description_t* vfs_get_kernel_file_descriptor_table();
 unsigned* vfs_get_kernel_file_count();
 
 // vfs_op.c
-FS_ERR vfs_find(char* path, fs_node_t* cwd, fs_node_t** ret_node);
 int vfs_open(char* path, char* modestr);
 void vfs_close(int file_descriptor);
 void vfs_printtree();

@@ -373,7 +373,7 @@ void kmain() {
     // load_elf_file("hi.elf");
 
     int fd1, fd2, fd3;
-    SYSCALL_2P(SYSCALL_OPEN, fd1, "(0)/test.txt", "r");
+    SYSCALL_2P(SYSCALL_OPEN, fd1, "(0)/test-test.txt", "r");
     printf("got file descriptor %d\n", fd1);
     SYSCALL_2P(SYSCALL_OPEN, fd2, "(0)/testdir/testdir-level2/file.txt", "r");
     printf("got file descriptor %d\n", fd2);
