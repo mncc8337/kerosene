@@ -1,5 +1,5 @@
 # Kerosene
-A WIP hobby x86 monolithic OS for learning purposes.
+A WIP hobby x86 monolithic OS.
 ## Features
 - PS/2 keyboard driver
 - basic framebuffer video driver
