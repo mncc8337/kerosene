@@ -156,7 +156,6 @@ static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_n
         new_node->next_sibling = NULL;
 
         current_node = new_node;
-        puts("create a file!");
     }
 
     // we should found the node and added it to the tree at this point

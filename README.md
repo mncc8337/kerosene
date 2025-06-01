@@ -61,65 +61,60 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 > - I am not responsible for any damage caused to your machine by the OS. Try this with your own risk!
 > - I do not test the runability of the OS on every commits so don't expect it to run normaly. Also i do not own many pc to test properly so it maybe only works on my pc.
 ## Progress
-### Baby first step
-- [x] basic bootloader
-- [x] load the kernel
-- [x] 2-stage bootloader
-- [x] print some text in the kernel
-- [x] switch to GRUB
 ### Kernel stuffs
 - [x] load GDT in the kernel
 - [x] load IDT in the kernel
-- [x] handle exception interrupt
+- [x] handle exception interrupts
 - [x] handle interrupts send by PIC
-- [x] load kernel with ELF binary instead of flat binary
-- [x] support multiboot
 - [x] higher half kernel
 - [ ] multiprocessor support
 ### Hardware drivers
-- [ ] PS/2 keyboard driver
+- PS/2 keyboard driver
     + [x] get key scancode
     + [x] translate scancode to keycode
     + [x] LED indicating
-    + [ ] more here
-- [x] PIT
+- PIT
     + [x] generate ticks
-    + [x] PC speaker (beep beep boop boop)
-- [x] memory manager
-    + [x] physical memory manager: bitmap allocator
+    + [x] PC speaker beep beep boop boop
+- memory manager
+    + physical memory manager
+        + [x] bitmap allocator
+        + [ ] better allocator
     + [x] virtual memory manager
-    + [x] the heap: first-fit allocator
-- [ ] ATA
+    + heap
+        + [x] first-fit allocator
+        + [ ] better allocator
+- ATA
     + [x] PIO mode
-    + [ ] more here
 - [x] CMOS and RTC: get datetime
 - [ ] APCI
 - [ ] APIC
 - [ ] HPET
 - [ ] PS/2 mouse driver
-- [x] framebuffer
+- framebuffer
     + [x] plot pixel
     + [x] render psf fonts
-    + [ ] more here
-- [ ] USB
+- USB
+    + [ ] keyboard
+    + [ ] mouse
 - [ ] sound
 - [ ] networking
 ### Filesystem
 - [x] MBR support
 - [ ] GPT support
-- [x] FAT32 fs
-- [ ] ext2 fs
-- [x] ramfs
-- [ ] vfs
+- fs
+    + [x] FAT32
+    + [ ] ext2
+    + [x] ramfs
+- vfs
     + [x] node tree
     + [x] find node in tree
     + [x] unused node clean up
-    + [ ] more here
 ### Userland
 - [x] TSS setup
 - [x] enter usermode
-- [ ] syscall
-    + [x] putchar
+- syscall
+    + [x] putchar()
     + [x] current time
     + [x] terminate process
     + [x] sleep()
@@ -127,21 +122,21 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     + [ ] read file
     + [ ] write file
     + [x] close file
-- [ ] process manager
+- process manager
     + [x] load process
     + [x] load and save process state
     + [x] basic process scheduling
     + [x] process terminate
     + [x] spinlock
     + [ ] semaphore
-- [x] load and run ELF file
+- [x] load and run ELF files
 ## Known bugs
 - ATA PIO mode initialization occasionally failed: address mark not found
-- `print_debug` gives gliberrish result if put in many formats
 - `video_framebuffer_print_char` sometime cause a pagefault
+- `print_debug` gives gliberrish result if put in many formats
 ## Learning resources
 > [!Tip]
-> Anything related to osdev is on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
+> Anything related to osdev can be found on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
 ### Great tutorials
 - https://www.cs.bham.ac.uk/~exr/lectures/opsys/10_11/lectures/os-dev.pdf
 - http://www.osdever.net/bkerndev/Docs/gettingstarted.htm
