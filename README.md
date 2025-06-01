@@ -69,13 +69,12 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [x] higher half kernel
 - [ ] multiprocessor support
 ### Hardware drivers
-- PS/2 keyboard driver
-    + [x] get key scancode
-    + [x] translate scancode to keycode
-    + [x] LED indicating
-- PIT
-    + [x] generate ticks
-    + [x] PC speaker beep beep boop boop
+- PS/2
+    + PS/2 keyboard driver
+        + [x] get key scancode
+        + [x] translate scancode to keycode
+        + [x] LED indicating
+    + [ ] PS/2 mouse driver
 - memory manager
     + physical memory manager
         + [x] bitmap allocator
@@ -86,14 +85,20 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
         + [ ] better allocator
 - ATA
     + [x] PIO mode
+    + [ ] SATA
 - [x] CMOS and RTC: get datetime
 - [ ] APCI
-- [ ] APIC
-- [ ] HPET
-- [ ] PS/2 mouse driver
-- framebuffer
-    + [x] plot pixel
-    + [x] render psf fonts
+- counter
+    + PIT
+        + [x] generate ticks
+        + [x] PC speaker beep beep boop boop
+    + [ ] APIC
+    + [ ] HPET
+- video
+    + [x] vga
+    + framebuffer
+        + [x] plot pixel
+        + [x] render psf fonts
 - USB
     + [ ] keyboard
     + [ ] mouse
@@ -110,6 +115,8 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     + [x] node tree
     + [x] find node in tree
     + [x] unused node clean up
+    + [ ] symlink
+    + [ ] permission
 ### Userland
 - [x] TSS setup
 - [x] enter usermode
