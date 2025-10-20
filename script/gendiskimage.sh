@@ -7,10 +7,8 @@ if [ -f "${BIN_DIR}disk-backup.img" ]; then
     exit
 fi
 
-# unmount all the things
+# unmount mnt
 sudo umount ./mnt
-sudo losetup -d /dev/loop0
-sudo losetup -d /dev/loop1
 
 rm ${BIN_DIR}disk.img
 mkdir -p mnt
@@ -41,19 +39,30 @@ EOF
 echo installing grub
 echo ------------------------------------------------------
 
-sudo losetup /dev/loop0 ${BIN_DIR}disk.img
-sudo losetup /dev/loop1 ${BIN_DIR}disk.img -o 1048576 # 1024^2
-sudo mkdosfs -F32 -f 2 /dev/loop1
-sudo mount --onlyonce /dev/loop1 ./mnt
+# find the first free loop device (/dev/loop0)
+# and create /dev/loop0p1 for the first partition
+LOOP_DEV=$(sudo losetup --find --partscan ${BIN_DIR}disk.img --show)
+if [ -z "$LOOP_DEV" ]; then
+    echo "failed to set up loop device"
+    exit 1
+fi
+echo "using loop device $LOOP_DEV"
 
-sudo grub-install --root-directory=./mnt --boot-directory=./mnt/boot --no-floppy --modules="normal part_msdos fat multiboot" /dev/loop0
+sudo mkdosfs -F32 -f 2 ${LOOP_DEV}p1
+sudo mount --onlyonce ${LOOP_DEV}p1 ./mnt
+
+sudo grub-install --target=i386-pc \
+                  --root-directory=./mnt \
+                  --boot-directory=./mnt/boot \
+                  --no-floppy \
+                  --modules="normal part_msdos fat multiboot" \
+                  ${LOOP_DEV}
 
 sudo mkdir -p ./mnt/boot/grub
 sudo cp grub.cfg ./mnt/boot/grub
 
 sudo umount ./mnt
-sudo losetup -d /dev/loop0
-sudo losetup -d /dev/loop1
+sudo losetup -d ${LOOP_DEV}
 
 cp ${BIN_DIR}disk.img ${BIN_DIR}disk-backup.img
 

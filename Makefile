@@ -1,5 +1,9 @@
 include .env
 
+export BIN_DIR
+export OBJ_DIR
+export DISK_IMAGE_SIZE
+
 $(shell mkdir $(BIN_DIR) $(OBJ_DIR))
 
 # kernel defines
@@ -98,9 +102,11 @@ disk:
 	./script/gendiskimage.sh $(DISK_IMAGE_SIZE)
 
 copyfs: disk
-	./script/cpyfile.sh grub.cfg ./mnt/boot/grub/ # update grub config
-	./script/cpyfile.sh bin/kerosene.elf ./mnt/boot/ # update kernel
-	for file in fsfiles/*; do ./script/cpyfile.sh $$file ./mnt/; done
+	./script/mount-device.sh
+	sudo cp grub.cfg ./mnt/boot/grub/ # update grub config
+	sudo cp bin/kerosene.elf ./mnt/boot/ # update kernel
+	for file in fsfiles/*; do sudo cp -r $$file ./mnt/; done
+	./script/umount-device.sh
 
 run:
 	./script/run.sh
@@ -111,10 +117,10 @@ run-debug:
 userapp: $(USER_ELF)
 
 clean:
-	rm -r $(BIN_DIR) $(OBJ_DIR)
+	rm -r $(OBJ_DIR) $(BIN_DIR)kerosene.elf $(BIN_DIR)libk.a $(BIN_DIR)libc.a
 
-clean-all: clean
-	rm disk.img disk-backup.img
+clean-all:
+	rm -r $(BIN_DIR) $(OBJ_DIR)
 
 DEPS  = $(patsubst %.o,%.d,$(OBJ))
 DEPS += $(patsubst %.o,%.d,$(LIBC_OBJ))

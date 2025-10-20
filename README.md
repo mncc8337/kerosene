@@ -24,7 +24,7 @@ A WIP hobby x86 monolithic OS.
 make sure to source enviroment vars before doing anything. makefile and shell scripts depend heavily on them.
 ```
 cp example.env .env
-source .env
+export $(grep -v '^#' .env | xargs)
 ```
 #### build
 ```

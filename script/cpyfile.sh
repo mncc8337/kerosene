@@ -16,16 +16,22 @@ if [ ! -d "$dest" ]; then
     mkdir -p $dest
 fi
 
-if [ -z "$(losetup -a | grep "/dev/loop1")" ]; then
-    sudo losetup /dev/loop1 ${BIN_DIR}disk.img -o 1048576 # 1024^2
+echo "setting up loop device..."
+LOOP_DEV=$(sudo losetup --find --partscan ${BIN_DIR}disk.img --show)
+if [ -z "$LOOP_DEV" ]; then
+    echo "failed to set up loop device"
+    exit 1
 fi
-sudo mount --onlyonce /dev/loop1 ./mnt
+
+echo "using loop device $LOOP_DEV"
+
+sudo mount --onlyonce ${LOOP_DEV}p1 ./mnt
 
 if sudo cp -r --preserve=timestamps $1 $dest; then
     echo copied $1 to $dest
 fi
 
 sudo umount ./mnt
-sudo losetup -d /dev/loop1
+sudo losetup -d $LOOP_DEV
 
 sync
