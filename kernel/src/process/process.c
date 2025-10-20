@@ -28,8 +28,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
         proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
         proc->file_count = vfs_get_kernel_file_count();
         proc->cwd = &vfs_getfs(RAMFS_DISK)->root_node;
-    }
-    else {
+    } else {
         // only users need to have a separate page directory
         proc->page_directory = vmmngr_alloc_page_directory();
         if(!proc->page_directory) {
@@ -77,8 +76,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
         proc->stack_addr = (uint32_t)heap_alloc(heap, DEFAULT_STACK_SIZE, false);
 
         vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
-    }
-    else {
+    } else {
         regs->cs = 0x08; // kernel code selector
         regs->ds = 0x10; // kernel data selector
         regs->es = regs->ds;

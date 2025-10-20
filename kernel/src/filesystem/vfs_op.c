@@ -24,8 +24,7 @@ static void cleanup_node_tree(fs_node_t* start_node) {
             // parent directory maybe unused at this point
             cleanup_node_tree(parent_node);
         }
-    }
-    else {
+    } else {
         fs_node_t* current_node = parent_node->children;
         while(current_node->next_sibling != start_node)
             current_node = current_node->next_sibling;
@@ -46,8 +45,7 @@ static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_n
         for(unsigned i = 0; i <= MAX_DISK_ID_STRLEN; i++) {
             if(path[i + 1] != ')') {
                 diskid_string[i] = path[i + 1];
-            }
-            else {
+            } else {
                 diskid_string[i] = '\0';
                 break;
             }
@@ -57,12 +55,10 @@ static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_n
         if(FS[diskid].type != FS_EMPTY) {
             current_node = &FS[diskid].root_node;
             parent_node = current_node;
-        }
-        else return ERR_FS_NOT_SUPPORTED;
+        } else return ERR_FS_NOT_SUPPORTED;
 
         path += strlen(diskid_string) + 3;
-    }
-    else if(path[0] == '/') {
+    } else if(path[0] == '/') {
         current_node = &FS[RAMFS_DISK].root_node;
         parent_node = current_node;
         path++;
@@ -117,8 +113,7 @@ static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_n
             // and then add it to the tree
             if(!parent_node->children) {
                 parent_node->children = new_node;
-            }
-            else {
+            } else {
                 fs_node_t* current_sibling = parent_node->children;
                 while(current_sibling->next_sibling)
                     current_sibling = current_sibling->next_sibling;
@@ -146,8 +141,7 @@ static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_n
         // link the new node to the tree
         if(!parent_node->children) {
             parent_node->children = new_node;
-        }
-        else {
+        } else {
             fs_node_t* current_sibling = parent_node->children;
             while(current_sibling->next_sibling)
                 current_sibling = current_sibling->next_sibling;

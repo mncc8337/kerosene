@@ -153,8 +153,7 @@ semaphore_t* semaphore_create(unsigned max_count) {
 void semaphore_acquire(semaphore_t* semaphore, regs_t* regs) {
     if(semaphore->current_count < semaphore->max_count) {
         semaphore->current_count++;
-    }
-    else {
+    } else {
         current_process->state = PROCESS_STATE_BLOCK;
         process_queue_push(&semaphore->waiting_queue, current_process);
 
@@ -169,6 +168,5 @@ void semaphore_release(semaphore_t* semaphore) {
         process_t* proc = process_queue_pop(&semaphore->waiting_queue);
         proc->state = PROCESS_STATE_READY;
         process_queue_push(&ready_queue, proc);
-    }
-    else semaphore->current_count--;
+    } else semaphore->current_count--;
 }

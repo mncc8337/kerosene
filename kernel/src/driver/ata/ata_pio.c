@@ -76,8 +76,9 @@ static ATA_PIO_ERR ata_pio_identify() {
 
     // read status port
     uint8_t stat = port_inb(PORT_ATA_PIO_STAT);
-    if(stat == 0) // drive does not exists
-        return ERR_ATA_PIO_NO_DEV;
+
+    // drive does not exists
+    if(stat == 0) return ERR_ATA_PIO_NO_DEV;
 
     wait_until_not_busy();
 
@@ -103,6 +104,7 @@ char* ata_pio_get_error() {
 ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector_cnt, uint8_t* buff) {
     if(!LBA28_mode) return ERR_ATA_PIO_METHOD_NOT_AVAILABLE;
     if(sector_cnt == 0) return ERR_ATA_PIO_INVALID_PARAMS;
+
     const int slavebit = 0; // idk what is this
 
     port_outb(PORT_ATA_PIO_DEV_CTRL, 0x2);
@@ -134,8 +136,7 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
                 dat = port_inw(PORT_ATA_PIO_DATA);
                 buff[j*512 + i*2] = dat & 0xff;
                 buff[j*512 + i*2 + 1] = dat >> 8;
-            }
-            else {
+            } else {
                 dat = (uint16_t)buff[j*512 + i*2] | ((uint16_t)buff[j*512 + i*2 + 1] << 8);
                 port_outw(PORT_ATA_PIO_DATA, dat);
             }
@@ -143,7 +144,8 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
         err = wait_until_data_ready();
         if(err) return err;
     }
-    if(!read_op) port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_CACHE_FLUSH);
+    if(!read_op)
+        port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_CACHE_FLUSH);
 
     wait_ata(0);
     return ERR_ATA_PIO_SUCCESS;
@@ -166,17 +168,18 @@ ATA_PIO_ERR ata_pio_init(uint16_t* buff) {
     ATA_PIO_ERR err = wait_ata(1);
     if(err) return err;
 
-    for(int i = 0; i < 256; i++) buff[i] = port_inw(PORT_ATA_PIO_DATA);
+    for(int i = 0; i < 256; i++)
+        buff[i] = port_inw(PORT_ATA_PIO_DATA);
 
     LBA48_mode = buff[83] & 0x400;
     supported_UDMA = buff[88] & 0xff;
     active_UDMA = buff[88] >> 8;
     cable80 = buff[93] & 0x800;
-    total_addressable_sec_LBA28 = buff[60] | (buff[61] << 16); // idk which one is low or high
-    total_addressable_sec_LBA48 = (uint64_t)buff[100] |        // also this one
-                                 ((uint64_t)buff[101] << 16) | // maybe they are in reversed order
-                                 ((uint64_t)buff[102] << 32) |
-                                 ((uint64_t)buff[103] << 48);
+    total_addressable_sec_LBA28 = buff[60] | (buff[61] << 16);  // idk which one is low or high
+    total_addressable_sec_LBA48 = (uint64_t)buff[100]           // also this one
+                                  | ((uint64_t)buff[101] << 16) // maybe they are in reversed order
+                                  | ((uint64_t)buff[102] << 32)
+                                  | ((uint64_t)buff[103] << 48);
     LBA28_mode = (total_addressable_sec_LBA28 != 0);
 
     return ERR_ATA_PIO_SUCCESS;

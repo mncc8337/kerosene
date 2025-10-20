@@ -182,6 +182,7 @@ static void scroll_screen(unsigned ammount) {
         vid_mem[i * 2] = vid_mem[i * 2 + text_cols * 2 * ammount];
         vid_mem[i * 2 + 1] = vid_mem[i * 2 + text_cols * 2 * ammount + 1];
     }
+
     for(int i = start; i <= end; i++) {
         vid_mem[i * 2] = ' ';
         vid_mem[i * 2 + 1] = 0xf;
@@ -201,12 +202,10 @@ void video_vga_print_char(char chr, int offset, int fg, int bg, bool move) {
 
     if(chr == '\n') {
         offset += text_cols - (offset % text_cols);
-    }
-    else if(chr == '\b') {
+    } else if(chr == '\b') {
         offset--;
         vid_mem[offset * 2] = ' ';
-    }
-    else {
+    } else {
         vid_mem[offset * 2] = chr;
         vid_mem[offset * 2 + 1] = attr;
         offset++;

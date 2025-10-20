@@ -2,49 +2,7 @@
 #include "ata.h"
 
 #include "string.h"
-
-// these processes are used very frequently
-// so i define some macros for them
-
-// TODO: check checksum (optional)
-// to be sure that the long name and the short name match
-// they will not match if the short entries are edited in
-// a computer which does not support LFN
-// which is very unlikely to occur
-#define PROCESS_LFN_ENTRY(entry_name, namelen, temp_lfn, lfn_ready, found_last_LFN_entry) \
-    lfn_ready = true; \
-    int order = temp_lfn->order; \
-    bool last_LFN_entry = false; \
-    if(!found_last_LFN_entry) { \
-        found_last_LFN_entry = true; \
-        last_LFN_entry = true; \
-        order &= 0x3f; \
-    } \
-    int cnt; \
-    int offset = (order - 1) * 13; \
-    parse_lfn(temp_lfn, entry_name, offset, &cnt); \
-    if(last_LFN_entry) { \
-        namelen = offset + cnt; \
-        if(namelen >= FILENAME_LIMIT) { \
-            namelen = FILENAME_LIMIT; \
-            entry_name[FILENAME_LIMIT-1] = '\0'; \
-        } \
-    }
-
-#define PROCESS_SFN_ENTRY(entry_name, namelen, temp_dir) \
-    int name_pos = 0; \
-    while(temp_dir->name[name_pos] != ' ' && name_pos < 8) { \
-        entry_name[name_pos] = temp_dir->name[name_pos]; \
-        name_pos++; \
-    } \
-    if(temp_dir->name[8] != ' ') { \
-        entry_name[name_pos++] = '.'; \
-        for(int i = 8; i < 11 && temp_dir->name[i] != ' '; i++) { \
-            entry_name[name_pos++] = temp_dir->name[i]; \
-        } \
-    } \
-    entry_name[name_pos++] = '\0'; \
-    namelen = name_pos;
+#include "stdio.h"
 
 static void parse_lfn(fat_lfn_entry_t* lfn, char* buff, int offset, int* cnt) {
     *cnt = 0;
@@ -65,6 +23,58 @@ static void parse_lfn(fat_lfn_entry_t* lfn, char* buff, int offset, int* cnt) {
         (*cnt)++;
         if(lfn->chars_3[i] == 0) return;
     }
+}
+
+// TODO: check checksum (optional)
+// to be sure that the long name and the short name match
+// they will not match if the short entries are edited in
+// a computer which does not support LFN
+// which is very unlikely to occur
+static void process_lfn_entry(
+    char (*entry_name)[FILENAME_LIMIT],
+    int* namelen,
+    fat_lfn_entry_t** temp_lfn,
+    bool* lfn_ready,
+    bool* found_last_LFN_entry
+) {
+    *lfn_ready = true;
+    int order = (*temp_lfn)->order;
+    bool last_LFN_entry = false;
+    if(!(*found_last_LFN_entry)) {
+        (*found_last_LFN_entry) = true;
+        last_LFN_entry = true;
+        order &= 0x3f;
+    }
+    int cnt;
+    int offset = (order - 1) * 13;
+    parse_lfn(*temp_lfn, *entry_name, offset, &cnt);
+    if(last_LFN_entry) {
+        (*namelen) = offset + cnt;
+        if((*namelen) >= FILENAME_LIMIT) {
+            (*namelen) = FILENAME_LIMIT;
+            (*entry_name)[FILENAME_LIMIT-1] = '\0';
+        }
+    }
+}
+
+static void process_sfn_entry(
+    char (*entry_name)[FILENAME_LIMIT],
+    int* namelen,
+    fat_directory_entry_t** temp_dir
+) {
+    int name_pos = 0;
+    while((*temp_dir)->name[name_pos] != ' ' && name_pos < 8) {
+        (*entry_name)[name_pos] = (*temp_dir)->name[name_pos];
+        name_pos++;
+    }
+    if((*temp_dir)->name[8] != ' ') {
+        (*entry_name)[name_pos++] = '.';
+        for(int i = 8; i < 11 && (*temp_dir)->name[i] != ' '; i++) {
+            (*entry_name)[name_pos++] = (*temp_dir)->name[i];
+        }
+    }
+    (*entry_name)[name_pos++] = '\0';
+    (*namelen) = name_pos;
 }
 
 static void set_FAT_entry(
@@ -164,7 +174,12 @@ static size_t count_free_cluster(fat32_bootrecord_t* bootrec, fs_t* fs, uint32_t
 // expand a cluster chain
 // return start of expanded cluster address when success
 // return 0 when cannot find free cluster
-static uint32_t expand_cluster_chain(fs_t* fs, uint32_t end_cluster, size_t cluster_count, bool clear) {
+static uint32_t expand_cluster_chain(
+    fs_t* fs,
+    uint32_t end_cluster,
+    size_t cluster_count,
+    bool clear
+) {
     fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
     uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
     // create new chain
@@ -348,7 +363,13 @@ static uint8_t to_fat_attr(uint32_t flags) {
     return attr;
 }
 
-static FS_ERR read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, unsigned cluster_offset) {
+static FS_ERR read_file(
+    fs_t* fs,
+    uint32_t* start_cluster,
+    uint8_t* buffer,
+    size_t size,
+    unsigned cluster_offset
+) {
     fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = get_first_data_sector(bootrec);
@@ -404,8 +425,7 @@ static FS_ERR read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size
                 sectors_per_cluster,
                 buffer
             );
-        }
-        else {
+        } else {
             ata_pio_LBA28_access(
                 true,
                 fs->partition.LBA_start + first_sector,
@@ -435,7 +455,15 @@ static FS_ERR read_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size
     return ERR_FS_SUCCESS;
 }
 
-static FS_ERR write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, size_t size, int cluster_offset, size_t file_size, size_t next_position) {
+static FS_ERR write_file(
+    fs_t* fs,
+    uint32_t* start_cluster,
+    uint8_t* buffer,
+    size_t size,
+    int cluster_offset,
+    size_t file_size,
+    size_t next_position
+) {
     fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = get_first_data_sector(bootrec);
@@ -456,10 +484,9 @@ static FS_ERR write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, siz
 
             *current_cluster = new_cluster;
             cluster_offset -= cluster_size * (int)(cluster_offset / cluster_size);
-        }
-        else if(FAT_val == FAT_BAD_CLUSTER)
+        } else if(FAT_val == FAT_BAD_CLUSTER) {
             return ERR_FS_BAD_CLUSTER;
-        else {
+        } else {
             *current_cluster = FAT_val;
             cluster_offset -= cluster_size;
         }
@@ -496,8 +523,7 @@ static FS_ERR write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, siz
                 sectors_per_cluster,
                 buffer
             );
-        }
-        else {
+        } else {
             if(next_position <= file_size) {
                 ata_pio_LBA28_access(
                     true,
@@ -506,8 +532,7 @@ static FS_ERR write_file(fs_t* fs, uint32_t* start_cluster, uint8_t* buffer, siz
                     ext_buffer
                 );
                 memcpy(ext_buffer, buffer, size);
-            }
-            else {
+            } else {
                 memcpy(ext_buffer, buffer, size);
                 memset(ext_buffer + size, 0, cluster_size - size);
             }
@@ -640,7 +665,12 @@ FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
     iter += 32;
     if(iter >= cluster_size) {
         // load next cluster
-        uint32_t FAT_val = get_FAT_entry(bootrec, diriter->node->fs, first_FAT_sector, current_cluster);
+        uint32_t FAT_val = get_FAT_entry(
+            bootrec,
+            diriter->node->fs,
+            first_FAT_sector,
+            current_cluster
+        );
 
         if(FAT_val >= FAT_EOC)
             return ERR_FS_EOF;
@@ -662,14 +692,14 @@ FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
             // check if it is a long file name entry
             if(directory[i+11] == 0x0f) {
                 fat_lfn_entry_t* temp_lfn = (fat_lfn_entry_t*)(directory+i);
-                PROCESS_LFN_ENTRY(entry_name, namelen, temp_lfn, lfn_ready, found_last_LFN_entry);
+                process_lfn_entry(&entry_name, &namelen, &temp_lfn, &lfn_ready, &found_last_LFN_entry);
                 continue;
             }
 
             fat_directory_entry_t* temp_dir = (fat_directory_entry_t*)(directory+i);
 
             if(!lfn_ready) {
-                PROCESS_SFN_ENTRY(entry_name, namelen, temp_dir)
+                process_sfn_entry(&entry_name, &namelen, &temp_dir);
             }
 
             // LFN name is already ready
@@ -729,7 +759,14 @@ FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
 }
 
 // add a new entry to parent
-FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size, fs_node_t* new_node) {
+FS_ERR fat32_add_entry(
+    fs_node_t* parent,
+    char* name,
+    uint32_t start_cluster,
+    uint8_t attr,
+    size_t size,
+    fs_node_t* new_node
+) {
     new_node->flags = 0;
 
     fat32_bootrecord_t* bootrec = &(parent->fs->fat32_info.bootrec);
@@ -759,9 +796,14 @@ FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, ui
             // the newly created cluster is cleared
             // so we only need to clear the buffer, no reading needed
             memset(directory, 0, cluster_size);
+        } else {
+            ata_pio_LBA28_access(
+                true,
+                parent->fs->partition.LBA_start + first_sector,
+                sectors_per_cluster,
+                directory
+            );
         }
-        else
-            ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
         bool found = false;
         for(start_index = 0; start_index < cluster_size; start_index += 32) {
@@ -772,13 +814,13 @@ FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, ui
             if(directory[start_index] == 0xe5) continue;
             if(directory[start_index+11] == 0x0f) {
                 fat_lfn_entry_t* temp_lfn = (fat_lfn_entry_t*)(directory+start_index);
-                PROCESS_LFN_ENTRY(entry_name, namelen, temp_lfn, lfn_ready, found_last_LFN_entry);
+                process_lfn_entry(&entry_name, &namelen, &temp_lfn, &lfn_ready, &found_last_LFN_entry);
                 continue;
             }
 
             fat_directory_entry_t* temp_dir = (fat_directory_entry_t*)(directory+start_index);
             if(!lfn_ready) {
-                PROCESS_SFN_ENTRY(entry_name, namelen, temp_dir)
+                process_sfn_entry(&entry_name, &namelen, &temp_dir);
             }
 
             // found duplication
@@ -827,8 +869,7 @@ FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, ui
     // . and .. directory need to be handle differently
     if(dotdot_entry) {
         memcpy(shortname, name, namelen);
-    }
-    else {
+    } else {
         // it's only needed to be different from the others short name entries
         // so we can actually using a random number generator to do this
         bool isdir = attr & FAT_ATTR_DIRECTORY;
@@ -927,8 +968,7 @@ FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, ui
                 if(temp_lfn->chars_3[j] == '\0') goto done_parsing_name;
             }
 
-        }
-        else if(i == 0) { // directory entry
+        } else if(i == 0) { // directory entry
             fat_directory_entry_t* dir_entry = (fat_directory_entry_t*)(directory + start_index);
             memcpy(dir_entry->name, shortname, 11);
             dir_entry->attr = attr;
@@ -1010,7 +1050,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
             fat_directory_entry_t* temp_dir = (fat_directory_entry_t*)(directory+i);
 
             // at this point this entry should be a SFN
-            PROCESS_SFN_ENTRY(entry_name, namelen, temp_dir)
+            process_sfn_entry(&entry_name, &namelen, &temp_dir);
             // if it is not . or .. entry then there is a child entry
             if(strcmp(entry_name, ".") && strcmp(entry_name, ".."))
                 return ERR_FS_DIR_NOT_EMPTY;
@@ -1033,15 +1073,13 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
         if(directory[node_index+32] == 0x0)
             clear_val = 0x0;
         else clear_val = 0xe5;
-    }
-    else {
+    } else {
         // check next cluster to see if it is clear or not
         uint32_t FAT_val = get_FAT_entry(bootrec, parent->fs, first_FAT_sector, current_cluster);
 
         if(FAT_val >= FAT_EOC || FAT_val == FAT_BAD_CLUSTER) {
             clear_val = 0x0;
-        }
-        else {
+        } else {
             int first_sector = ((FAT_val - 2) * sectors_per_cluster) + first_data_sector;
             // read the very next sector
             ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, 1, directory);

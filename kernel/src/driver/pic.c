@@ -46,8 +46,7 @@ void irq_set_mask(uint8_t irq_line) {
 
     if(irq_line < 8) {
         port = PORT_PIC1_DATA;
-    }
-    else {
+    } else {
         port = PORT_PIC2_DATA;
         irq_line -= 8;
     }
@@ -61,8 +60,7 @@ void irq_clear_mask(uint8_t irq_line) {
 
     if(irq_line < 8) {
         port = PORT_PIC1_DATA;
-    }
-    else {
+    } else {
         port = PORT_PIC2_DATA;
         irq_line -= 8;
     }

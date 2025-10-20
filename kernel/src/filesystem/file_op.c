@@ -21,14 +21,11 @@ FS_ERR file_open(file_description_t* file, fs_node_t* node, char* modestr) {
     if(modestr[0] == 'w') {
         mode = FILE_WRITE;
         file_reset(node);
-    }
-    else if(modestr[0] == 'r') {
+    } else if(modestr[0] == 'r') {
         mode = FILE_READ;
-    }
-    else if(modestr[0] == 'a') {
+    } else if(modestr[0] == 'a') {
         mode = FILE_APPEND;
-    }
-    else return ERR_FS_FAILED;
+    } else return ERR_FS_FAILED;
 
     if(modestr[1] != '\0') {
         if(modestr[1] == '+') {
@@ -36,8 +33,7 @@ FS_ERR file_open(file_description_t* file, fs_node_t* node, char* modestr) {
                 mode |= FILE_READ;
             else
                 mode |= FILE_WRITE;
-        }
-        else return ERR_FS_FAILED;
+        } else return ERR_FS_FAILED;
     }
 
     file->node = node;
@@ -132,8 +128,7 @@ FS_ERR file_write(file_description_t* file, uint8_t* buffer, size_t size) {
 
     if(file->mode & FILE_APPEND) {
         file->node->size += size;
-    }
-    else {
+    } else {
         file->position += size;
         if(file->position > file->node->size)
             file->node->size = file->position;

@@ -225,32 +225,31 @@ static key_t current_key;
 
 static void set_scancode_set() {
     unsigned tries = 0;
+    while(tries < 3) {
+        // make sure to use scancode set 1
+        ps2_wait_for_writing_data();
+        ps2_write_data(KBD_SCANCODE_SET);
+        ps2_wait_for_writing_data();
+        // NOTE:
+        // the osdev wiki said that
+        // 1 is for scancode set 1 and 2 is for scancode set 2
+        // but for some reason if i use 1 then the controller send scancode set 2
+        // and if i use 2 the controller send scancode set 1
+        // maybe it was sone translation stuff
+        ps2_write_data(2);
+        // wait for respond (ACK or RESEND)
+        uint8_t respond = 0;
+        while(respond != KBD_ACK && respond != KBD_RESEND) {
+            ps2_wait_for_reading_data();
+            respond = ps2_read_data();
+        }
 
-try_again:
-    if(tries == 3) return;
-
-    // make sure to use scancode set 1
-    ps2_wait_for_writing_data();
-    ps2_write_data(KBD_SCANCODE_SET);
-    ps2_wait_for_writing_data();
-    // NOTE:
-    // the osdev wiki said that
-    // 1 is for scancode set 1 and 2 is for scancode set 2
-    // but for some reason if i use 1 then the controller send scancode set 2
-    // and if i use 2 the controller send scancode set 1
-    // maybe it was sone translation stuff
-    ps2_write_data(2);
-    // wait for respond (ACK or RESEND)
-    uint8_t respond = 0;
-    while(respond != KBD_ACK && respond != KBD_RESEND) {
-        ps2_wait_for_reading_data();
-        respond = ps2_read_data();
-    }
-
-    // if we received RESEND then the previous command has failed
-    if(respond == KBD_RESEND) {
-        tries++;
-        goto try_again;
+        // if we received RESEND then the previous command has failed
+        if(respond == KBD_RESEND) {
+            tries++;
+            continue;
+        }
+        break;
     }
 }
 
@@ -284,8 +283,7 @@ static void kbd_handler(regs_t* r) {
         extended_byte = true;
         // skip
         return;
-    }
-    else if(scancode == KBD_PAUSE_SCANCODE_1ST) {
+    } else if(scancode == KBD_PAUSE_SCANCODE_1ST) {
         interrupt_loop_cnt = 5;
         irq_install_handler(1, kbd_trash_int_handler);
 
@@ -341,7 +339,8 @@ static void kbd_handler(regs_t* r) {
     if(key_pressed[KBD_KEYCODE_LSHIFT] || key_pressed[KBD_KEYCODE_RSHIFT]) {
         if(mapped < 0x61 || mapped > 0x7a)
             mapped = locale_map_key(kcode, true);
-        else if(!capslock_on) mapped = locale_map_key(kcode, true);
+        else if(!capslock_on)
+            mapped = locale_map_key(kcode, true);
     }
     // convert to uppercase if only capslock is on
     if(capslock_on && mapped >= 0x61
@@ -362,30 +361,30 @@ static void kbd_handler(regs_t* r) {
 // set keyboard LED indicators
 void kbd_set_led(bool scroll, bool num, bool caps) {
     uint8_t bits = scroll | (num << 1) | (caps << 2);
+
     unsigned tries = 0;
+    while(tries < 3) {
+        // send command byte
+        ps2_wait_for_writing_data();
+        ps2_write_data(KBD_LED);
 
-try_again:
-    if(tries == 3) return; // give up after 3 tries
+        // send data byte
+        ps2_wait_for_writing_data();
+        ps2_write_data(bits);
 
-    // send command byte
-    ps2_wait_for_writing_data();
-    ps2_write_data(KBD_LED);
+        // wait for ACK or RESEND
+        uint8_t respond = 0;
+        while(respond != KBD_ACK && respond != KBD_RESEND) {
+            ps2_wait_for_reading_data();
+            respond = ps2_read_data();
+        }
 
-    // send data byte
-    ps2_wait_for_writing_data();
-    ps2_write_data(bits);
-
-    // wait for ACK or RESEND
-    uint8_t respond = 0;
-    while(respond != KBD_ACK && respond != KBD_RESEND) {
-        ps2_wait_for_reading_data();
-        respond = ps2_read_data();
-    }
-
-    // if we received RESEND then the previous command has failed
-    if(respond == KBD_RESEND) {
-        tries++;
-        goto try_again;
+        // if we received RESEND then the previous command has failed
+        if(respond == KBD_RESEND) {
+            tries++;
+            continue;
+        }
+        break;
     }
 }
 
@@ -393,7 +392,7 @@ try_again:
 void kbd_wait_key(key_t* k) {
     lastest_key_handled = true; // make sure to get a new key
     // wait until get a new key (unhandled)
-    while(lastest_key_handled);
+    while(lastest_key_handled) asm volatile("sti; hlt;");
     lastest_key_handled = true;
     if(k) *k = current_key;
 }

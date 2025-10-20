@@ -49,8 +49,7 @@ bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header) {
 
     if(last_header->magic == HEAP_FREE) {
         last_header->size += page_count * MMNGR_PAGE_SIZE;
-    }
-    else {
+    } else {
         // add new region
         heap_header_t* header = (heap_header_t*)heap->end;
         header->magic = HEAP_FREE;
@@ -95,8 +94,7 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
                 new_size += MMNGR_PAGE_SIZE - addr % MMNGR_PAGE_SIZE;
 
             if(header->size >= new_size) break;
-        }
-        else if(header->size >= reg_size) break;
+        } else if(header->size >= reg_size) break;
 
         next_header:
         final_header = header;
@@ -159,8 +157,7 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
         if(diff >= sizeof(heap_header_t) + MIN_REGION_SIZE) {
             header->size = diff - sizeof(heap_header_t);
             newh->prev = header;
-        }
-        else {
+        } else {
             // merge the excess bytes to previous region, used or not used
             heap_header_t* prevh = header->prev;
             prevh->size += diff;

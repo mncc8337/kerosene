@@ -46,7 +46,8 @@ static void scroll_screen(unsigned ammount) {
     );
     memset(
         framebuffer + cursor_posy * font_height * fb_pitch,
-        0, ammount * font_height * fb_pitch
+        0,
+        ammount * font_height * fb_pitch
     );
 }
 
@@ -107,12 +108,10 @@ void video_framebuffer_plot_pixel(unsigned x, unsigned y, int color) {
     if(fb_bpp == 8) {
         uint8_t* pixel = framebuffer + y * fb_pitch + x;
         *pixel = color;
-    }
-    else if(fb_bpp == 16) {
+    } else if(fb_bpp == 16) {
         uint16_t* pixel = (uint16_t*)(framebuffer + y * fb_pitch) + x;
         *pixel = color;
-    }
-    else if(fb_bpp == 32) {
+    } else if(fb_bpp == 32) {
         uint32_t* pixel = (uint32_t*)(framebuffer + y * fb_pitch) + x;
         *pixel = color;
     }
@@ -128,16 +127,13 @@ int video_framebuffer_get_pixel(unsigned x, unsigned y) {
     if(fb_bpp == 8) {
         uint8_t* pixel = framebuffer + y * fb_pitch + x;
         ret = *pixel;
-    }
-    else if(fb_bpp == 16) {
+    } else if(fb_bpp == 16) {
         uint16_t* pixel = (uint16_t*)(framebuffer + y * fb_pitch) + x;
         ret = *pixel;
-    }
-    else if(fb_bpp == 32) {
+    } else if(fb_bpp == 32) {
         uint32_t* pixel = (uint32_t*)(framebuffer + y * fb_pitch) + x;
         ret = *pixel;
-    }
-    else {
+    } else {
         ret = 0;
     }
 
@@ -199,10 +195,12 @@ static void draw_line_low(int x0, int y0, int x1, int y1, int color) {
         if(D > 0) {
             y += yi;
             D += 2 * (dy - dx);
+        } else {
+            D += 2 * dy;
         }
-        else D += 2 * dy;
     }
 }
+
 static void draw_line_high(int x0, int y0, int x1, int y1, int color) {
     int dx = x1 - x0;
     int dy = y1 - y0;
@@ -224,6 +222,7 @@ static void draw_line_high(int x0, int y0, int x1, int y1, int color) {
         else D += 2 * dx;
     }
 }
+
 void video_framebuffer_draw_line(int x0, int y0, int x1, int y1, int color) {
     int dy = y1 - y0;
     if(y1 < y0) dy = y0 - y1;
@@ -234,8 +233,7 @@ void video_framebuffer_draw_line(int x0, int y0, int x1, int y1, int color) {
     if(dy < dx) {
         if(x0 > x1) draw_line_low(x1, y1, x0, y0, color);
         else draw_line_low(x0, y0, x1, y1, color);
-    }
-    else {
+    } else {
         if(y0 > y1) draw_line_high(x1, y1, x0, y0, color);
         else draw_line_high(x0, y0, x1, y1, color);
     }
@@ -284,12 +282,13 @@ int video_framebuffer_rgb(int r, int g, int b) {
 static void draw_cursor(bool load_buffer) {
     for(int y = 0; y < font_height; y++) {
         for(int x = 0; x < font_width; x++) {
-            if(load_buffer)
+            if(load_buffer) {
                 video_framebuffer_plot_pixel(
                     x + cursor_buffer_posx * font_width,
                     y + cursor_buffer_posy * font_height,
                     cursor_buffer[y * font_width + x]
                 );
+            }
 
             // load new location to buffer
             cursor_buffer[y * font_width + x] = video_framebuffer_get_pixel(
@@ -314,6 +313,7 @@ static void draw_cursor(bool load_buffer) {
 int video_framebuffer_get_cursor() {
     return cursor_posy * text_cols + cursor_posx;
 }
+
 void video_framebuffer_set_cursor(int offset) {
     cursor_posy = offset / text_cols;
     cursor_posx = offset % text_cols;
@@ -343,8 +343,7 @@ void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool mov
         load_cursor_buffer = true;
         _cursor_posx = 0;
         _cursor_posy++;
-    }
-    else if(chr == '\b') {
+    } else if(chr == '\b') {
         load_cursor_buffer = true;
         _cursor_posx -= 1;
         if(_cursor_posx < 0) {
@@ -360,8 +359,7 @@ void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool mov
                     y + _cursor_posy * font_height,
                     0x0
                 );
-    }
-    else {
+    } else {
         char* glyph = psf_get_glyph(chr);
 
         int col = 0;
@@ -390,6 +388,7 @@ void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool mov
         _cursor_posx = 0;
         _cursor_posy++;
     }
+
     if(move) {
         cursor_posx = _cursor_posx;
         cursor_posy = _cursor_posy;

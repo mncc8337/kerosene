@@ -104,8 +104,7 @@ static ramfs_datanode_t* copy_datanode_chain(ramfs_datanode_t* datanode) {
         if(copied) {
             copied->next = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
             copied = copied->next;
-        }
-        else {
+        } else {
             copied = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
             ret = copied;
         }
@@ -137,8 +136,7 @@ static void fix_empty_entries(ramfs_node_t* node) {
                     start_node = current_datanode;
                     first_empty_entry_id = entry_id;
                 }
-            }
-            else start_node = 0;
+            } else start_node = 0;
         }
 
         // to next ramnode
@@ -475,10 +473,8 @@ FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
             // there are may be a bunch of empty entries before this so
             if(entry_id == 0 || entry_list[entry_id - 1] == EMPTY_ENTRY)
                 fix_empty_entries(parent_ramnode);
-        }
-        else entry_list[entry_id] = EMPTY_ENTRY;
-    }
-    else {
+        } else entry_list[entry_id] = EMPTY_ENTRY;
+    } else {
         // the next datanode maybe cleared/emptied
         // so just set to EMPTY and let the machine does its job
         entry_list[entry_id] = EMPTY_ENTRY;

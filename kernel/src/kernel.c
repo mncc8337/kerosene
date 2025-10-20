@@ -110,8 +110,7 @@ void video_init(multiboot_info_t* mbd) {
             video_pitch, video_bpp
         );
         print_debug(LT_OK, "VESA video initialised\n");
-    }
-    else {
+    } else {
         video_vga_init(video_width, video_height);
         print_debug(LT_OK, "VGA video initialised\n");
     }
@@ -229,8 +228,7 @@ void kinit(multiboot_info_t* mbd) {
         if(!strcmp(sec_name, ".symtab")) {
             print_debug(LT_IF, "found .symtab section\n");
             kernel_set_symtab_sh_ptr((uint32_t)sh);
-        }
-        else if(!strcmp(sec_name, ".strtab")) {
+        } else if(!strcmp(sec_name, ".strtab")) {
             print_debug(LT_IF, "found .strtab section\n");
             kernel_set_strtab_ptr(sh->addr + KERNEL_START);
         }
@@ -255,8 +253,7 @@ void kinit(multiboot_info_t* mbd) {
     if(!vfs_init()) {
         print_debug(LT_OK, "initialised ramFS on fs (%d)\n", RAMFS_DISK);
         disk_init();
-    }
-    else print_debug(LT_ER, "failed to initialise FS. not enough memory\n");
+    } else print_debug(LT_ER, "failed to initialise FS. not enough memory\n");
 
     print_debug(LT_IF, "all disk detected: ");
     for(int i = 0; i < MAX_FS; i++)
@@ -395,5 +392,9 @@ void kmain() {
     puts("main kernel process exited. halting");
 
     key_t key;
-    while(true) kbd_wait_key(&key);
+    while(true) {
+        // asm volatile("sti; hlt;");
+        kbd_wait_key(&key);
+        putchar(key.mapped);
+    }
 }

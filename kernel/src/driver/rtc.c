@@ -77,12 +77,14 @@ struct tm rtc_get_current_time() {
         curr_time.tm_mon  = read_reg(RTC_REG_MONTH);
         curr_time.tm_year = read_reg(RTC_REG_YEAR);
 
-    } while(last_second    != curr_time.tm_sec
-            || last_minute != curr_time.tm_min
-            || last_hour   != curr_time.tm_hour
-            || last_day    != curr_time.tm_mday
-            || last_month  != curr_time.tm_mon
-            || last_year   != curr_time.tm_year);
+    } while(
+        last_second    != curr_time.tm_sec
+        || last_minute != curr_time.tm_min
+        || last_hour   != curr_time.tm_hour
+        || last_day    != curr_time.tm_mday
+        || last_month  != curr_time.tm_mon
+        || last_year   != curr_time.tm_year
+    );
 
 
     uint8_t reg_b = read_reg(RTC_REG_B);
