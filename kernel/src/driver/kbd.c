@@ -258,7 +258,9 @@ static void kbd_handler(regs_t* r);
 
 static uint8_t interrupt_progress_cnt = 0;
 static uint8_t interrupt_loop_cnt = 0;
-static void kbd_trash_int_handler() {
+static void kbd_trash_int_handler(regs_t* r) {
+    (void)(r); // avoid unused arg
+
     ps2_read_data();
     interrupt_progress_cnt++;
     // loop for sometime to discard useless interrupts
