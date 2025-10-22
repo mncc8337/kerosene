@@ -162,8 +162,11 @@ static FS_ERR read_file(
     ramfs_datanode_t** start_datanode,
     uint8_t* buffer,
     size_t size,
+    size_t* actual_read_size,
     int data_offset
 ) {
+    *actual_read_size = 0;
+
     // make sure that data_offset is less than RAMFS_DATANODE_SIZE
     while(data_offset >= RAMFS_DATANODE_SIZE) {
         if(!(*start_datanode)->next)
@@ -179,11 +182,14 @@ static FS_ERR read_file(
 
         memcpy(buffer, (*start_datanode)->data + data_offset, read_all ? size : read_size);
 
-        if(read_all)
+        if(read_all) {
+            *actual_read_size += size;
             return ERR_FS_SUCCESS;
+        }
 
         size -= read_size;
         buffer += read_size;
+        *actual_read_size += read_size;
 
         if(!(*start_datanode)->next)
             return ERR_FS_EOF;
@@ -197,6 +203,7 @@ static FS_ERR read_file(
 
         size -= read_size;
         buffer += read_size;
+        *actual_read_size += read_size;
         if(size == 0) break;
 
         if(!(*start_datanode)->next)
@@ -211,11 +218,14 @@ static FS_ERR write_file(
     ramfs_datanode_t** start_datanode,
     uint8_t* buffer,
     size_t size,
+    size_t* actual_write_size,
     int data_offset
 ) {
     // basically the same as read_file
     // but change the direction of memcpy
     // and add more datanode when not enough
+
+    *actual_write_size = 0;
 
     while(data_offset >= RAMFS_DATANODE_SIZE) {
         if(!(*start_datanode)->next) {
@@ -235,6 +245,7 @@ static FS_ERR write_file(
 
         size -= write_size;
         buffer += write_size;
+        *actual_write_size += write_size;
 
         if(size == 0)
             return ERR_FS_SUCCESS;
@@ -258,6 +269,7 @@ static FS_ERR write_file(
 
         size -= write_size;
         buffer += write_size;
+        *actual_write_size += write_size;
         if(size == 0) break;
 
         // this should not happen
@@ -591,8 +603,18 @@ FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* c
         unsigned size = RAMFS_DATANODE_SIZE;
         if(!current_datanode->next) size = ramnode->size % RAMFS_DATANODE_SIZE;
 
-        FS_ERR write_err = file_write(&dst_file, current_datanode->data, size);
-        if(write_err && write_err != ERR_FS_EOF) return write_err;
+        size_t write_size;
+        size_t written_size = 0;
+        while(written_size < size) {
+            FS_ERR write_err = file_write(
+                &dst_file,
+                current_datanode->data + written_size,
+                size - written_size,
+                &write_size
+            );
+            if(write_err && write_err != ERR_FS_EOF) return write_err;
+            written_size += write_size;
+        }
 
         current_datanode = current_datanode->next;
     }
@@ -644,7 +666,8 @@ FS_ERR ramfs_seek(file_description_t* file, size_t pos) {
 FS_ERR ramfs_read(
     file_description_t* file,
     uint8_t* buffer,
-    size_t size
+    size_t size,
+    size_t* actual_read_size
 ) {
     int offset = file->position % RAMFS_DATANODE_SIZE;
     if(file->position != 0 && offset == 0)
@@ -654,11 +677,17 @@ FS_ERR ramfs_read(
         (ramfs_datanode_t**)&file->ramfs.current_datanode,
         buffer,
         size,
+        actual_read_size,
         offset
     );
 }
 
-FS_ERR ramfs_write(file_description_t* file, uint8_t* buffer, size_t size) {
+FS_ERR ramfs_write(
+    file_description_t* file,
+    uint8_t* buffer,
+    size_t size,
+    size_t* actual_write_size
+) {
     int position = file->position;
     ramfs_datanode_t** datanode_ptr = (ramfs_datanode_t**)&file->ramfs.current_datanode;
     if(file->mode & FILE_APPEND) {
@@ -674,6 +703,7 @@ FS_ERR ramfs_write(file_description_t* file, uint8_t* buffer, size_t size) {
         datanode_ptr,
         buffer,
         size,
+        actual_write_size,
         offset
     );
 }

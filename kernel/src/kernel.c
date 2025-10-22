@@ -360,53 +360,52 @@ void kmain() {
 
     print_debug(LT_IF, "done initialising\n");
 
-    int ret;
-
     process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
     process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
     if(proc1) scheduler_add_process(proc1);
     if(proc2) scheduler_add_process(proc2);
 
-    // load_elf_file("hi.elf");
+    load_elf_file("hi.elf");
 
-    int fd1, fd2, fd3;
-    SYSCALL_2P(SYSCALL_OPEN, fd1, "(0)/test-test.txt", "w");
-    printf("got file descriptor %d\n", fd1);
-    SYSCALL_2P(SYSCALL_OPEN, fd2, "(0)/testdir/testdir-level2/file.txt", "r");
-    printf("got file descriptor %d\n", fd2);
-    SYSCALL_2P(SYSCALL_OPEN, fd3, "(0)/testdir/testdir.txt", "r");
-    printf("got file descriptor %d\n", fd3);
-
-    puts("current vfs tree");
-    vfs_printtree();
-    SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
-
+    int fd;
     int read_res;
     uint8_t fbuff[5];
 
     puts("reading from (0)/testdir/testdir-level2/file.txt");
-    while((read_res = vfs_read(fd2, fbuff, 5)) > 0) {
+    fd = vfs_open("(0)/testdir/testdir-level2/file.txt", "r");
+    while((read_res = vfs_read(fd, fbuff, 5)) > 0) {
         for(int i = 0; i < read_res; i++)
             putchar(fbuff[i]);
     }
+    vfs_close(fd);
 
     puts("reading from (0)/testdir/testdir.txt");
-    SYSCALL_3P(SYSCALL_READ, read_res, fd3, fbuff, 5);
-    while(read_res > 0) {
+    fd = vfs_open("(0)/testdir/testdir.txt", "r");
+    while((read_res = vfs_read(fd, fbuff, 5)) > 0) {
         for(int i = 0; i < read_res; i++)
             putchar(fbuff[i]);
-        SYSCALL_3P(SYSCALL_READ, read_res, fd3, fbuff, 5);
+    }
+    vfs_close(fd);
+
+    puts("writing to (0)/test-test.txt");
+    fd = vfs_open("(0)/test-test.txt", "w");
+    char str[] = "con chim bay tren troi\n";
+    size_t written_size = 0;
+    size_t total_write_size = strlen(str);
+    size_t actual_write_size;
+    while(written_size < total_write_size) {
+        actual_write_size = vfs_write(fd, (uint8_t*)(str + written_size), total_write_size - written_size);
+        written_size += actual_write_size;
     }
 
-    SYSCALL_1P(SYSCALL_CLOSE, ret, fd1);
-    printf("closed file descriptor %d\n", fd1);
-    SYSCALL_1P(SYSCALL_CLOSE, ret, fd2);
-    printf("closed file descriptor %d\n", fd2);
-    SYSCALL_1P(SYSCALL_CLOSE, ret, fd3);
-    printf("closed file descriptor %d\n", fd3);
 
-    puts("current vfs tree");
-    vfs_printtree();
+    puts("reading from (0)/test-test.txt");
+    fd = vfs_open("(0)/test-test.txt", "r");
+    while((read_res = vfs_read(fd, fbuff, 5)) > 0) {
+        for(int i = 0; i < read_res; i++)
+            putchar(fbuff[i]);
+    }
+    vfs_close(fd);
 
     puts("main kernel process exited. halting");
 
@@ -414,6 +413,5 @@ void kmain() {
     while(true) {
         // asm volatile("sti; hlt;");
         kbd_wait_key(&key);
-        putchar(key.mapped);
     }
 }

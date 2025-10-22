@@ -75,6 +75,9 @@ FS_ERR file_open(file_description_t* file, fs_node_t* node, char* modestr) {
 }
 
 FS_ERR file_seek(file_description_t* file, size_t pos) {
+    // TODO:
+    // support a+ mode
+
     if(file->mode & FILE_APPEND)
         return ERR_FS_FAILED;
 
@@ -88,7 +91,7 @@ FS_ERR file_seek(file_description_t* file, size_t pos) {
     }
 }
 
-FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* read_size) {
+FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size) {
     if(!(file->mode & FILE_READ)) return ERR_FS_FAILED;
 
     if(file->position == file->node->size) return ERR_FS_EOF;
@@ -96,50 +99,51 @@ FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t*
     FS_ERR err;
     switch(file->node->fs->type) {
         case FS_RAMFS:
-            err = ramfs_read(file, buffer, size);
+            err = ramfs_read(file, buffer, size, actual_read_size);
             break;
         case FS_FAT32:
-            err = fat32_read(file, buffer, size);
+            err = fat32_read(file, buffer, size, actual_read_size);
             break;
         default:
             return ERR_FS_NOT_SUPPORTED;
     }
     if(err != ERR_FS_SUCCESS && err != ERR_FS_EOF) return err;
 
-    file->position += size;
-    *read_size = size;
-    if(file->position > file->node->size) {
-        *read_size = size - (file->position - file->node->size);
-        file->position = file->node->size;
-    }
+    file->position += (*actual_read_size);
+    // if(file->position > file->node->size)
+    //     file->position = file->node->size;
+
     return err;
 
 }
 
-FS_ERR file_write(file_description_t* file, uint8_t* buffer, size_t size) {
+FS_ERR file_write(
+    file_description_t* file,
+    uint8_t* buffer,
+    size_t size,
+    size_t* actual_write_size
+) {
     if(!(file->mode & FILE_WRITE) && !(file->mode & FILE_APPEND))
         return ERR_FS_FAILED;
 
     FS_ERR err;
     switch(file->node->fs->type) {
         case FS_RAMFS:
-            err = ramfs_write(file, buffer, size);
+            err = ramfs_write(file, buffer, size, actual_write_size);
             break;
         case FS_FAT32:
-            err = fat32_write(file, buffer, size);
+            err = fat32_write(file, buffer, size, actual_write_size);
             break;
         default:
             return ERR_FS_NOT_SUPPORTED;
     }
     if(err) return err;
 
-    if(file->mode & FILE_APPEND) {
-        file->node->size += size;
-    } else {
-        file->position += size;
-        if(file->position > file->node->size)
-            file->node->size = file->position;
+    if(!(file->mode & FILE_APPEND)) {
+        file->position += (*actual_write_size);
     }
+
+    file->node->size += (*actual_write_size);
     file->node->modified_timestamp = time(NULL);
     return ERR_FS_SUCCESS;
 }

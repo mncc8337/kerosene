@@ -40,7 +40,7 @@ static void process_lfn_entry(
     int order = (*temp_lfn)->order;
     bool last_LFN_entry = false;
     if(!(*found_last_LFN_entry)) {
-        (*found_last_LFN_entry) = true;
+        *found_last_LFN_entry = true;
         last_LFN_entry = true;
         order &= 0x3f;
     }
@@ -48,9 +48,9 @@ static void process_lfn_entry(
     int offset = (order - 1) * 13;
     parse_lfn(*temp_lfn, *entry_name, offset, &cnt);
     if(last_LFN_entry) {
-        (*namelen) = offset + cnt;
+        *namelen = offset + cnt;
         if((*namelen) >= FILENAME_LIMIT) {
-            (*namelen) = FILENAME_LIMIT;
+            *namelen = FILENAME_LIMIT;
             (*entry_name)[FILENAME_LIMIT-1] = '\0';
         }
     }
@@ -67,13 +67,13 @@ static void process_sfn_entry(
         name_pos++;
     }
     if((*temp_dir)->name[8] != ' ') {
-        (*entry_name)[name_pos++] = '.';
+        *entry_name[name_pos++] = '.';
         for(int i = 8; i < 11 && (*temp_dir)->name[i] != ' '; i++) {
-            (*entry_name)[name_pos++] = (*temp_dir)->name[i];
+            *entry_name[name_pos++] = (*temp_dir)->name[i];
         }
     }
     (*entry_name)[name_pos++] = '\0';
-    (*namelen) = name_pos;
+    *namelen = name_pos;
 }
 
 static void set_FAT_entry(
@@ -367,6 +367,7 @@ static FS_ERR read_file(
     uint32_t* start_cluster,
     uint8_t* buffer,
     size_t size,
+    size_t* actual_read_size,
     unsigned cluster_offset
 ) {
     fat32_bootrecord_t* bootrec = &(fs->fat32_info.bootrec);
@@ -377,6 +378,8 @@ static FS_ERR read_file(
     uint32_t* current_cluster = start_cluster;
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t ext_buffer[cluster_size];
+
+    *actual_read_size = 0;
 
     while(cluster_offset >= cluster_size) {
 
@@ -405,11 +408,14 @@ static FS_ERR read_file(
         bool read_all = remain_size >= size;
         memcpy(buffer, ext_buffer + cluster_offset, read_all ? size : remain_size);
 
-        if(read_all)
+        if(read_all) {
+            *actual_read_size += size;
             return ERR_FS_SUCCESS;
+        }
 
         size -= remain_size;
         buffer += remain_size;
+        *actual_read_size += remain_size;
 
         // get next cluster
         uint32_t FAT_val = get_FAT_entry(bootrec, fs, first_FAT_sector, *current_cluster);
@@ -440,11 +446,13 @@ static FS_ERR read_file(
                 ext_buffer
             );
             memcpy(buffer, ext_buffer, size);
+            *actual_read_size += size;
             break;
         }
 
         size -= cluster_size;
         buffer += cluster_size;
+        *actual_read_size += cluster_size;
 
         if(size == 0) break;
 
@@ -467,6 +475,7 @@ static FS_ERR write_file(
     uint32_t* start_cluster,
     uint8_t* buffer,
     size_t size,
+    size_t* actual_write_size,
     int cluster_offset,
     size_t file_size,
     size_t next_position
@@ -479,6 +488,8 @@ static FS_ERR write_file(
     uint32_t* current_cluster = start_cluster;
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t ext_buffer[cluster_size];
+
+    *actual_write_size = 0;
 
     while((unsigned)cluster_offset >= cluster_size) {
         // get next cluster
@@ -510,7 +521,8 @@ static FS_ERR write_file(
         );
 
         unsigned remain_size =  cluster_size - cluster_offset;
-        memcpy(ext_buffer + cluster_offset, buffer, remain_size > size ? size : remain_size);
+        bool write_all = size <= remain_size;
+        memcpy(ext_buffer + cluster_offset, buffer, write_all ? size : remain_size);
         ata_pio_LBA28_access(
             false,
             fs->partition.LBA_start + first_sector,
@@ -518,10 +530,14 @@ static FS_ERR write_file(
             ext_buffer
         );
 
-        if(size <= remain_size) return ERR_FS_SUCCESS;
+        if(write_all) {
+            *actual_write_size += size;
+            return ERR_FS_SUCCESS;
+        }
 
         size -= remain_size;
         buffer += remain_size;
+        *actual_write_size += remain_size;
     }
 
     int estimated_clusters = size / cluster_size;
@@ -559,11 +575,13 @@ static FS_ERR write_file(
                 first_sector, sectors_per_cluster,
                 ext_buffer
             );
+            *actual_write_size += size;
             break;
         }
 
         size -= cluster_size;
         buffer += cluster_size;
+        *actual_write_size += cluster_size;
 
         if(size == 0) break;
 
@@ -1384,7 +1402,8 @@ FS_ERR fat32_seek(file_description_t* file, size_t pos) {
 FS_ERR fat32_read(
     file_description_t* file,
     uint8_t* buffer,
-    size_t size
+    size_t size,
+    size_t* actual_read_size
 ) {
     fat32_bootrecord_t* bootrec = &(file->node->fs->fat32_info.bootrec);
     int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
@@ -1399,11 +1418,17 @@ FS_ERR fat32_read(
         &(file->fat32.current_cluster),
         buffer,
         size,
+        actual_read_size,
         offset
     );
 }
 
-FS_ERR fat32_write(file_description_t* file, uint8_t* data, size_t size) {
+FS_ERR fat32_write(
+    file_description_t* file,
+    uint8_t* data,
+    size_t size,
+    size_t* actual_write_size
+) {
     fat32_bootrecord_t* bootrec = &(file->node->fs->fat32_info.bootrec);
     int cluster_size = bootrec->bpb.bytes_per_sector * bootrec->bpb.sectors_per_cluster;
 
@@ -1423,6 +1448,7 @@ FS_ERR fat32_write(file_description_t* file, uint8_t* data, size_t size) {
         cluster_ptr,
         data,
         size,
+        actual_write_size,
         offset,
         file->node->size,
         position + size

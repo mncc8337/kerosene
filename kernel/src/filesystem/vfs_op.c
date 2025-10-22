@@ -3,7 +3,6 @@
 
 #include "stdlib.h"
 #include "string.h"
-#include "stdio.h"
 
 extern fs_t* FS;
 
@@ -255,27 +254,25 @@ int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
         return -1;
 }
 
-// delete later
-static void printnode(fs_node_t* node, int level) {
-    for(int i = 0; i < level; i++)
-        printf("  ");
-    puts(node->name);
+int vfs_write(int file_descriptor, uint8_t* buffer, size_t size) {
+    process_t* proc = scheduler_get_current_process();
 
-    if(node->children)
-        printnode(node->children, level + 1);
+    if(file_descriptor < 0 || (unsigned)file_descriptor >= *(proc->file_count))
+        return -1;
 
-    fs_node_t* sibling = node->next_sibling;
-    while(sibling) {
-        printnode(sibling, level);
-        sibling = sibling->next_sibling;
-    }
-}
-void vfs_printtree() {
-    for(unsigned i = 0; i < MAX_FS; i++) {
-        if(FS[i].type == FS_EMPTY) continue;
+    file_description_t* fde = proc->file_descriptor_table + file_descriptor;
 
-        printf("(%d)\n", i);
+    if(fde->node == NULL)
+        return -1;
 
-        printnode(&FS[i].root_node, 1);
-    }
+    if(!(fde->mode & FILE_WRITE))
+        return -1;
+
+    size_t write_size;
+    FS_ERR write_err = file_write(fde, buffer, size, &write_size);
+
+    if(write_err == ERR_FS_SUCCESS)
+        return write_size;
+    else
+        return -1;
 }

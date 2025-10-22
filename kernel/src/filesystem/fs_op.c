@@ -23,15 +23,16 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
     uint8_t buffer[UNIVERSAL_COPY_SIZE];
     while(remain_size) {
         unsigned write_size = (remain_size >= UNIVERSAL_COPY_SIZE) ? UNIVERSAL_COPY_SIZE : remain_size;
-        size_t read_size;
-        final_err = file_read(&src_file, buffer, write_size, &read_size);
-        write_size = read_size;
+        size_t actual_read_size;
+        final_err = file_read(&src_file, buffer, write_size, &actual_read_size);
         if(final_err != ERR_FS_SUCCESS && final_err != ERR_FS_EOF)
             break;
-        if((final_err = file_write(&dst_file, buffer, write_size)))
+
+        size_t actual_write_size;
+        if((final_err = file_write(&dst_file, buffer, actual_read_size, &actual_write_size)))
             break;
 
-        remain_size -= write_size;
+        remain_size -= actual_write_size;
     }
 
     file_close(&src_file);

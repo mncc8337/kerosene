@@ -81,6 +81,7 @@ void syscall_init() {
     ADD_SYSCALL(SYSCALL_OPEN, vfs_open);
     ADD_SYSCALL(SYSCALL_CLOSE, vfs_close);
     ADD_SYSCALL(SYSCALL_READ, vfs_read);
+    ADD_SYSCALL(SYSCALL_WRITE, vfs_write);
 
     isr_new_interrupt(0x80, syscall_dispatcher, 0xee);
 }
