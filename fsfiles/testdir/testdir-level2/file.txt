@@ -1,1 +1,1 @@
-a file in a 'level 2' dir
+Lorem ipsum dolor sit amet.

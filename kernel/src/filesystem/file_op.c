@@ -40,6 +40,9 @@ FS_ERR file_open(file_description_t* file, fs_node_t* node, char* modestr) {
     file->mode = mode;
     file->position = 0;
 
+    // TODO:
+    // clear file content if mode is w or w+
+
     switch(node->fs->type) {
         case FS_RAMFS:
             if(mode & FILE_WRITE || mode & FILE_READ) {
@@ -85,7 +88,7 @@ FS_ERR file_seek(file_description_t* file, size_t pos) {
     }
 }
 
-FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size) {
+FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* read_size) {
     if(!(file->mode & FILE_READ)) return ERR_FS_FAILED;
 
     if(file->position == file->node->size) return ERR_FS_EOF;
@@ -104,7 +107,11 @@ FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size) {
     if(err != ERR_FS_SUCCESS && err != ERR_FS_EOF) return err;
 
     file->position += size;
-    if(file->position > file->node->size) file->position = file->node->size;
+    *read_size = size;
+    if(file->position > file->node->size) {
+        *read_size = size - (file->position - file->node->size);
+        file->position = file->node->size;
+    }
     return err;
 
 }

@@ -10,7 +10,7 @@ argc = len(sys.argv)
 if argc == 1:
     print("no input file")
     exit(1)
-if(argc == 2):
+if argc == 2:
     print("no output file")
     exit(1)
 
@@ -39,9 +39,9 @@ for byte in bin:
     cnt += 1
     if cnt % 10 == 0:
         header_content += '\n'
-header_content = header_content[:-1];
+header_content = header_content[:-1]
 if cnt % 10 == 0:
-    header_content = header_content[:-1];
+    header_content = header_content[:-1]
 header_content += "\n};\n\n"
 
 header_content += f"int {alt_name}_size = {cnt};"

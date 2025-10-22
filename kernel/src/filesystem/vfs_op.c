@@ -99,7 +99,7 @@ static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_n
             if(find_err) {
                 for(unsigned i = 0; i < allocated_counter; i++)
                     kfree(allocated[i]);
-                // we should clarify wether the target is not found or the dir in the middle is not found
+                // we should clarify whether the target is not found or the dir in the middle is not found
                 if(find_err == ERR_FS_NOT_FOUND && strtok(NULL, "/", &old) == NULL) {
                     if(create_node) {
                         create_file_flag = true;
@@ -158,12 +158,16 @@ static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_n
     return ERR_FS_SUCCESS;
 }
 
+// TODO:
+// specify the error when failed
+
 int vfs_open(char* path, char* modestr) {
     process_t* proc = scheduler_get_current_process();
 
     // NOTE: make sure that proc->cwd has been in the node tree already
     fs_node_t* node;
-    FS_ERR find_err = find_and_create_node(path, proc->cwd, &node, true);
+    bool do_touch_file = (modestr[0] == 'w') || (modestr[0] == 'a');
+    FS_ERR find_err = find_and_create_node(path, proc->cwd, &node, do_touch_file);
     if(find_err)
         return -1;
 
@@ -189,13 +193,13 @@ int vfs_open(char* path, char* modestr) {
 
         fde = proc->file_descriptor_table + (*proc->file_count);
         file_descriptor = *proc->file_count;
-        *proc->file_count += 1;
+        (*proc->file_count)++;
     }
 
     FS_ERR open_err = file_open(fde, node, modestr);
     if(open_err) {
         if((unsigned)file_descriptor == *proc->file_count - 1) {
-            *proc->file_count -= 1;
+            (*proc->file_count)--;
         }
         fde->node = NULL;
         cleanup_node_tree(node);
@@ -213,7 +217,7 @@ void vfs_close(int file_descriptor) {
     if(file_descriptor < 0 || (unsigned)file_descriptor >= *(proc->file_count))
         return;
 
-    file_description_t* fde = &proc->file_descriptor_table[file_descriptor];
+    file_description_t* fde = proc->file_descriptor_table + file_descriptor;
 
     if(fde->node == NULL)
         return;
@@ -224,6 +228,31 @@ void vfs_close(int file_descriptor) {
     cleanup_node_tree(fde->node);
 
     fde->node = NULL;
+}
+
+int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
+    process_t* proc = scheduler_get_current_process();
+
+    if(file_descriptor < 0 || (unsigned)file_descriptor >= *(proc->file_count))
+        return -1;
+
+    file_description_t* fde = proc->file_descriptor_table + file_descriptor;
+
+    if(fde->node == NULL)
+        return -1;
+
+    if(!(fde->mode & FILE_READ))
+        return -1;
+
+    size_t read_size;
+    FS_ERR read_err = file_read(fde, buffer, size, &read_size);
+
+    if(read_err == ERR_FS_SUCCESS)
+        return read_size;
+    else if(read_err == ERR_FS_EOF)
+        return 0;
+    else
+        return -1;
 }
 
 // delete later

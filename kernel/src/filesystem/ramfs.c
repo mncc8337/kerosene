@@ -158,7 +158,12 @@ static void fix_empty_entries(ramfs_node_t* node) {
     start_node->next = NULL;
 }
 
-static FS_ERR read_file(ramfs_datanode_t** start_datanode, uint8_t* buffer, size_t size, int data_offset) {
+static FS_ERR read_file(
+    ramfs_datanode_t** start_datanode,
+    uint8_t* buffer,
+    size_t size,
+    int data_offset
+) {
     // make sure that data_offset is less than RAMFS_DATANODE_SIZE
     while(data_offset >= RAMFS_DATANODE_SIZE) {
         if(!(*start_datanode)->next)
@@ -177,7 +182,7 @@ static FS_ERR read_file(ramfs_datanode_t** start_datanode, uint8_t* buffer, size
         if(read_all)
             return ERR_FS_SUCCESS;
 
-        size -= RAMFS_DATANODE_SIZE - data_offset;
+        size -= read_size;
         buffer += read_size;
 
         if(!(*start_datanode)->next)
@@ -202,7 +207,12 @@ static FS_ERR read_file(ramfs_datanode_t** start_datanode, uint8_t* buffer, size
     return ERR_FS_SUCCESS;
 }
 
-static FS_ERR write_file(ramfs_datanode_t** start_datanode, uint8_t* buffer, size_t size, int data_offset) {
+static FS_ERR write_file(
+    ramfs_datanode_t** start_datanode,
+    uint8_t* buffer,
+    size_t size,
+    int data_offset
+) {
     // basically the same as read_file
     // but change the direction of memcpy
     // and add more datanode when not enough
@@ -631,12 +641,21 @@ FS_ERR ramfs_seek(file_description_t* file, size_t pos) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR ramfs_read(file_description_t* file, uint8_t* buffer, size_t size) {
+FS_ERR ramfs_read(
+    file_description_t* file,
+    uint8_t* buffer,
+    size_t size
+) {
     int offset = file->position % RAMFS_DATANODE_SIZE;
     if(file->position != 0 && offset == 0)
         offset = RAMFS_DATANODE_SIZE;
 
-    return read_file((ramfs_datanode_t**)&file->ramfs.current_datanode, buffer, size, offset);
+    return read_file(
+        (ramfs_datanode_t**)&file->ramfs.current_datanode,
+        buffer,
+        size,
+        offset
+    );
 }
 
 FS_ERR ramfs_write(file_description_t* file, uint8_t* buffer, size_t size) {

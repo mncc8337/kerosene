@@ -289,7 +289,7 @@ void kinit(multiboot_info_t* mbd) {
 }
 
 void idle_process() {
-    while(true);
+    while(true) asm volatile("sti; hlt;");
 }
 
 void load_elf_file(char* path) {
@@ -370,15 +370,33 @@ void kmain() {
     // load_elf_file("hi.elf");
 
     int fd1, fd2, fd3;
-    SYSCALL_2P(SYSCALL_OPEN, fd1, "(0)/test-test.txt", "r");
+    SYSCALL_2P(SYSCALL_OPEN, fd1, "(0)/test-test.txt", "w");
     printf("got file descriptor %d\n", fd1);
     SYSCALL_2P(SYSCALL_OPEN, fd2, "(0)/testdir/testdir-level2/file.txt", "r");
     printf("got file descriptor %d\n", fd2);
     SYSCALL_2P(SYSCALL_OPEN, fd3, "(0)/testdir/testdir.txt", "r");
     printf("got file descriptor %d\n", fd3);
 
+    puts("current vfs tree");
     vfs_printtree();
     SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
+
+    int read_res;
+    uint8_t fbuff[5];
+
+    puts("reading from (0)/testdir/testdir-level2/file.txt");
+    while((read_res = vfs_read(fd2, fbuff, 5)) > 0) {
+        for(int i = 0; i < read_res; i++)
+            putchar(fbuff[i]);
+    }
+
+    puts("reading from (0)/testdir/testdir.txt");
+    SYSCALL_3P(SYSCALL_READ, read_res, fd3, fbuff, 5);
+    while(read_res > 0) {
+        for(int i = 0; i < read_res; i++)
+            putchar(fbuff[i]);
+        SYSCALL_3P(SYSCALL_READ, read_res, fd3, fbuff, 5);
+    }
 
     SYSCALL_1P(SYSCALL_CLOSE, ret, fd1);
     printf("closed file descriptor %d\n", fd1);
@@ -387,6 +405,7 @@ void kmain() {
     SYSCALL_1P(SYSCALL_CLOSE, ret, fd3);
     printf("closed file descriptor %d\n", fd3);
 
+    puts("current vfs tree");
     vfs_printtree();
 
     puts("main kernel process exited. halting");

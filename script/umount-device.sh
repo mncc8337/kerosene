@@ -3,8 +3,6 @@ set -e
 
 # get the absolute path to the disk image
 IMG_PATH=$(realpath "${BIN_DIR}disk.img")
-echo $IMG_PATH
-echo $BIN_DIR
 
 # find the loop device associated with that file
 LOOP_DEV=$(sudo losetup --list --noheadings -O NAME,BACK-FILE | grep "$IMG_PATH" | awk '{print $1}')

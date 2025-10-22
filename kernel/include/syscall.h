@@ -7,6 +7,7 @@ enum {
     SYSCALL_SLEEP,
     SYSCALL_OPEN,
     SYSCALL_CLOSE,
+    SYSCALL_READ,
     MAX_SYSCALL
 };
 
