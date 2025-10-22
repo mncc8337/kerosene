@@ -125,10 +125,16 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     + [x] current time
     + [x] terminate process
     + [x] sleep()
-    + [x] open file
-    + [ ] read file
-    + [ ] write file
-    + [x] close file
+    + vfs
+        + [x] open file
+        + [x] close file
+        + [x] read file
+        + [x] write file
+        + [ ] file seek
+        + [ ] remove file
+        + [ ] mkdir
+        + [ ] remove dir
+        + [ ] dir iteration
 - process manager
     + [x] load process
     + [x] load and save process state
