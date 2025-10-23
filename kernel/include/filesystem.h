@@ -192,6 +192,7 @@ file_description_t* vfs_get_kernel_file_descriptor_table();
 unsigned* vfs_get_kernel_file_count();
 
 // vfs_op.c
+void vfs_cleanup_node_tree(fs_node_t* start_node);
 int vfs_open(char* path, char* modestr);
 void vfs_close(int file_descriptor);
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size);

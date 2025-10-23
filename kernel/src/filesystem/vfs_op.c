@@ -6,33 +6,6 @@
 
 extern fs_t* FS;
 
-static void cleanup_node_tree(fs_node_t* start_node) {
-    if(start_node->refcount > 0)
-        return;
-    if(start_node->children)
-        return;
-    // now it is safe to delete this node
-    
-    // remove node from tree
-    fs_node_t* parent_node = start_node->parent;
-    if(parent_node->children == start_node) {
-        if(start_node->next_sibling)
-            parent_node->children = start_node->next_sibling;
-        else {
-            parent_node->children = NULL;
-            // parent directory maybe unused at this point
-            cleanup_node_tree(parent_node);
-        }
-    } else {
-        fs_node_t* current_node = parent_node->children;
-        while(current_node->next_sibling != start_node)
-            current_node = current_node->next_sibling;
-        current_node->next_sibling = start_node->next_sibling;
-    }
-
-    kfree(start_node);
-}
-
 static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_node, bool create_node) {
     fs_node_t* current_node = cwd;
     fs_node_t* parent_node = current_node->parent;
@@ -157,11 +130,41 @@ static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_n
     return ERR_FS_SUCCESS;
 }
 
+void vfs_cleanup_node_tree(fs_node_t* start_node) {
+    if(start_node->refcount > 0)
+        return;
+    if(start_node->children)
+        return;
+    // now it is safe to delete this node
+    
+    // remove node from tree
+    fs_node_t* parent_node = start_node->parent;
+    if(parent_node->children == start_node) {
+        if(start_node->next_sibling)
+            parent_node->children = start_node->next_sibling;
+        else {
+            parent_node->children = NULL;
+            // parent directory maybe unused at this point
+            vfs_cleanup_node_tree(parent_node);
+        }
+    } else {
+        fs_node_t* current_node = parent_node->children;
+        while(current_node->next_sibling != start_node)
+            current_node = current_node->next_sibling;
+        current_node->next_sibling = start_node->next_sibling;
+    }
+
+    kfree(start_node);
+}
+
 // TODO:
 // specify the error when failed
 
 int vfs_open(char* path, char* modestr) {
     process_t* proc = scheduler_get_current_process();
+
+    if(*proc->file_count >= MAX_FILE)
+        return -1;
 
     // NOTE: make sure that proc->cwd has been in the node tree already
     fs_node_t* node;
@@ -171,41 +174,27 @@ int vfs_open(char* path, char* modestr) {
         return -1;
 
     int file_descriptor = -1;
-    file_description_t* fde;
+    file_description_t* fde = NULL;
 
-    // find hole to insert new file descriptor
-    for(unsigned i = 0; i < (*proc->file_count); i++) {
-        if(proc->file_descriptor_table[i].node == NULL) {
-            fde = proc->file_descriptor_table + i;
-            file_descriptor = i;
+    // find a hole to insert new file descriptor
+    // it should always found one
+    // since we must not exceed max file limit at this point
+    for(file_descriptor = 0; file_descriptor < MAX_FILE; file_descriptor++) {
+        if(proc->file_descriptor_table[file_descriptor].node == NULL) {
+            fde = proc->file_descriptor_table + file_descriptor;
             break;
         }
     }
 
-    if(file_descriptor == -1) {
-        // no hole found, add a new entry
-
-        if(*proc->file_count >= MAX_FILE) {
-            cleanup_node_tree(node);
-            return -1;
-        }
-
-        fde = proc->file_descriptor_table + (*proc->file_count);
-        file_descriptor = *proc->file_count;
-        (*proc->file_count)++;
-    }
-
     FS_ERR open_err = file_open(fde, node, modestr);
     if(open_err) {
-        if((unsigned)file_descriptor == *proc->file_count - 1) {
-            (*proc->file_count)--;
-        }
         fde->node = NULL;
-        cleanup_node_tree(node);
+        vfs_cleanup_node_tree(node);
         return -1;
     }
 
     node->refcount++;
+    proc->file_count++;
 
     return file_descriptor;
 }
@@ -213,7 +202,7 @@ int vfs_open(char* path, char* modestr) {
 void vfs_close(int file_descriptor) {
     process_t* proc = scheduler_get_current_process();
 
-    if(file_descriptor < 0 || (unsigned)file_descriptor >= *(proc->file_count))
+    if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return;
 
     file_description_t* fde = proc->file_descriptor_table + file_descriptor;
@@ -224,15 +213,16 @@ void vfs_close(int file_descriptor) {
     file_close(fde);
 
     fde->node->refcount--;
-    cleanup_node_tree(fde->node);
+    vfs_cleanup_node_tree(fde->node);
 
     fde->node = NULL;
+    proc->file_count--;
 }
 
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current_process();
 
-    if(file_descriptor < 0 || (unsigned)file_descriptor >= *(proc->file_count))
+    if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return -1;
 
     file_description_t* fde = proc->file_descriptor_table + file_descriptor;
@@ -257,7 +247,7 @@ int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
 int vfs_write(int file_descriptor, uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current_process();
 
-    if(file_descriptor < 0 || (unsigned)file_descriptor >= *(proc->file_count))
+    if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return -1;
 
     file_description_t* fde = proc->file_descriptor_table + file_descriptor;

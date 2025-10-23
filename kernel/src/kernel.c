@@ -271,7 +271,7 @@ void kinit(multiboot_info_t* mbd) {
 
     // add kernel process
     // there must be at least one process in the scheduler
-    kernel_process = process_new((uint32_t)kmain, 0, false);
+    kernel_process = process_new((uint32_t)kmain, 0, false, true);
     if(!kernel_process) {
         print_debug(LT_CR, "failed to initialise kernel process. not enough memory\n");
         kernel_panic(NULL);
@@ -397,7 +397,6 @@ void kmain() {
         actual_write_size = vfs_write(fd, (uint8_t*)(str + written_size), total_write_size - written_size);
         written_size += actual_write_size;
     }
-
 
     puts("reading from (0)/test-test.txt");
     fd = vfs_open("(0)/test-test.txt", "r");
