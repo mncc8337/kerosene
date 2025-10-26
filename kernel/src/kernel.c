@@ -169,6 +169,7 @@ void disk_init() {
 }
 
 void kinit(multiboot_info_t* mbd) {
+    // from kernel_entry.asm
     extern char kernel_start;
     extern char kernel_end;
     kernel_size = &kernel_end - &kernel_start;
@@ -202,7 +203,7 @@ void kinit(multiboot_info_t* mbd) {
     video_init(mbd);
 
     if(kheap_init()) {
-        print_debug(LT_ER, "failed to initialise kernel heap. not enough memory\n");
+        print_debug(LT_CR, "failed to initialise kernel heap. not enough memory\n");
         kernel_panic(NULL);
     }
     print_debug(LT_OK, "kernel heap initialised\n");
@@ -253,7 +254,10 @@ void kinit(multiboot_info_t* mbd) {
     if(!vfs_init()) {
         print_debug(LT_OK, "initialised ramFS on fs (%d)\n", RAMFS_DISK);
         disk_init();
-    } else print_debug(LT_ER, "failed to initialise FS. not enough memory\n");
+    } else {
+        print_debug(LT_CR, "failed to initialise FS. not enough memory\n");
+        kernel_panic(NULL);
+    }
 
     print_debug(LT_IF, "all disk detected: ");
     for(int i = 0; i < MAX_FS; i++)
@@ -292,42 +296,7 @@ void idle_process() {
     while(true) asm volatile("sti; hlt;");
 }
 
-void load_elf_file(char* path) {
-    fs_t* fs = vfs_getfs(0);
-    if(!fs) return;
-
-    fs_node_t elf;
-    FS_ERR find_err = fs_find(&fs->root_node, path, &elf);
-    if(find_err) {
-        printf("cannot find '%s', fs error %d\n", path, find_err);
-        return;
-    }
-
-    printf("found %s\n", path);
-
-    void* addr = kmalloc(elf.size);
-    if(!addr) {
-        puts("OOM!");
-        return;
-    }
-
-    uint32_t entry;
-    FS_ERR fserr;
-    ELF_ERR err = elf_load(&elf, addr, vmmngr_get_page_directory(), &entry, &fserr);
-    kfree(addr);
-    if(err) {
-        if(err == ERR_ELF_FILE_ERROR) printf("failed to load elf, fs err %d\n", err);
-        else printf("failed to load elf, elf err %d\n", err);
-
-        return;
-    }
-    else puts("elf file loaded");
-
-    printf("jumping to entry (0x%x)\n", entry);
-    int (*prog)(void) = (void*)entry;
-    int exit_code = prog();
-    printf("program exited with code %d\n", exit_code);
-}
+int load_elf_err;
 
 void kernel_proc1() {
     int ret;
@@ -349,9 +318,11 @@ void kernel_proc2() {
 void kmain() {
     print_debug(LT_OK, "successfully jumped into main kernel process\n");
 
+    int ret;
+
     // there must be a idle process so that sleep()
     // in other processes could work
-    process_t* idle_proc = process_new((uint32_t)idle_process, 999, false);
+    process_t* idle_proc = process_new((uint32_t)idle_process, 999, false, true);
     if(idle_proc) {
         scheduler_add_process(idle_proc);
         print_debug(LT_OK, "created idle process\n");
@@ -360,51 +331,27 @@ void kmain() {
 
     print_debug(LT_IF, "done initialising\n");
 
-    process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
-    process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
+    process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false, true);
+    process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false, true);
     if(proc1) scheduler_add_process(proc1);
     if(proc2) scheduler_add_process(proc2);
 
-    load_elf_file("hi.elf");
-
-    int fd;
-    int read_res;
-    uint8_t fbuff[5];
-
-    puts("reading from (0)/testdir/testdir-level2/file.txt");
-    fd = vfs_open("(0)/testdir/testdir-level2/file.txt", "r");
-    while((read_res = vfs_read(fd, fbuff, 5)) > 0) {
-        for(int i = 0; i < read_res; i++)
-            putchar(fbuff[i]);
+    process_t* uproc = process_new(0, 0, true, false);
+    if(uproc) {
+        ELF_ERR load_err = elf_load_to_proc("hi.elf", uproc);
+        if(load_err) {
+            if(load_elf_err == ERR_ELF_FILE_ERROR) {
+                FS_ERR ferr = elf_get_err();
+                printf("file err while loading %s: %d\n", "hi.elf", ferr);
+            } else {
+                printf("elf err while loading %s: %d\n", "hi.elf", load_err);
+            }
+        } else {
+            SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
+            scheduler_add_process(uproc);
+            puts("uproc started");
+        }
     }
-    vfs_close(fd);
-
-    puts("reading from (0)/testdir/testdir.txt");
-    fd = vfs_open("(0)/testdir/testdir.txt", "r");
-    while((read_res = vfs_read(fd, fbuff, 5)) > 0) {
-        for(int i = 0; i < read_res; i++)
-            putchar(fbuff[i]);
-    }
-    vfs_close(fd);
-
-    puts("writing to (0)/test-test.txt");
-    fd = vfs_open("(0)/test-test.txt", "w");
-    char str[] = "con chim bay tren troi\n";
-    size_t written_size = 0;
-    size_t total_write_size = strlen(str);
-    size_t actual_write_size;
-    while(written_size < total_write_size) {
-        actual_write_size = vfs_write(fd, (uint8_t*)(str + written_size), total_write_size - written_size);
-        written_size += actual_write_size;
-    }
-
-    puts("reading from (0)/test-test.txt");
-    fd = vfs_open("(0)/test-test.txt", "r");
-    while((read_res = vfs_read(fd, fbuff, 5)) > 0) {
-        for(int i = 0; i < read_res; i++)
-            putchar(fbuff[i]);
-    }
-    vfs_close(fd);
 
     puts("main kernel process exited. halting");
 

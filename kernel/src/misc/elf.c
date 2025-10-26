@@ -5,6 +5,8 @@
 
 #include "string.h"
 
+static int errcode;
+
 elf_section_header_t* elf_get_shtab(elf_header_t* eh) {
     return (elf_section_header_t*)((void*)eh + eh->sh_offset);
 }
@@ -31,15 +33,21 @@ ELF_ERR elf_validate(elf_header_t* elf_header) {
     return ERR_ELF_SUCCESS;
 }
 
-ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry, FS_ERR* fserr) {
+int elf_get_err() {
+    return errcode;
+}
+
+ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry) {
     file_description_t f;
-    *fserr = file_open(&f, node, "r");
-    if(*fserr) return ERR_ELF_FILE_ERROR;
+    errcode = file_open(&f, node, "r");
+    if(errcode)
+        return ERR_ELF_FILE_ERROR;
 
     size_t read_size;
-    *fserr = file_read(&f, addr, node->size, &read_size);
+    errcode = file_read(&f, addr, node->size, &read_size);
     file_close(&f);
-    if(*fserr != ERR_FS_SUCCESS && *fserr != ERR_FS_EOF) return ERR_ELF_FILE_ERROR;
+    if(errcode != ERR_FS_SUCCESS && errcode != ERR_FS_EOF)
+        return ERR_ELF_FILE_ERROR;
 
     elf_header_t* elf_header = (elf_header_t*)addr;
     int elf_err = elf_validate(elf_header);
@@ -84,6 +92,9 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
     }
 
     // now all the vaddrs in PHs are usable
+    // switch to the modified pd to set stuff
+
+    vmmngr_switch_page_directory(pd);
 
     for(unsigned i = 0; i < elf_header->ph_entry_count; i++) {
         elf_program_header_t* ph = &phtab[i];
@@ -96,7 +107,39 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
             memset((void*)ph->vaddr + ph->file_segment_size, 0, ph->mem_segment_size - ph->file_segment_size);
     }
 
+    vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+
     *entry = elf_header->program_entry;
-    (void)(entry); // avoid unused warning
+    return ERR_ELF_SUCCESS;
+}
+
+ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
+    fs_t* fs = vfs_getfs(0);
+    if(!fs) {
+        errcode = ERR_FS_FAILED;
+        return ERR_ELF_FILE_ERROR;
+    }
+
+    fs_node_t elf;
+    errcode = fs_find(&fs->root_node, path, &elf);
+    if(errcode)
+        return ERR_ELF_FILE_ERROR;
+
+    void* addr = kmalloc(elf.size);
+    if(!addr)
+        return ERR_ELF_OOM;
+
+    uint32_t entry;
+    errcode = elf_load(&elf, addr, proc->page_directory, &entry);
+    kfree(addr);
+    if(errcode)
+        return errcode;
+
+    // printf("jumping to entry (0x%x)\n", entry);
+    // int (*prog)(void) = (void*)entry;
+    // int exit_code = prog();
+    // printf("program exited with code %d\n", exit_code);
+    proc->regs.eip = entry;
+
     return ERR_ELF_SUCCESS;
 }

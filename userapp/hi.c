@@ -28,5 +28,6 @@ int main() {
 
     printf("current time: %d\n", time(NULL));
 
+    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
     return 0;
 }
