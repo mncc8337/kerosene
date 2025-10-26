@@ -1,7 +1,7 @@
 [bits 32]
 
 global gdt_flush
-extern gdtr
+extern gdtr ; from gdt.c
 gdt_flush:
     lgdt [gdtr]
     jmp 0x08:.flush
