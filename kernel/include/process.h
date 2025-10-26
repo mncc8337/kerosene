@@ -48,7 +48,7 @@ typedef struct {
 } semaphore_t;
 
 // process.c
-process_t* process_new(uint32_t eip, int priority, bool is_user, bool is_thread);
+process_t* process_new(uint32_t eip, int priority, bool is_user);
 void process_delete(process_t* proc);
 
 // process_queue.c

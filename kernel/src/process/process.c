@@ -11,7 +11,7 @@ static unsigned process_count = 0;
 // from kernel.c
 extern process_t* kernel_process;
 
-process_t* process_new(uint32_t eip, int priority, bool is_user, bool is_thread) {
+process_t* process_new(uint32_t eip, int priority, bool is_user) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
 
@@ -21,7 +21,6 @@ process_t* process_new(uint32_t eip, int priority, bool is_user, bool is_thread)
     if(parent_proc != kernel_process && !is_user)
         return NULL;
 
-    proc->id = process_count + 1;
     proc->priority = priority;
     proc->state = PROCESS_STATE_READY;
     proc->alive_ticks = 0;
@@ -34,31 +33,23 @@ process_t* process_new(uint32_t eip, int priority, bool is_user, bool is_thread)
         proc->file_count = vfs_get_kernel_file_count();
         proc->cwd = &vfs_getfs(RAMFS_DISK)->root_node;
     } else {
-        if(!is_thread) {
-            // create a new page directory
-            proc->page_directory = vmmngr_alloc_page_directory();
-            if(!proc->page_directory) {
-                kfree(proc);
-                return NULL;
-            }
-
-            // create a file descriptor table
-            void* fdt = kmalloc(sizeof(file_description_t) * MAX_FILE);
-            if(!fdt) {
-                if(!is_thread)
-                    vmmngr_free_page_directory(proc->page_directory);
-                kfree(proc);
-                return NULL;
-            }
-            proc->file_descriptor_table = fdt;
-            proc->file_count = 0;
-
-            // create standard files
-        } else {
-            proc->page_directory = parent_proc->page_directory;
-            proc->file_descriptor_table = parent_proc->file_descriptor_table;
-            proc->file_count = parent_proc->file_count;
+        // create a new page directory
+        proc->page_directory = vmmngr_alloc_page_directory();
+        if(!proc->page_directory) {
+            kfree(proc);
+            return NULL;
         }
+
+        // create a file descriptor table
+        void* fdt = kmalloc(sizeof(file_description_t) * MAX_FILE);
+        if(!fdt) {
+            vmmngr_free_page_directory(proc->page_directory);
+            kfree(proc);
+            return NULL;
+        }
+        proc->file_descriptor_table = fdt;
+        proc->file_count = 0;
+
         proc->cwd = parent_proc->cwd;
     }
 
@@ -67,38 +58,34 @@ process_t* process_new(uint32_t eip, int priority, bool is_user, bool is_thread)
     regs->eflags = DEFAULT_EFLAGS;
     regs->ebp = 0;
     if(is_user) {
-        if(!is_thread) {
-            // switch page directory to create user heap
-            vmmngr_switch_page_directory(proc->page_directory);
+        // switch page directory to create user heap
+        vmmngr_switch_page_directory(proc->page_directory);
 
-            heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
-            if(!heap) {
-                vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
-                vmmngr_free_page_directory(proc->page_directory);
-                kfree(proc->file_descriptor_table);
-                kfree(proc);
-                return NULL;
-            }
-
-            regs->cs = 0x1b; // user code selector
-            regs->ds = 0x23; // user data selector
-            regs->es = regs->ds;
-            regs->fs = regs->ds;
-            regs->gs = regs->ds;
-            regs->ss = regs->ds;
-            // this should yield no error because the heap is new
-            proc->stack_addr = (uint32_t)heap_alloc(heap, DEFAULT_STACK_SIZE, false);
-
+        heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
+        if(!heap) {
             vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
-        } else {
-            regs->cs = 0x1b; // user code selector
-            regs->ds = 0x23; // user data selector
-            regs->es = regs->ds;
-            regs->fs = regs->ds;
-            regs->gs = regs->ds;
-            regs->ss = regs->ds;
-            proc->stack_addr = parent_proc->stack_addr;
+            vmmngr_free_page_directory(proc->page_directory);
+            kfree(proc->file_descriptor_table);
+            kfree(proc);
+            return NULL;
         }
+
+        regs->cs = 0x1b; // user code selector
+        regs->ds = 0x23; // user data selector
+        regs->es = regs->ds;
+        regs->fs = regs->ds;
+        regs->gs = regs->ds;
+        regs->ss = regs->ds;
+        proc->stack_addr = (uint32_t)heap_alloc(heap, DEFAULT_STACK_SIZE, false);
+        vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+
+        if(!proc->stack_addr) {
+            vmmngr_free_page_directory(proc->page_directory);
+            kfree(proc->file_descriptor_table);
+            kfree(proc);
+            return NULL;
+        }
+
     } else {
         regs->cs = 0x08; // kernel code selector
         regs->ds = 0x10; // kernel data selector
@@ -115,7 +102,10 @@ process_t* process_new(uint32_t eip, int priority, bool is_user, bool is_thread)
     }
     regs->useresp = proc->stack_addr + DEFAULT_STACK_SIZE;
 
-    process_count++;
+    // prevent interrupts to safely increment proc count
+    asm volatile("cli");
+    proc->id = ++process_count;
+    asm volatile("sti");
 
     return proc;
 }
@@ -123,9 +113,6 @@ process_t* process_new(uint32_t eip, int priority, bool is_user, bool is_thread)
 void process_delete(process_t* proc) {
     // kernel resources are shared so dont touch them
     if(proc != kernel_process) {
-        // TODO:
-        // dont clear resources if another thread is using them
-
         vmmngr_free_page_directory(proc->page_directory);
 
         // close opened file
