@@ -1,5 +1,5 @@
-#include "pic.h"
-#include "system.h"
+#include <pic.h>
+#include <system.h>
 
 void pic_send_eoi(uint8_t irq) {
     if(irq >= 8)

@@ -1,10 +1,10 @@
 #pragma once
 
-#include "filesystem.h"
-#include "mem.h"
-#include "process.h"
+#include <filesystem.h>
+#include <mem.h>
+#include <process.h>
 
-#include "stdint.h"
+#include <stdint.h>
 
 typedef enum {
     ERR_ELF_SUCCESS,

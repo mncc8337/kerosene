@@ -1,10 +1,10 @@
 #pragma once
 
-#include "mem.h"
-#include "system.h"
-#include "filesystem.h"
+#include <mem.h>
+#include <system.h>
+#include <filesystem.h>
 
-#include "stdint.h"
+#include <stdint.h>
 
 // how many ticks a process will run before got switch to others
 #define PROCESS_ALIVE_TICKS 4
@@ -27,7 +27,7 @@ typedef struct process {
     regs_t regs;
     
     file_description_t* file_descriptor_table;
-    unsigned* file_count;
+    unsigned file_count;
     fs_node_t* cwd;
 
     struct process* next;

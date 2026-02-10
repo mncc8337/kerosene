@@ -1,4 +1,4 @@
-#include "process.h"
+#include <process.h>
 
 bool process_sort_by_sleep_ticks(process_t* a, process_t* b) {
     return a->sleep_ticks < b->sleep_ticks;

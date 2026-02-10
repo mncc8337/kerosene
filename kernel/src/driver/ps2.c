@@ -1,5 +1,5 @@
-#include "ps2.h"
-#include "system.h"
+#include <ps2.h>
+#include <system.h>
 
 uint8_t ps2_read_data() {
     return port_inb(PORT_PS2_DATA);

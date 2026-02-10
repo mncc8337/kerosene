@@ -1,5 +1,5 @@
-#include "video.h"
-#include "system.h"
+#include <video.h>
+#include <system.h>
 
 static uint8_t* vid_mem = (uint8_t*)VIDEO_START;
 

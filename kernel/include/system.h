@@ -1,8 +1,8 @@
 #pragma once
 
-#include "stdint.h"
-#include "stdbool.h"
-#include "stdatomic.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdatomic.h>
 
 #define GDT_MAX_DESCRIPTORS 6
 #define IDT_MAX_DESCRIPTORS 256

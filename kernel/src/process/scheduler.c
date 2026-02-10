@@ -1,7 +1,7 @@
-#include "process.h"
-#include "system.h"
+#include <process.h>
+#include <system.h>
 
-#include "string.h"
+#include <string.h>
 
 static process_queue_t ready_queue = PROCESS_QUEUE_INIT;
 // this is a linked list sorted by sleep_ticks

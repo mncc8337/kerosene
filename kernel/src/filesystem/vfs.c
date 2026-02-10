@@ -1,10 +1,14 @@
-#include "filesystem.h"
-#include "ata.h"
-#include "mem.h"
+#include <filesystem.h>
+#include <ata.h>
+#include <mem.h>
 
 fs_t* FS;
 static file_description_t KERNEL_FDT[MAX_FILE];
 static unsigned KERNEL_FILE_COUNT = 0;
+
+static fs_node_t* kern_proc = NULL;
+static fs_node_t* kern_glbout = NULL;
+static fs_node_t* kern_glbin = NULL;
 
 static bool fat32_check(uint8_t* sect) {
     fat32_bootrecord_t* fat32_bootrec = (fat32_bootrecord_t*)sect;
@@ -38,12 +42,37 @@ bool vfs_init() {
     for(unsigned i = 0; i < MAX_FS; i++)
         FS[i].type = FS_EMPTY;
 
-    if(ramfs_init(&FS[RAMFS_DISK])) {
-        kfree(FS);
+    if(ramfs_init(&FS[RAMFS_DISK])) return true;
+
+    // creating kernel directories and files
+
+    if(vfs_find_and_create_node("/proc", &FS[RAMFS_DISK].root_node, &kern_proc, true, false))
         return true;
-    }
+
+    if(vfs_find_and_create_node("/glbout", &FS[RAMFS_DISK].root_node, &kern_glbout, true, true))
+        return true;
+
+    if(vfs_find_and_create_node("/glbin", &FS[RAMFS_DISK].root_node, &kern_glbin, true, true))
+        return true;
+
+    // prevent these from being delete from the tree
+    kern_glbout->refcount = 69429;
+    kern_glbin->refcount = 69420;
+    KERNEL_FILE_COUNT = 2;
 
     return false;
+}
+
+fs_node_t* vfs_get_proc_dir() {
+    return kern_proc;
+}
+
+fs_node_t* vfs_get_glbout() {
+    return kern_glbout;
+}
+
+fs_node_t* vfs_get_glbin() {
+    return kern_glbin;
 }
 
 fs_type_t vfs_detectfs(partition_entry_t* part) {
@@ -72,6 +101,6 @@ file_description_t* vfs_get_kernel_file_descriptor_table() {
     return KERNEL_FDT;
 }
 
-unsigned* vfs_get_kernel_file_count() {
-    return &KERNEL_FILE_COUNT;
+unsigned vfs_get_kernel_file_count() {
+    return KERNEL_FILE_COUNT;
 }

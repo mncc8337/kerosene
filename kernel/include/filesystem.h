@@ -1,11 +1,11 @@
 #pragma once
 
-#include "stdint.h"
-#include "stdbool.h"
-#include "stddef.h"
-#include "stdatomic.h"
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdatomic.h>
 
-#include "time.h"
+#include <time.h>
 
 // filename limit including null char
 #define FILENAME_LIMIT 256
@@ -95,7 +95,7 @@ typedef struct {
     ramfs_datanode_t* datanode_chain;
 } ramfs_node_t;
 
-#include "fat_type.h"
+#include <fat_type.h>
 
 typedef struct fs_node {
     char name[FILENAME_LIMIT];
@@ -185,13 +185,17 @@ partition_entry_t mbr_get_partition_entry(unsigned int id);
 
 // vfs.c
 bool vfs_init();
+fs_node_t* vfs_get_proc_dir();
+fs_node_t* vfs_get_glbout();
+fs_node_t* vfs_get_glbin();
 fs_type_t vfs_detectfs(partition_entry_t* part);
 fs_t* vfs_getfs(int id);
 bool vfs_is_fs_available(int id);
 file_description_t* vfs_get_kernel_file_descriptor_table();
-unsigned* vfs_get_kernel_file_count();
+unsigned vfs_get_kernel_file_count();
 
 // vfs_op.c
+FS_ERR vfs_find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_node, bool create_node, bool is_file);
 void vfs_cleanup_node_tree(fs_node_t* start_node);
 int vfs_open(char* path, char* modestr);
 void vfs_close(int file_descriptor);

@@ -1,12 +1,19 @@
-#include "filesystem.h"
-#include "process.h"
+#include <filesystem.h>
+#include <process.h>
 
-#include "stdlib.h"
-#include "string.h"
+#include <stdlib.h>
+#include <string.h>
 
+// from vfs.c
 extern fs_t* FS;
 
-static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_node, bool create_node) {
+FS_ERR vfs_find_and_create_node(
+    char* path,
+    fs_node_t* cwd,
+    fs_node_t** ret_node,
+    bool create_node,
+    bool is_file
+) {
     fs_node_t* current_node = cwd;
     fs_node_t* parent_node = current_node->parent;
     if(!parent_node) parent_node = current_node;
@@ -105,11 +112,20 @@ static FS_ERR find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_n
         if(!new_node)
             return ERR_FS_NOT_ENOUGH_SPACE;
 
-        FS_ERR touch_err = fs_touch(parent_node, current_name, new_node);
-        if(touch_err) {
-            kfree(new_node);
-            return touch_err;
+        if(is_file) {
+            FS_ERR touch_err = fs_touch(parent_node, current_name, new_node);
+            if(touch_err) {
+                kfree(new_node);
+                return touch_err;
+            }
+        } else {
+            FS_ERR mkdir_err = fs_mkdir(parent_node, current_name, new_node);
+            if(mkdir_err) {
+                kfree(new_node);
+                return mkdir_err;
+            }
         }
+
         // link the new node to the tree
         if(!parent_node->children) {
             parent_node->children = new_node;
@@ -163,13 +179,13 @@ void vfs_cleanup_node_tree(fs_node_t* start_node) {
 int vfs_open(char* path, char* modestr) {
     process_t* proc = scheduler_get_current_process();
 
-    if(*proc->file_count >= MAX_FILE)
+    if(proc->file_count >= MAX_FILE)
         return -1;
 
     // NOTE: make sure that proc->cwd has been in the node tree already
     fs_node_t* node;
     bool do_touch_file = (modestr[0] == 'w') || (modestr[0] == 'a');
-    FS_ERR find_err = find_and_create_node(path, proc->cwd, &node, do_touch_file);
+    FS_ERR find_err = vfs_find_and_create_node(path, proc->cwd, &node, do_touch_file, true);
     if(find_err)
         return -1;
 

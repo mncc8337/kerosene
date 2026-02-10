@@ -1,4 +1,4 @@
-#include "locale.h"
+#include <locale.h>
 
 static int kbd_layout = -1;
 static int timezone = TIMEZONE_NONE;

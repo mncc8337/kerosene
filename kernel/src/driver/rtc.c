@@ -1,6 +1,6 @@
-#include "rtc.h"
-#include "system.h"
-#include "locale.h"
+#include <rtc.h>
+#include <system.h>
+#include <locale.h>
 
 static bool is_update_in_progress() {
     port_outb(PORT_RTC_SELECT_REG, RTC_REG_A);

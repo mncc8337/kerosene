@@ -1,6 +1,6 @@
 #pragma once
 
-#include "stdint.h"
+#include <stdint.h>
 
 #define PORT_PIC1_COMM  0x20
 #define PORT_PIC1_DATA  0x21

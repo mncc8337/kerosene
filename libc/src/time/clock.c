@@ -1,7 +1,7 @@
-#include "time.h"
+#include <time.h>
 
 #if defined(__is_libk)
-#include "timer.h"
+#include <timer.h>
 #endif
 
 clock_t clock() {

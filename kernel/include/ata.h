@@ -1,7 +1,7 @@
 #pragma once
 
-#include "stdbool.h"
-#include "stdint.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 typedef enum {
     ERR_ATA_PIO_SUCCESS,

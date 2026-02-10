@@ -1,7 +1,7 @@
 #pragma once
 
-#include "stdbool.h"
-#include "time.h"
+#include <stdbool.h>
+#include <time.h>
 
 enum KEYBOARD_LAYOUT {
     KBD_LAYOUT_US

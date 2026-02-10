@@ -1,8 +1,8 @@
-#include "system.h"
-#include "mem.h"
-#include "misc/elf.h"
-#include "stdio.h"
-#include "video.h"
+#include <system.h>
+#include <mem.h>
+#include <misc/elf.h>
+#include <stdio.h>
+#include <video.h>
 
 #define MAX_FRAMES 30
 

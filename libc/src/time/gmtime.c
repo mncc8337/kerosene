@@ -1,5 +1,5 @@
-#include "time.h"
-#include "stdbool.h"
+#include <time.h>
+#include <stdbool.h>
 
 #define SECS_PER_DAY 86400
 

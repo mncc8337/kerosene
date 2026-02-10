@@ -1,6 +1,6 @@
 #pragma once
 
-#include "stdint.h"
+#include <stdint.h>
 
 #if defined(__is_libk)
 #define CLOCKS_PER_SEC TIMER_FREQUENCY

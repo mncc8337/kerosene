@@ -1,7 +1,7 @@
-#include "misc/psf.h"
+#include <misc/psf.h>
 
 // default font
-#include "access/font.h"
+#include <access/font.h>
 
 PSF_font_t* font = (PSF_font_t*)font_h_data;
 

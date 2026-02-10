@@ -1,8 +1,9 @@
 #pragma once
 
-#include "stdint.h"
-#include "stddef.h"
-#include "stdbool.h"
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
+#include <stdatomic.h>
 
 typedef enum {
     ERR_MEM_SUCCESS,
@@ -65,6 +66,7 @@ typedef struct {
     uint32_t end;
     uint32_t max_addr;
     uint32_t min_size;
+    volatile atomic_flag lock;
     uint8_t flags;
 } __attribute__((packed)) heap_t;
 

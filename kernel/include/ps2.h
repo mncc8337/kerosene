@@ -1,6 +1,6 @@
 #pragma once
 
-#include "stdint.h"
+#include <stdint.h>
 
 #define PORT_PS2_DATA 0x60
 #define PORT_PS2_STAT 0x64

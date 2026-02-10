@@ -1,6 +1,6 @@
 #pragma once
 
-#include "time.h"
+#include <time.h>
 
 time_t timer_get_start_time();
 time_t timer_get_current_time();

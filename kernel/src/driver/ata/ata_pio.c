@@ -1,5 +1,5 @@
-#include "ata.h"
-#include "system.h"
+#include <ata.h>
+#include <system.h>
 
 static bool LBA28_mode;
 static bool LBA48_mode;
@@ -112,6 +112,7 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
 
     // 0xe0 for master, 0xf0 for slave
     port_outb(PORT_ATA_PIO_DRIVE, 0xe0 | (slavebit << 4) | ((lba >> 24) & 0xf));
+    wait_400ns();
     // send NULL
     port_outb(PORT_ATA_PIO_FEATURE, 0x0);
     // send sector count

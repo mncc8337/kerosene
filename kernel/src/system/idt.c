@@ -1,4 +1,4 @@
-#include "system.h"
+#include <system.h>
 
 static idt_entry_t idt[IDT_MAX_DESCRIPTORS];
 idtr_t idtr;

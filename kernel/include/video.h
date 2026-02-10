@@ -1,7 +1,7 @@
 #pragma once
 
-#include "stdint.h"
-#include "stdbool.h"
+#include <stdint.h>
+#include <stdbool.h>
 
 #define PORT_SCREEN_CTRL 0x3d4
 #define PORT_SCREEN_DATA 0x3d5

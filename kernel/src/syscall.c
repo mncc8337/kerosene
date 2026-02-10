@@ -1,11 +1,11 @@
-#include "syscall.h"
-#include "system.h"
-#include "process.h"
-#include "filesystem.h"
+#include <syscall.h>
+#include <system.h>
+#include <process.h>
+#include <filesystem.h>
 
-#include "stdio.h"
-#include "time.h"
-#include "string.h"
+#include <stdio.h>
+#include <time.h>
+#include <string.h>
 
 #define ADD_SYSCALL(id, func) \
 syscalls[id] = func

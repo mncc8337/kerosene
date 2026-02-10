@@ -1,10 +1,10 @@
-#include "time.h"
-#include "stddef.h"
+#include <time.h>
+#include <stddef.h>
 
 #if defined(__is_libk)
-#include "timer.h"
+#include <timer.h>
 #else
-#include "syscall.h"
+#include <syscall.h>
 #endif
 
 time_t time(time_t* timer) {

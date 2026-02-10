@@ -1,23 +1,23 @@
-#include "multiboot.h"
+#include <multiboot.h>
 
-#include "video.h"
-#include "ata.h"
-#include "kbd.h"
-#include "timer.h"
-#include "filesystem.h"
-#include "locale.h"
+#include <video.h>
+#include <ata.h>
+#include <kbd.h>
+#include <timer.h>
+#include <filesystem.h>
+#include <locale.h>
 
-#include "system.h"
-#include "process.h"
-#include "syscall.h"
-#include "mem.h"
+#include <system.h>
+#include <process.h>
+#include <syscall.h>
+#include <mem.h>
 
-#include "stdio.h"
-#include "stdlib.h"
-#include "string.h"
-#include "debug.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <debug.h>
 
-#include "misc/elf.h"
+#include <misc/elf.h>
 
 uint32_t kernel_size;
 
@@ -275,7 +275,7 @@ void kinit(multiboot_info_t* mbd) {
 
     // add kernel process
     // there must be at least one process in the scheduler
-    kernel_process = process_new((uint32_t)kmain, 0, false, true);
+    kernel_process = process_new((uint32_t)kmain, 0, false);
     if(!kernel_process) {
         print_debug(LT_CR, "failed to initialise kernel process. not enough memory\n");
         kernel_panic(NULL);
@@ -322,7 +322,7 @@ void kmain() {
 
     // there must be a idle process so that sleep()
     // in other processes could work
-    process_t* idle_proc = process_new((uint32_t)idle_process, 999, false, true);
+    process_t* idle_proc = process_new((uint32_t)idle_process, 999, false);
     if(idle_proc) {
         scheduler_add_process(idle_proc);
         print_debug(LT_OK, "created idle process\n");
@@ -331,12 +331,12 @@ void kmain() {
 
     print_debug(LT_IF, "done initialising\n");
 
-    process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false, true);
-    process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false, true);
+    process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
+    process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
     if(proc1) scheduler_add_process(proc1);
     if(proc2) scheduler_add_process(proc2);
 
-    process_t* uproc = process_new(0, 0, true, false);
+    process_t* uproc = process_new(0, 0, true);
     if(uproc) {
         ELF_ERR load_err = elf_load_to_proc("hi.elf", uproc);
         if(load_err) {
@@ -351,6 +351,8 @@ void kmain() {
             scheduler_add_process(uproc);
             puts("uproc started");
         }
+    } else {
+        printf("failed to start uproc\n");
     }
 
     puts("main kernel process exited. halting");

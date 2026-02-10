@@ -1,6 +1,6 @@
 #pragma once
 
-#include "time.h"
+#include <time.h>
 
 #define PORT_RTC_SELECT_REG 0x70
 #define PORT_RTC_DAT 0x71

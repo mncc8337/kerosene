@@ -1,7 +1,7 @@
-#include "video.h"
-#include "misc/psf.h"
+#include <video.h>
+#include <misc/psf.h>
 
-#include "string.h"
+#include <string.h>
 
 static uint8_t* framebuffer = (uint8_t*)VIDEO_START;
 

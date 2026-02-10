@@ -1,5 +1,5 @@
-#include "pit.h"
-#include "system.h"
+#include <pit.h>
+#include <system.h>
 
 void pit_timer_frequency(int hz) {
     uint16_t div = 1193180 / hz;

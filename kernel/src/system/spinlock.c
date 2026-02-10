@@ -1,4 +1,4 @@
-#include "system.h"
+#include <system.h>
 
 void spinlock_acquire(volatile atomic_flag* lock) {
     while(atomic_flag_test_and_set_explicit(lock, memory_order_acquire))

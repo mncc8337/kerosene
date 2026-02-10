@@ -1,6 +1,6 @@
-#include "time.h"
+#include <time.h>
 
-#include "stdint.h"
+#include <stdint.h>
 
 #define TYPE_SIGNED(type) ((type) -1 < 0)
 

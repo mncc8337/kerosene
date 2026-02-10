@@ -1,8 +1,8 @@
-#include "timer.h"
-#include "system.h"
-#include "pit.h"
-#include "rtc.h"
-#include "process.h"
+#include <timer.h>
+#include <system.h>
+#include <pit.h>
+#include <rtc.h>
+#include <process.h>
 
 static unsigned ticks = 0;
 static time_t start_timestamp;

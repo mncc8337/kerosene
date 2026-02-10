@@ -1,8 +1,8 @@
-#include "stdlib.h"
-#include "stdio.h"
+#include <stdlib.h>
+#include <stdio.h>
 
 #if defined(__is_libk)
-#include "system.h"
+#include <system.h>
 #endif
 
 __attribute__((__noreturn__))

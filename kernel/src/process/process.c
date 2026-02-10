@@ -1,7 +1,8 @@
-#include "process.h"
-#include "filesystem.h"
-#include "system.h"
-#include "mem.h"
+#include <process.h>
+#include <filesystem.h>
+#include <stdlib.h>
+#include <system.h>
+#include <mem.h>
 
 #define DEFAULT_EFLAGS 0x202
 #define DEFAULT_STACK_SIZE 16 * 1024
@@ -103,9 +104,41 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     regs->useresp = proc->stack_addr + DEFAULT_STACK_SIZE;
 
     // prevent interrupts to safely increment proc count
+    unsigned long eflags;
+    asm volatile("pushf; pop %0" : "=r"(eflags));
     asm volatile("cli");
     proc->id = ++process_count;
-    asm volatile("sti");
+    asm volatile("push %0; popf" : : "r"(eflags));
+
+    // create standard files
+    if(is_user) {
+        // fs_t* ramfs = vfs_getfs(RAMFS_DISK);
+
+        fs_node_t* sysproc_dir = vfs_get_proc_dir();
+
+        char buff[10];
+        itoa(proc->id, buff, 10);
+
+
+        fs_node_t* proc_dir;
+        if(vfs_find_and_create_node(buff, sysproc_dir, &proc_dir, true, false)) {
+            process_delete(proc);
+            return NULL;
+        }
+
+        file_description_t* fdt = proc->file_descriptor_table;
+        file_description_t* stdout = fdt + 0;
+        file_description_t* stdin = fdt + 1;
+
+        // should always success
+        file_open(stdout, vfs_get_glbout(), "a");
+        file_open(stdin, vfs_get_glbin(), "a+");
+
+        fdt[0].node->refcount++;
+        fdt[1].node->refcount++;
+
+        proc->file_count = 2;
+    }
 
     return proc;
 }

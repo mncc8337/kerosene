@@ -1,6 +1,6 @@
-#include "debug.h"
-#include "video.h"
-#include "stdio.h"
+#include <debug.h>
+#include <video.h>
+#include <stdio.h>
 
 static void print_log_tag(int lt) {
     putchar('[');

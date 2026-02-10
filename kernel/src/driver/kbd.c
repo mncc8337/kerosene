@@ -1,7 +1,7 @@
-#include "kbd.h"
-#include "system.h"
-#include "ps2.h"
-#include "locale.h"
+#include <kbd.h>
+#include <system.h>
+#include <ps2.h>
+#include <locale.h>
 
 #define KBD_EXTENDED_BYTE 0xe0
 

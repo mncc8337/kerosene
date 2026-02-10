@@ -1,9 +1,9 @@
-#include "misc/elf.h"
+#include <misc/elf.h>
 
-#include "mem.h"
-#include "filesystem.h"
+#include <mem.h>
+#include <filesystem.h>
 
-#include "string.h"
+#include <string.h>
 
 static int errcode;
 

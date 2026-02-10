@@ -1,5 +1,5 @@
-#include "video.h"
-#include "misc/psf.h"
+#include <video.h>
+#include <misc/psf.h>
 
 static bool linear_graphics_mode = false;
 

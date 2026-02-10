@@ -1,7 +1,7 @@
 #pragma once
 
-#include "stdbool.h"
-#include "stdint.h"
+#include <stdbool.h>
+#include <stdint.h>
 
 #define PSF_FONT_MAGIC 0x864ab572
 
