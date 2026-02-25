@@ -104,9 +104,8 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     regs->useresp = proc->stack_addr + DEFAULT_STACK_SIZE;
 
     // prevent interrupts to safely increment proc count
-    unsigned long eflags;
-    asm volatile("pushf; pop %0" : "=r"(eflags));
-    asm volatile("cli");
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
     proc->id = ++process_count;
     asm volatile("push %0; popf" : : "r"(eflags));
 

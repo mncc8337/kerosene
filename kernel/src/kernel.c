@@ -285,7 +285,8 @@ void kinit(multiboot_info_t* mbd) {
     print_debug(LT_OK, "scheduler initialised\n");
 
     // start interrupts again after setting up everything
-    // this will also start the scheduler and cause a process switch to kmain
+    // this will also enable the timer callback (scheduler switch, see kernel/driver/timer.c)
+    // and cause a process switch to kmain
     asm volatile("sti");
 
     // wait for process switch

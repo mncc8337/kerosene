@@ -110,7 +110,9 @@ clean:
 }
 
 MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags) {
-    asm volatile("cli");
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+
     page_directory_t* virt_pd;
     if(page_directory == NULL) virt_pd = (page_directory_t*)VMMNGR_PD;
     else {
@@ -130,7 +132,7 @@ MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtu
         if(!new_phys) {
             if(page_directory)
                 unmap_temporary_pd();
-            asm volatile("sti");
+            asm volatile("push %0; popf" : : "r"(eflags));
             return ERR_MEM_OOM;
         }
         new_table = true;
@@ -183,7 +185,7 @@ MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtu
     if(page_directory)
         unmap_temporary_pd();
 
-    asm volatile("sti");
+    asm volatile("push %0; popf" : : "r"(eflags));
     return ERR_MEM_SUCCESS;
 }
 

@@ -11,26 +11,26 @@ void pit_timer_frequency(int hz) {
 unsigned pit_get_count() {
     unsigned count = 0;
 
-    asm volatile("cli");
+    unsigned long eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
 
     port_outb(PORT_PIT_COM,0);
 
     count = port_inb(PORT_PIT_CH0);
     count |= port_inb(PORT_PIT_CH0) << 8;
 
-    asm volatile("sti");
-
+    asm volatile("push %0; popf" : : "r"(eflags));
     return count;
 }
 
 void pit_set_count(unsigned count) {
-    asm volatile("cli");
+    unsigned long eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
 	
 	port_outb(PORT_PIT_CH0, count & 0xff);
 	port_outb(PORT_PIT_CH0, (count & 0xff00) >> 8);
 
-    asm volatile("sti");
-
+    asm volatile("push %0; popf" : : "r"(eflags));
 	return;
 }
 
