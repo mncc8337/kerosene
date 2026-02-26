@@ -39,7 +39,7 @@ DEFINES := -DKERNEL_START=$(KERNEL_START) \
 		  -DUHEAP_INITIAL_SIZE=$(UHEAP_INITIAL_SIZE) \
 		  -DUHEAP_MAX_SIZE=$(UHEAP_MAX_SIZE) \
 
-CFLAGS = $(DEFINES) -ffreestanding -O2 -Wall -Wextra -g -MMD -MP
+CFLAGS = $(DEFINES) -ffreestanding -O0 -Wall -Wextra -g -MMD -MP
 LDFLAGS = -T linker.ld -nostdlib -lgcc
 ASFLAGS = $(DEFINES) -f elf32 -F dwarf
 

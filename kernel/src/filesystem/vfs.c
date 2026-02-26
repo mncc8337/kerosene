@@ -60,6 +60,10 @@ bool vfs_init() {
     kern_glbin->refcount = 69420;
     KERNEL_FILE_COUNT = 2;
 
+    // should always success
+    file_open(KERNEL_FDT + 0, kern_glbout, "a+");
+    file_open(KERNEL_FDT + 1, kern_glbin, "a+");
+
     return false;
 }
 

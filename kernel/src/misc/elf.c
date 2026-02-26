@@ -45,7 +45,7 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
 
     size_t read_size;
     errcode = file_read(&f, addr, node->size, &read_size);
-    file_close(&f);
+    file_sync(&f);
     if(errcode != ERR_FS_SUCCESS && errcode != ERR_FS_EOF)
         return ERR_ELF_FILE_ERROR;
 

@@ -226,7 +226,7 @@ void vfs_close(int file_descriptor) {
     if(fde->node == NULL)
         return;
 
-    file_close(fde);
+    file_sync(fde);
 
     fde->node->refcount--;
     vfs_cleanup_node_tree(fde->node);
@@ -271,7 +271,7 @@ int vfs_write(int file_descriptor, uint8_t* buffer, size_t size) {
     if(fde->node == NULL)
         return -1;
 
-    if(!(fde->mode & FILE_WRITE))
+    if(!(fde->mode & FILE_WRITE) && !(fde->mode & FILE_APPEND))
         return -1;
 
     size_t write_size;

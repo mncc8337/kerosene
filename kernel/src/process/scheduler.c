@@ -11,12 +11,6 @@ static process_queue_t delete_queue = PROCESS_QUEUE_INIT;
 
 static process_t* current_process = NULL;
 
-// FIXME
-// currently the only way to get all processes is though process queues
-// now i have semaphore implemented and each semaphore have its own process queue
-// now to get blocked processes i need to read semaphores' queue
-// since semaphores are unmanaged so it is imposible to get all of them
-
 static uint64_t global_sleep_ticks = 0;
 
 static bool process_switched = false;
@@ -24,10 +18,6 @@ static bool process_switched = false;
 static void context_switch(regs_t* regs) {
     memcpy(regs, &current_process->regs, sizeof(regs_t));
     vmmngr_switch_page_directory(current_process->page_directory);
-
-    // set err_code to tell that the registers has changed (see syscall.c)
-    regs->err_code = 1;
-    process_switched = false;
 }
 
 static void to_next_process(regs_t* regs, bool add_back) {
@@ -78,6 +68,7 @@ void scheduler_kill_process(regs_t* regs) {
     to_next_process(NULL, false);
     // process switching always happens because there is always a kernel process to switch to
     context_switch(regs);
+    process_switched = false;
 }
 
 void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
@@ -90,6 +81,7 @@ void scheduler_set_sleep(regs_t* regs, unsigned ticks) {
     to_next_process(regs, false);
 
     if(process_switched) context_switch(regs);
+    process_switched = false;
 }
 
 void scheduler_switch(regs_t* regs) {
@@ -112,13 +104,14 @@ void scheduler_switch(regs_t* regs) {
         if(sleep_queue.size == 0) global_sleep_ticks = 0;
     }
 
+    current_process->alive_ticks++;
+
     // switch to other thread if exceeded max runtime
     if(!process_switched && current_process->alive_ticks % PROCESS_ALIVE_TICKS == 0)
         to_next_process(regs, true);
 
-    current_process->alive_ticks++;
-
     if(process_switched) context_switch(regs);
+    process_switched = false;
 }
 
 void scheduler_init(process_t* proc) {
@@ -132,41 +125,4 @@ void scheduler_init(process_t* proc) {
     // because kernel page directory is preloaded
 
     process_switched = true;
-}
-
-// semaphores interract closely to the scheduler so i put them here
-
-semaphore_t* semaphore_create(unsigned max_count) {
-    semaphore_t* ret = (semaphore_t*)kmalloc(sizeof(semaphore_t));
-
-    if(ret) {
-        ret->max_count = max_count;
-        ret->current_count = 0;
-        ret->waiting_queue.top = NULL;
-        ret->waiting_queue.bottom = NULL;
-        ret->waiting_queue.size = 0;
-    }
-
-    return ret;
-}
-
-void semaphore_acquire(semaphore_t* semaphore, regs_t* regs) {
-    if(semaphore->current_count < semaphore->max_count) {
-        semaphore->current_count++;
-    } else {
-        current_process->state = PROCESS_STATE_BLOCK;
-        process_queue_push(&semaphore->waiting_queue, current_process);
-
-        // save registers, dont add process back to ready queue
-        to_next_process(regs, false);
-        if(process_switched) context_switch(regs);
-    }
-}
-
-void semaphore_release(semaphore_t* semaphore) {
-    if(semaphore->waiting_queue.size) {
-        process_t* proc = process_queue_pop(&semaphore->waiting_queue);
-        proc->state = PROCESS_STATE_READY;
-        process_queue_push(&ready_queue, proc);
-    } else semaphore->current_count--;
 }

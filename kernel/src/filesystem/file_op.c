@@ -148,7 +148,7 @@ FS_ERR file_write(
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR file_close(file_description_t* file) {
+FS_ERR file_sync(file_description_t* file) {
     switch(file->node->fs->type) {
         case FS_RAMFS:
             return ramfs_update_entry(file->node);

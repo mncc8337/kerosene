@@ -18,7 +18,7 @@ int putchar(int ic) {
     spinlock_release(&lock);
 #else
     int ret;
-    SYSCALL_1P(SYSCALL_PUTCHAR, ret, (char)ic);
+    SYSCALL_3P(SYSCALL_WRITE, ret, 0, (uint8_t*)&ic, 1);
 #endif
     return ic;
 }

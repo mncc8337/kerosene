@@ -35,8 +35,8 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
         remain_size -= actual_write_size;
     }
 
-    file_close(&src_file);
-    file_close(&dst_file);
+    file_sync(&src_file);
+    file_sync(&dst_file);
     if(final_err) return final_err;
 
     return ERR_FS_SUCCESS;

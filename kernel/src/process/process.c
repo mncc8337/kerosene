@@ -1,8 +1,10 @@
 #include <process.h>
 #include <filesystem.h>
-#include <stdlib.h>
 #include <system.h>
 #include <mem.h>
+
+#include <string.h>
+#include <stdlib.h>
 
 #define DEFAULT_EFLAGS 0x202
 #define DEFAULT_STACK_SIZE 16 * 1024
@@ -15,6 +17,9 @@ extern process_t* kernel_process;
 process_t* process_new(uint32_t eip, int priority, bool is_user) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
+
+    // clear registers
+    memset((void*)&proc->regs, 0, sizeof(regs_t));
 
     process_t* parent_proc = scheduler_get_current_process();
 
@@ -159,7 +164,7 @@ void process_delete(process_t* proc) {
             // TODO:
             // wait for IO op to be done
             // before closing
-            file_close(fde);
+            file_sync(fde);
 
             fde->node->refcount--;
             vfs_cleanup_node_tree(fde->node);

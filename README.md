@@ -141,7 +141,6 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
     + [x] basic process scheduling
     + [x] process terminate
     + [x] spinlock
-    + [ ] semaphore
 - [x] load and run ELF files
 ## Known bugs
 - ATA PIO mode initialization occasionally failed: address mark not found

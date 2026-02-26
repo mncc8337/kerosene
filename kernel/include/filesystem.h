@@ -218,7 +218,7 @@ FS_ERR file_open(file_description_t* file, fs_node_t* node, char* modestr);
 FS_ERR file_seek(file_description_t* file, size_t pos);
 FS_ERR file_write(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_write_size);
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
-FS_ERR file_close(file_description_t* file);
+FS_ERR file_sync(file_description_t* file);
 
 // ramfs.c
 ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear);

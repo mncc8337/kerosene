@@ -22,6 +22,7 @@
 uint32_t kernel_size;
 
 void kmain();
+void idle_process();
 process_t* kernel_process = 0;
 
 void mem_init(void* mmap_addr, uint32_t mmap_length) {
@@ -284,6 +285,16 @@ void kinit(multiboot_info_t* mbd) {
     scheduler_init(kernel_process);
     print_debug(LT_OK, "scheduler initialised\n");
 
+    // there must be a idle process so that sleep()
+    // in other processes could work
+    process_t* idle_proc = process_new((uint32_t)idle_process, 999, false);
+    if(idle_proc) {
+        scheduler_add_process(idle_proc);
+        print_debug(LT_OK, "created idle process\n");
+    }
+    else print_debug(LT_WN, "failed to create idle process. sleep() may not work in some processes\n");
+
+
     // start interrupts again after setting up everything
     // this will also enable the timer callback (scheduler switch, see kernel/driver/timer.c)
     // and cause a process switch to kmain
@@ -317,26 +328,18 @@ void kernel_proc2() {
 }
 
 void kmain() {
-    print_debug(LT_OK, "successfully jumped into main kernel process\n");
+    print_debug(LT_OK, "jumped into main kernel process\n");
+    print_debug(LT_IF, "done initialising\n");
+
+    // do kernel stuff
 
     int ret;
-
-    // there must be a idle process so that sleep()
-    // in other processes could work
-    process_t* idle_proc = process_new((uint32_t)idle_process, 999, false);
-    if(idle_proc) {
-        scheduler_add_process(idle_proc);
-        print_debug(LT_OK, "created idle process\n");
-    }
-    else print_debug(LT_WN, "failed to create idle process. sleep() may not work in some processes\n");
-
-    print_debug(LT_IF, "done initialising\n");
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
     process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
     if(proc1) scheduler_add_process(proc1);
     if(proc2) scheduler_add_process(proc2);
-
+    
     process_t* uproc = process_new(0, 0, true);
     if(uproc) {
         ELF_ERR load_err = elf_load_to_proc("hi.elf", uproc);
@@ -356,7 +359,13 @@ void kmain() {
         printf("failed to start uproc\n");
     }
 
-    puts("main kernel process exited. halting");
+    SYSCALL_1P(SYSCALL_SLEEP, ret, 3000);
+    puts("\nkernel read");
+    uint8_t buff[4096];
+    vfs_read(0, buff, 4096);
+    puts((char*)buff);
+
+    puts("nothing to do in the main process. halting");
 
     key_t key;
     while(true) {

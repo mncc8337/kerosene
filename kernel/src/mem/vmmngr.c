@@ -190,6 +190,9 @@ MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtu
 }
 
 void vmmngr_unmap(page_directory_t* page_directory, virtual_addr_t virt) {
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+
     bool mapped_temp_table = false;
 
     page_directory_t* virt_pd;
@@ -226,6 +229,8 @@ clean:
         unmap_temporary_pt();
     if(page_directory)
         unmap_temporary_pd();
+
+    asm volatile("push %0; popf" : : "r"(eflags));
 }
 
 MEM_ERR vmmngr_alloc_page(pte_t* pte) {
@@ -308,7 +313,7 @@ void vmmngr_switch_page_directory(page_directory_t* dir) {
 }
 
 void vmmngr_flush_tlb_entry(virtual_addr_t addr) {
-	asm volatile("invlpg (%0)" : : "b" ((void*)addr) : "memory");
+    asm volatile("invlpg %0" : : "m" (*(char*)addr) : "memory");
 }
 
 void vmmngr_init() {

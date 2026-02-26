@@ -199,6 +199,7 @@ static FS_ERR read_file(
 
     while(true) {
         unsigned read_size = (size < RAMFS_DATANODE_SIZE) ? size : RAMFS_DATANODE_SIZE;
+        // BUG: here
         memcpy(buffer, (*start_datanode)->data, read_size);
 
         size -= read_size;
@@ -619,7 +620,7 @@ FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* c
         current_datanode = current_datanode->next;
     }
 
-    file_close(&dst_file);
+    file_sync(&dst_file);
 
     return ERR_FS_SUCCESS;
 }
