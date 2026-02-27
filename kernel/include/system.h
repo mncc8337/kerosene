@@ -101,12 +101,12 @@ void gdt_init();
 
 // idt.c
 void idt_init();
-void idt_set_descriptor(uint8_t vector, void (*isr)(regs_t*), uint8_t flags);
+void idt_set_descriptor(uint8_t vector, uint32_t (*isr)(regs_t*), uint8_t flags);
 
 // isr.c
-void irq_install_handler(int irq, void (*handler)(regs_t*));
+void irq_install_handler(int irq, uint32_t (*handler)(regs_t*));
 void irq_uninstall_handler(int irq);
-void isr_new_interrupt(int isr, void (*handler)(regs_t*), uint8_t flags);
+void isr_new_interrupt(int isr, uint32_t (*handler)(regs_t*), uint8_t flags);
 void isr_init();
 
 // spinlock.c

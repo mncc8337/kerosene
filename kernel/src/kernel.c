@@ -276,7 +276,7 @@ void kinit(multiboot_info_t* mbd) {
 
     // add kernel process
     // there must be at least one process in the scheduler
-    kernel_process = process_new((uint32_t)kmain, 0, false);
+    kernel_process = process_new((uint32_t)kmain, false);
     if(!kernel_process) {
         print_debug(LT_CR, "failed to initialise kernel process. not enough memory\n");
         kernel_panic(NULL);
@@ -287,7 +287,7 @@ void kinit(multiboot_info_t* mbd) {
 
     // there must be a idle process so that sleep()
     // in other processes could work
-    process_t* idle_proc = process_new((uint32_t)idle_process, 999, false);
+    process_t* idle_proc = process_new((uint32_t)idle_process, false);
     if(idle_proc) {
         scheduler_add_process(idle_proc);
         print_debug(LT_OK, "created idle process\n");
@@ -335,35 +335,35 @@ void kmain() {
 
     int ret;
 
-    process_t* proc1 = process_new((uint32_t)kernel_proc1, 0, false);
-    process_t* proc2 = process_new((uint32_t)kernel_proc2, 0, false);
+    process_t* proc1 = process_new((uint32_t)kernel_proc1, false);
+    process_t* proc2 = process_new((uint32_t)kernel_proc2, false);
     if(proc1) scheduler_add_process(proc1);
     if(proc2) scheduler_add_process(proc2);
-    
-    process_t* uproc = process_new(0, 0, true);
-    if(uproc) {
-        ELF_ERR load_err = elf_load_to_proc("hi.elf", uproc);
-        if(load_err) {
-            if(load_elf_err == ERR_ELF_FILE_ERROR) {
-                FS_ERR ferr = elf_get_err();
-                printf("file err while loading %s: %d\n", "hi.elf", ferr);
-            } else {
-                printf("elf err while loading %s: %d\n", "hi.elf", load_err);
-            }
-        } else {
-            SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
-            scheduler_add_process(uproc);
-            puts("uproc started");
-        }
-    } else {
-        printf("failed to start uproc\n");
-    }
 
-    SYSCALL_1P(SYSCALL_SLEEP, ret, 3000);
-    puts("\nkernel read");
-    uint8_t buff[4096];
-    vfs_read(0, buff, 4096);
-    puts((char*)buff);
+    // process_t* uproc = process_new(0, true);
+    // if(uproc) {
+    //     ELF_ERR load_err = elf_load_to_proc("hi.elf", uproc);
+    //     if(load_err) {
+    //         if(load_elf_err == ERR_ELF_FILE_ERROR) {
+    //             FS_ERR ferr = elf_get_err();
+    //             printf("file err while loading %s: %d\n", "hi.elf", ferr);
+    //         } else {
+    //             printf("elf err while loading %s: %d\n", "hi.elf", load_err);
+    //         }
+    //     } else {
+    //         SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
+    //         scheduler_add_process(uproc);
+    //         puts("uproc started");
+    //     }
+    // } else {
+    //     printf("failed to start uproc\n");
+    // }
+    //
+    // SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
+    // puts("ok");
+    // uint8_t buff[4096];
+    // vfs_read(0, buff, 4096);
+    // puts((char*)buff);
 
     puts("nothing to do in the main process. halting");
 

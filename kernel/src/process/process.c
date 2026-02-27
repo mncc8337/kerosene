@@ -3,23 +3,16 @@
 #include <system.h>
 #include <mem.h>
 
-#include <string.h>
 #include <stdlib.h>
-
-#define DEFAULT_EFLAGS 0x202
-#define DEFAULT_STACK_SIZE 16 * 1024
 
 static unsigned process_count = 0;
 
 // from kernel.c
 extern process_t* kernel_process;
 
-process_t* process_new(uint32_t eip, int priority, bool is_user) {
+process_t* process_new(uint32_t eip, bool is_user) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
-
-    // clear registers
-    memset((void*)&proc->regs, 0, sizeof(regs_t));
 
     process_t* parent_proc = scheduler_get_current_process();
 
@@ -27,7 +20,6 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
     if(parent_proc != kernel_process && !is_user)
         return NULL;
 
-    proc->priority = priority;
     proc->state = PROCESS_STATE_READY;
     proc->alive_ticks = 0;
     proc->sleep_ticks = 0;
@@ -59,10 +51,7 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
         proc->cwd = parent_proc->cwd;
     }
 
-    regs_t* regs = &proc->regs;
-    regs->eip = eip;
-    regs->eflags = DEFAULT_EFLAGS;
-    regs->ebp = 0;
+    // allocate the new stack
     if(is_user) {
         // switch page directory to create user heap
         vmmngr_switch_page_directory(proc->page_directory);
@@ -76,37 +65,64 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
             return NULL;
         }
 
+        proc->stack_addr = (uint32_t)heap_alloc(heap, DEFAULT_STACK_SIZE, false);
+        if(!proc->stack_addr) {
+            vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+            vmmngr_free_page_directory(proc->page_directory);
+            kfree(proc->file_descriptor_table);
+            kfree(proc);
+            return NULL;
+        }
+    } else {
+        proc->stack_addr = (uint32_t)kmalloc(DEFAULT_STACK_SIZE);
+        if(!proc->stack_addr) {
+            kfree(proc);
+            return NULL;
+        }
+    }
+
+    // push default register states
+    uint32_t stack_top = proc->stack_addr + DEFAULT_STACK_SIZE;
+    regs_t* regs;
+    if(is_user) {
+        regs = (regs_t*)(stack_top - sizeof(regs_t));
         regs->cs = 0x1b; // user code selector
         regs->ds = 0x23; // user data selector
         regs->es = regs->ds;
         regs->fs = regs->ds;
         regs->gs = regs->ds;
         regs->ss = regs->ds;
-        proc->stack_addr = (uint32_t)heap_alloc(heap, DEFAULT_STACK_SIZE, false);
-        vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
-
-        if(!proc->stack_addr) {
-            vmmngr_free_page_directory(proc->page_directory);
-            kfree(proc->file_descriptor_table);
-            kfree(proc);
-            return NULL;
-        }
-
+        regs->useresp = stack_top;
     } else {
+        // upon `iret` from ring 0 (kernel)
+        // it only pops eip, cs and eflags
+        // while in ring 3 (user)
+        // it pops eip, cs, eflags, useresp and ss
+        // so the regs pointer is different
+        // and we dont set useresp and ss here
+        regs = (regs_t*)(stack_top - sizeof(regs_t) + 8);
         regs->cs = 0x08; // kernel code selector
         regs->ds = 0x10; // kernel data selector
         regs->es = regs->ds;
         regs->fs = regs->ds;
         regs->gs = regs->ds;
-        regs->ss = regs->ds;
-        proc->stack_addr = (uint32_t)kmalloc(DEFAULT_STACK_SIZE);
-
-        if(!proc->stack_addr) {
-            kfree(proc);
-            return NULL;
-        }
     }
-    regs->useresp = proc->stack_addr + DEFAULT_STACK_SIZE;
+    regs->eax = 0;
+    regs->ebx = 0;
+    regs->ecx = 0;
+    regs->edx = 0;
+    regs->esi = 0;
+    regs->edi = 0;
+    regs->int_no = 0;
+    regs->err_code = 0;
+    regs->eip = eip;
+    regs->eflags = DEFAULT_EFLAGS;
+    regs->ebp = 0;
+
+    proc->saved_esp = (uint32_t)regs;
+
+    // restore to kernel pd
+    vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
 
     // prevent interrupts to safely increment proc count
     uint32_t eflags;
@@ -148,7 +164,6 @@ process_t* process_new(uint32_t eip, int priority, bool is_user) {
 }
 
 void process_delete(process_t* proc) {
-    // kernel resources are shared so dont touch them
     if(proc != kernel_process) {
         vmmngr_free_page_directory(proc->page_directory);
 
@@ -175,6 +190,10 @@ void process_delete(process_t* proc) {
             i++;
         }
         kfree(proc->file_descriptor_table);
+    } else {
+        // kernel resources are shared so dont touch them
+        // only delete the stack
+        kfree((void*)proc->stack_addr);
     }
 
     kfree(proc);

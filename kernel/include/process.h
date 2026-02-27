@@ -9,6 +9,9 @@
 // how many ticks a process will run before got switch to others
 #define PROCESS_ALIVE_TICKS 4
 
+#define DEFAULT_EFLAGS 0x202
+#define DEFAULT_STACK_SIZE 16 * 1024
+
 enum PROCESS_STATE {
     PROCESS_STATE_READY,
     PROCESS_STATE_ACTIVE,
@@ -18,13 +21,12 @@ enum PROCESS_STATE {
 
 typedef struct process {
     int id;
-    int priority;
     int state;
     uint64_t alive_ticks;
     uint64_t sleep_ticks;
     page_directory_t* page_directory;
     uint32_t stack_addr;
-    regs_t regs;
+    uint32_t saved_esp;
     
     file_description_t* file_descriptor_table;
     unsigned file_count;
@@ -42,7 +44,7 @@ typedef struct {
 #define PROCESS_QUEUE_INIT {NULL, NULL, 0}
 
 // process.c
-process_t* process_new(uint32_t eip, int priority, bool is_user);
+process_t* process_new(uint32_t eip, bool is_user);
 void process_delete(process_t* proc);
 
 // process_queue.c
@@ -56,7 +58,7 @@ process_t* scheduler_get_current_process();
 process_t* scheduler_get_ready_processes();
 process_t* scheduler_get_sleep_processes();
 void scheduler_add_process(process_t* proc);
-void scheduler_kill_process(regs_t* regs);
-void scheduler_set_sleep(regs_t* regs, unsigned ticks);
-void scheduler_switch(regs_t* regs);
+uint32_t scheduler_kill_process(regs_t* regs);
+uint32_t scheduler_set_sleep(regs_t* regs, unsigned ticks);
+uint32_t scheduler_switch(regs_t* regs);
 void scheduler_init(process_t* proc);

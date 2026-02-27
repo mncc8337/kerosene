@@ -11,14 +11,14 @@ int main() {
 
     printf("hi user eeee!\n");
 
-    // puts("buffer manipulation test");
-    // for(int i = 0; i < 512; i++)
-    //     buffer[i] = i;
-    //
-    // puts("buffer print");
-    // for(int i = 0; i < 512; i++)
-    //     printf("%d ", buffer[i]);
-    // putchar('\n');
+    puts("buffer manipulation test");
+    for(int i = 0; i < 512; i++)
+        buffer[i] = i;
+
+    puts("buffer print");
+    for(int i = 0; i < 512; i++)
+        printf("%d ", buffer[i]);
+    putchar('\n');
 
     puts("raw print test");
     SYSCALL_3P(SYSCALL_WRITE, ret, 0, "\

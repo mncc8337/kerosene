@@ -82,19 +82,28 @@ isr_common_stub:
     mov es, ax
     mov fs, ax
     mov gs, ax
-    mov eax, esp
+
+    mov eax, esp ; push esp by copy it to eax
     push eax
+
     mov eax, isr_handler
     cli
     cld
     call eax
-    pop eax
+    ; return value (next context's esp) now stored on eax
+
+    mov esp, eax ; switch context by switching esp
+    ; the idea is that processes store their register states by pushing them to their stack
+    ; and then switch to other process's stack
+    ; when it is time to switch in, it then switch to its stack and restore the state
+    ; by all the popping below
+    ; the final thing to do is faking storing registers for new processes (see process.c)
     pop gs
     pop fs
     pop es
     pop ds
     popa
-    add esp, 8 ; error code and isr number
+    add esp, 8 ; clean up error code and isr number
     iret
 
 global isr_table

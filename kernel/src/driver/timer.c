@@ -8,15 +8,16 @@ static unsigned ticks = 0;
 static time_t start_timestamp;
 static time_t seconds_since_start = 0;
 
-static void tick_handler(regs_t* r) {
+static uint32_t tick_handler(regs_t* r) {
     ticks++;
 
-    if(ticks % TIMER_FREQUENCY == 0) {
+    if(ticks == TIMER_FREQUENCY) {
         seconds_since_start++;
         ticks = 0;
     }
 
-    scheduler_switch(r);
+    // trigger the scheduler for every tick
+    return scheduler_switch(r);
 }
 
 time_t timer_get_start_time() {

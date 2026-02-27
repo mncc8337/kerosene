@@ -4,71 +4,44 @@
 #include <filesystem.h>
 
 #include <time.h>
-#include <string.h>
 
 #define ADD_SYSCALL(id, func) \
 syscalls[id] = func
 
+typedef int (*syscall_t)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+typedef uint32_t (*syscall_ctx_t)(regs_t*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+
 static void* syscalls[MAX_SYSCALL];
 
-static regs_t regs_copy;
-
-static void sys_prockill() {
-    scheduler_kill_process(&regs_copy);
-}
-
-static void sys_sleep(unsigned ticks) {
-    scheduler_set_sleep(&regs_copy, ticks);
-}
-
-static void syscall_dispatcher(regs_t* regs) {
-    if(regs->eax >= MAX_SYSCALL) return;
+static uint32_t syscall_dispatcher(regs_t* regs) {
+    // eax holds the syscall id
+    // while the other hold the args
+    if(regs->eax >= MAX_SYSCALL) return (uint32_t)regs;
 
     void* fn = syscalls[regs->eax];
-    if(!fn) return;
+    if(!fn) return (uint32_t)regs;
 
-    // NOTE:
-    // somehow modifying the registers directly will very likely to cause a page fault
-    // so we make a copy of it
-    // and only copy it back when context is switched
-    memcpy(&regs_copy, regs, sizeof(regs_t));
-
-    bool context_switched = false;
-    context_switched |= regs->eax == SYSCALL_KILL_PROCESS;
-    context_switched |= regs->eax == SYSCALL_SLEEP;
-
-    int ret;
-    asm volatile (
-        "push %1;"
-        "push %2;"
-        "push %3;"
-        "push %4;"
-        "push %5;"
-
-        "call *%6;"
-
-        "pop %%ebx;"
-        "pop %%ebx;"
-        "pop %%ebx;"
-        "pop %%ebx;"
-        "pop %%ebx;"
-
-        : "=a" (ret)
-        : "r" (regs->edi), "r" (regs->esi), "r" (regs->edx), "r" (regs->ecx), "r" (regs->ebx), "r" (fn)
+    bool context_switcher = (
+        regs->eax == SYSCALL_KILL_PROCESS ||
+        regs->eax == SYSCALL_SLEEP
     );
 
-    // if context is switched
-    // then load regs_copy to the original regs pointer
-    // and DO NOT CHANGE eax (returned value) because of context switching
-    if(context_switched) memcpy(regs, &regs_copy, sizeof(regs_t));
-    else regs->eax = ret;
+    if(!context_switcher) {
+        int ret = ((syscall_t)fn)(regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi);
+        regs->eax = ret;
+        return (uint32_t)regs;
+    }
+
+    // handle context switchers diffently
+    // since they take regs ptr as an argument
+    return ((syscall_ctx_t)fn)(regs, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi);
 }
 
 void syscall_init() {
     ADD_SYSCALL(SYSCALL_TIME, time);
 
-    ADD_SYSCALL(SYSCALL_KILL_PROCESS, sys_prockill);
-    ADD_SYSCALL(SYSCALL_SLEEP, sys_sleep);
+    ADD_SYSCALL(SYSCALL_KILL_PROCESS, scheduler_kill_process);
+    ADD_SYSCALL(SYSCALL_SLEEP, scheduler_set_sleep);
 
     ADD_SYSCALL(SYSCALL_OPEN, vfs_open);
     ADD_SYSCALL(SYSCALL_CLOSE, vfs_close);

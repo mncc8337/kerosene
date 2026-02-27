@@ -139,7 +139,8 @@ ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
     // int (*prog)(void) = (void*)entry;
     // int exit_code = prog();
     // printf("program exited with code %d\n", exit_code);
-    proc->regs.eip = entry;
+    regs_t* regs = (regs_t*)proc->stack_addr;
+    regs->eip = entry;
 
     return ERR_ELF_SUCCESS;
 }

@@ -5,7 +5,7 @@ idtr_t idtr;
 
 static bool vectors[IDT_MAX_DESCRIPTORS];
 
-void idt_set_descriptor(uint8_t vector, void (*isr)(regs_t*), uint8_t flags) {
+void idt_set_descriptor(uint8_t vector, uint32_t (*isr)(regs_t*), uint8_t flags) {
     idt_entry_t* descriptor = &idt[vector];
 
     descriptor->isr_low    = (uint32_t)isr & 0xffff;

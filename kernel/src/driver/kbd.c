@@ -254,11 +254,11 @@ static void set_scancode_set() {
 }
 
 // predefined it here to be used in trash interrupt handler
-static void kbd_handler(regs_t* r);
+static uint32_t kbd_handler(regs_t* r);
 
 static uint8_t interrupt_progress_cnt = 0;
 static uint8_t interrupt_loop_cnt = 0;
-static void kbd_trash_int_handler(regs_t* r) {
+static uint32_t kbd_trash_int_handler(regs_t* r) {
     (void)(r); // avoid unused arg
 
     ps2_read_data();
@@ -269,11 +269,13 @@ static void kbd_trash_int_handler(regs_t* r) {
         // reinstall the default handler
         irq_install_handler(1, kbd_handler);
     }
+
+    return (uint32_t)r;
 }
 
 static volatile bool lastest_key_handled = true;
 static bool extended_byte = false;
-static void kbd_handler(regs_t* r) {
+static uint32_t kbd_handler(regs_t* r) {
     (void)(r); // avoid unused arg
 
     // data must be ready at this point
@@ -284,7 +286,7 @@ static void kbd_handler(regs_t* r) {
         // turn on the flag 
         extended_byte = true;
         // skip
-        return;
+        return (uint32_t)r;
     } else if(scancode == KBD_PAUSE_SCANCODE_1ST) {
         interrupt_loop_cnt = 5;
         irq_install_handler(1, kbd_trash_int_handler);
@@ -293,7 +295,7 @@ static void kbd_handler(regs_t* r) {
         current_key.mapped = 0;
         current_key.released = false;
         extended_byte = false;
-        return;
+        return (uint32_t)r;
     }
 
     if(extended_byte &&
@@ -307,7 +309,7 @@ static void kbd_handler(regs_t* r) {
         current_key.mapped = 0;
         current_key.released = (scancode == KBD_PRINTSCREEN_RELEASED_SCANCODE_2ND);
         extended_byte = false;
-        return;
+        return (uint32_t)r;
     }
 
     bool released = (scancode & 0x80) == 0x80;
@@ -358,6 +360,8 @@ static void kbd_handler(regs_t* r) {
     
     // reset extended_byte status
     extended_byte = false;
+
+    return (uint32_t)r;
 }
 
 // set keyboard LED indicators

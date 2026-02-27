@@ -43,7 +43,7 @@ static char* exception_message[] = {
     "Reserved"
 };
 
-static void page_fault_handler(regs_t* r) {
+static uint32_t page_fault_handler(regs_t* r) {
     // the faulting address is stored in the CR2 register
     uint32_t faulting_address;
     asm volatile("mov %%cr2, %0" : "=r" (faulting_address));
@@ -79,6 +79,8 @@ static void page_fault_handler(regs_t* r) {
     if(sgx) printf("SGX violation, ");
 
     putchar('\n');
+
+    return (uint32_t)r;
 }
 
 static void* exception_handlers[] = {
@@ -88,7 +90,7 @@ static void* exception_handlers[] = {
 };
 
 // default exception handler
-static void exception_handler(regs_t* r) {
+static uint32_t exception_handler(regs_t* r) {
     video_framebuffer_set_cursor(0);
     video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
     printf("Exception: ");
@@ -102,19 +104,26 @@ static void exception_handler(regs_t* r) {
 
     stackframe_t stk = {(stackframe_t*)r->ebp, r->eip};
     kernel_panic(&stk);
+
+    return (uint32_t)r;
 }
 
 // default ISR. every interrupt will be "handled" by this function
-void isr_handler(regs_t* reg) {
-    void (*handler)(regs_t*) = routines[reg->int_no];
-    if(handler) handler(reg);
+// returned value is the next context's ESP
+uint32_t isr_handler(regs_t* reg) {
+    uint32_t (*handler)(regs_t*) = routines[reg->int_no];
+    if(handler) return handler(reg);
 
     // if it is an IRQ
     if(reg->int_no >= 32 && reg->int_no <= 47)
         pic_send_eoi(reg->int_no - 32);
+
+    // by default we will not switch context
+    // so return the original ESP
+    return (uint32_t)reg;
 }
 
-void irq_install_handler(int irq, void (*handler)(regs_t*)) {
+void irq_install_handler(int irq, uint32_t (*handler)(regs_t*)) {
     if(irq > 15) return;
     routines[irq+32] = handler;
 }
@@ -123,7 +132,7 @@ void irq_uninstall_handler(int irq) {
     routines[irq+32] = 0;
 }
 
-void isr_new_interrupt(int isr, void (*handler)(regs_t*), uint8_t flags) {
+void isr_new_interrupt(int isr, uint32_t (*handler)(regs_t*), uint8_t flags) {
     idt_set_descriptor(isr, isr_table[isr], flags);
     routines[isr] = handler;
 }
