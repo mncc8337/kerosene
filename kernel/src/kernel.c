@@ -320,9 +320,6 @@ void kernel_proc2() {
 void kmain() {
     print_debug(LT_OK, "jumped into main kernel process\n");
 
-    // set the new stack to the tss
-    tss_set_stack(scheduler_get_current_process()->stack_addr + DEFAULT_STACK_SIZE);
-
     print_debug(LT_IF, "done initialising\n");
 
     // do kernel stuff

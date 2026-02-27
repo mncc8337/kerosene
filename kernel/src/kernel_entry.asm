@@ -27,11 +27,11 @@ align 4
     dd 32  ; video depth
 
 section .bss
-; kernel stack
+; early kernel stack
 global kernel_stack_bottom
 global kernel_stack_top
 kernel_stack_bottom:
-resb 16384 ; 16 KiB
+resb 4 * 1024
 kernel_stack_top:
 
 section .data

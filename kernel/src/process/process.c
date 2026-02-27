@@ -47,6 +47,7 @@ process_t* process_new(uint32_t eip, bool is_user) {
     }
 
     // allocate the new stack
+    size_t stack_size;
     if(is_user) {
         // switch page directory to create user heap
         vmmngr_switch_page_directory(proc->page_directory);
@@ -60,7 +61,7 @@ process_t* process_new(uint32_t eip, bool is_user) {
             return NULL;
         }
 
-        proc->stack_addr = (uint32_t)heap_alloc(heap, DEFAULT_STACK_SIZE, false);
+        proc->stack_addr = (uint32_t)heap_alloc(heap, USER_STACK_SIZE, false);
         if(!proc->stack_addr) {
             vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
             vmmngr_free_page_directory(proc->page_directory);
@@ -68,19 +69,35 @@ process_t* process_new(uint32_t eip, bool is_user) {
             kfree(proc);
             return NULL;
         }
+        stack_size = USER_STACK_SIZE;
+
+        proc->tss_esp0 = (uint32_t)kmalloc(KERNEL_STACK_SIZE);
+        if(!proc->tss_esp0) {
+            vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+            vmmngr_free_page_directory(proc->page_directory);
+            kfree(proc->file_descriptor_table);
+            kfree(proc);
+            return NULL;
+        }
+        proc->tss_esp0 += KERNEL_STACK_SIZE;
     } else {
-        proc->stack_addr = (uint32_t)kmalloc(DEFAULT_STACK_SIZE);
+        proc->stack_addr = (uint32_t)kmalloc(KERNEL_STACK_SIZE);
         if(!proc->stack_addr) {
             kfree(proc);
             return NULL;
         }
+        stack_size = KERNEL_STACK_SIZE;
+
+        // unused for kernel process
+        proc->tss_esp0 = 0;
     }
 
-    // push default register states
-    uint32_t stack_top = proc->stack_addr + DEFAULT_STACK_SIZE;
+    uint32_t stack_top = proc->stack_addr + stack_size;
+
+    // `push` default register states
     regs_t* regs;
     if(is_user) {
-        regs = (regs_t*)(stack_top - sizeof(regs_t));
+        regs = (regs_t*)(proc->tss_esp0 - sizeof(regs_t));
         regs->cs = 0x1b; // user code selector
         regs->ds = 0x23; // user data selector
         regs->es = regs->ds;
@@ -137,6 +154,7 @@ process_t* process_new(uint32_t eip, bool is_user) {
 
         fs_node_t* proc_dir;
         if(vfs_find_and_create_node(buff, sysproc_dir, &proc_dir, true, false)) {
+            kfree((void*)proc->tss_esp0 - KERNEL_STACK_SIZE);
             process_delete(proc);
             return NULL;
         }
@@ -189,6 +207,8 @@ process_t* process_make_idle() {
 void process_delete(process_t* proc) {
     if(proc != kernel_process) {
         vmmngr_free_page_directory(proc->page_directory);
+
+        kfree((void*)proc->tss_esp0 - KERNEL_STACK_SIZE);
 
         // close opened file
         unsigned i = 0;

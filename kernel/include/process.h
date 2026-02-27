@@ -9,8 +9,10 @@
 // how many ticks a process will run before got switch to others
 #define PROCESS_ALIVE_TICKS 4
 
+// TODO: move these to .env
 #define DEFAULT_EFLAGS 0x202
-#define DEFAULT_STACK_SIZE 16 * 1024
+#define KERNEL_STACK_SIZE (8 * 1024)
+#define USER_STACK_SIZE (64 * 1024)
 
 enum PROCESS_STATE {
     PROCESS_STATE_READY,
@@ -25,8 +27,10 @@ typedef struct process {
     uint64_t alive_ticks;
     uint64_t sleep_ticks;
     page_directory_t* page_directory;
-    uint32_t stack_addr;
-    uint32_t saved_esp;
+
+    uint32_t stack_addr; // stack addr used to freeing
+    uint32_t saved_esp; // saved stack state of current process
+    uint32_t tss_esp0; // the stack to use when handling interrupts (usr proc only)
     
     file_description_t* file_descriptor_table;
     unsigned file_count;

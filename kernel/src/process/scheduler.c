@@ -26,7 +26,7 @@ static bool to_next_process(regs_t* regs, bool add_back) {
     current_process->state = PROCESS_STATE_ACTIVE;
 
     vmmngr_switch_page_directory(current_process->page_directory);
-    // tss_set_stack(current_process->stack_addr + DEFAULT_STACK_SIZE);
+    tss_set_stack(current_process->tss_esp0);
 
     return true;
 }
