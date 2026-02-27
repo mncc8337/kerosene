@@ -244,10 +244,6 @@ void kinit(multiboot_info_t* mbd) {
     isr_init();
     print_debug(LT_OK, "ISR initialised\n");
 
-    uint32_t esp = 0; asm volatile("mov %%esp, %%eax" : "=a" (esp));
-    tss_set_stack(esp);
-    print_debug(LT_OK, "TSS installed\n");
-
     syscall_init();
     print_debug(LT_OK, "syscall initialised\n");
 
@@ -323,37 +319,41 @@ void kernel_proc2() {
 
 void kmain() {
     print_debug(LT_OK, "jumped into main kernel process\n");
+
+    // set the new stack to the tss
+    tss_set_stack(scheduler_get_current_process()->stack_addr + DEFAULT_STACK_SIZE);
+
     print_debug(LT_IF, "done initialising\n");
 
     // do kernel stuff
 
-    // int ret;
+    int ret;
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, false);
     process_t* proc2 = process_new((uint32_t)kernel_proc2, false);
     if(proc1) scheduler_add_process(proc1);
     if(proc2) scheduler_add_process(proc2);
 
-    // process_t* uproc = process_new(0, true);
-    // if(uproc) {
-    //     ELF_ERR load_err = elf_load_to_proc("hi.elf", uproc);
-    //     if(load_err) {
-    //         FS_ERR ferr = elf_get_err();
-    //         printf("file err while loading %s: %d\n", "hi.elf", ferr);
-    //     } else {
-    //         SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
-    //         scheduler_add_process(uproc);
-    //         puts("uproc started");
-    //     }
-    // } else {
-    //     printf("failed to start uproc\n");
-    // }
-    //
-    // SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
-    // puts("ok");
-    // uint8_t buff[4096];
-    // vfs_read(0, buff, 4096);
-    // puts((char*)buff);
+    process_t* uproc = process_new(0, true);
+    if(uproc) {
+        ELF_ERR load_err = elf_load_to_proc("hi.elf", uproc);
+        if(load_err) {
+            FS_ERR ferr = elf_get_err();
+            printf("file err while loading %s: %d\n", "hi.elf", ferr);
+        } else {
+            SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
+            scheduler_add_process(uproc);
+            puts("uproc started");
+        }
+    } else {
+        printf("failed to start uproc\n");
+    }
+
+    SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
+    puts("ok");
+    uint8_t buff[4096];
+    vfs_read(0, buff, 4096);
+    puts((char*)buff);
 
     puts("nothing to do in the main process. halting");
 
