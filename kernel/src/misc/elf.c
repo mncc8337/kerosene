@@ -139,8 +139,11 @@ ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
     // int (*prog)(void) = (void*)entry;
     // int exit_code = prog();
     // printf("program exited with code %d\n", exit_code);
-    regs_t* regs = (regs_t*)proc->stack_addr;
+    
+    vmmngr_switch_page_directory(proc->page_directory);
+    regs_t* regs = (regs_t*)proc->saved_esp;
     regs->eip = entry;
+    vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
 
     return ERR_ELF_SUCCESS;
 }

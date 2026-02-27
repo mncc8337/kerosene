@@ -11,12 +11,11 @@ static process_t* current_process = NULL;
 
 static uint64_t global_sleep_ticks = 0;
 
-static bool process_switched = false;
+static bool to_next_process(regs_t* regs, bool add_back) {
+    if(!ready_queue.size) return false;
 
-static void to_next_process(regs_t* regs, bool add_back) {
+    // save regs before switching
     current_process->saved_esp = (uint32_t)regs;
-
-    if(!ready_queue.size) return;
 
     if(add_back) {
         current_process->state = PROCESS_STATE_READY;
@@ -26,7 +25,10 @@ static void to_next_process(regs_t* regs, bool add_back) {
     current_process = process_queue_pop(&ready_queue);
     current_process->state = PROCESS_STATE_ACTIVE;
 
-    process_switched = true;
+    vmmngr_switch_page_directory(current_process->page_directory);
+    // tss_set_stack(current_process->stack_addr + DEFAULT_STACK_SIZE);
+
+    return true;
 }
 
 process_t* scheduler_get_current_process() {
@@ -48,7 +50,7 @@ void scheduler_add_process(process_t* proc) {
 
 // put current process to delete queue, delete it later
 uint32_t scheduler_kill_process(regs_t* regs) {
-    if(current_process->id == 1) return (uint32_t)regs; // avoid deleting kernel process
+    if(current_process->id == 1) return (uint32_t)regs; // avoid deleting idle process
 
     // because we are using the stack of the process
     // and process_delete() will free the stack
@@ -56,12 +58,8 @@ uint32_t scheduler_kill_process(regs_t* regs) {
     // and do it later when we are using other process's stack
     process_queue_push(&delete_queue, current_process);
 
-    // dont save registers, dont add process back to ready queue
+    // dont add process back to ready queue
     to_next_process(regs, false);
-    // process switching always happens because there is always a kernel process to switch to
-    vmmngr_switch_page_directory(current_process->page_directory);
-    tss_set_stack(current_process->stack_addr + DEFAULT_STACK_SIZE);
-    process_switched = false;
 
     return current_process->saved_esp;
 }
@@ -73,16 +71,7 @@ uint32_t scheduler_set_sleep(regs_t* regs, unsigned ticks) {
     current_process->state = PROCESS_STATE_SLEEP;
     process_queue_sorted_push(&sleep_queue, current_process, process_sort_by_sleep_ticks);
 
-    // save registers, dont add process back to ready queue
     to_next_process(regs, false);
-
-    if(process_switched) {
-        vmmngr_switch_page_directory(current_process->page_directory);
-        tss_set_stack(current_process->stack_addr + DEFAULT_STACK_SIZE);
-        process_switched = false;
-    } else {
-        current_process->saved_esp = (uint32_t)regs;
-    }
 
     return current_process->saved_esp;
 }
@@ -108,30 +97,21 @@ uint32_t scheduler_switch(regs_t* regs) {
     }
 
     current_process->alive_ticks++;
+    current_process->saved_esp = (uint32_t)regs;
 
     // switch to other thread if exceeded max runtime
-    if(!process_switched && current_process->alive_ticks % PROCESS_ALIVE_TICKS == 0)
+    if(current_process->alive_ticks % PROCESS_ALIVE_TICKS == 0)
         to_next_process(regs, true);
-
-    if(process_switched) {
-        process_switched = false;
-    } else {
-        current_process->saved_esp = (uint32_t)regs;
-    }
 
     return current_process->saved_esp;
 }
 
-void scheduler_init(process_t* proc) {
+void scheduler_init(process_t* idle_proc) {
     // add the first process
 
-    proc->state = PROCESS_STATE_ACTIVE;
-    current_process = proc;
-    current_process->id = 1;
+    idle_proc->state = PROCESS_STATE_ACTIVE;
+    current_process = idle_proc;
 
     // note that we do not switch page directory
     // because kernel page directory is preloaded
-
-    tss_set_stack(current_process->stack_addr + DEFAULT_STACK_SIZE);
-    process_switched = true;
 }

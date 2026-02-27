@@ -22,7 +22,6 @@
 uint32_t kernel_size;
 
 void kmain();
-void idle_process();
 process_t* kernel_process = 0;
 
 void mem_init(void* mmap_addr, uint32_t mmap_length) {
@@ -274,41 +273,36 @@ void kinit(multiboot_info_t* mbd) {
     timer_init();
     print_debug(LT_OK, "timer initialised\n");
 
-    // add kernel process
-    // there must be at least one process in the scheduler
-    kernel_process = process_new((uint32_t)kmain, false);
-    if(!kernel_process) {
-        print_debug(LT_CR, "failed to initialise kernel process. not enough memory\n");
+    // idle process takes its creater eip to continue
+    // which is this function
+    process_t* idle_proc = process_make_idle();
+    if(!idle_proc) {
+        print_debug(LT_CR, "failed to create idle process. not enough memory\n");
         kernel_panic(NULL);
     }
-    print_debug(LT_IF, "created kernel main process\n");
-    scheduler_init(kernel_process);
+    print_debug(LT_OK, "created idle process\n");
+
+    scheduler_init(idle_proc);
     print_debug(LT_OK, "scheduler initialised\n");
 
-    // there must be a idle process so that sleep()
-    // in other processes could work
-    process_t* idle_proc = process_new((uint32_t)idle_process, false);
-    if(idle_proc) {
-        scheduler_add_process(idle_proc);
-        print_debug(LT_OK, "created idle process\n");
+    kernel_process = process_new((uint32_t)kmain, false);
+    if(kernel_process) {
+        scheduler_add_process(kernel_process);
+        print_debug(LT_OK, "created kernel main process\n");
+    } else {
+        print_debug(LT_CR, "failed to create main process. not enough memory\n");
+        kernel_panic(NULL);
     }
-    else print_debug(LT_WN, "failed to create idle process. sleep() may not work in some processes\n");
 
+    print_debug(LT_IF, "done initialising\n");
 
     // start interrupts again after setting up everything
     // this will also enable the timer callback (scheduler switch, see kernel/driver/timer.c)
-    // and cause a process switch to kmain
     asm volatile("sti");
 
-    // wait for process switch
-    while(true);
-}
-
-void idle_process() {
+    // going idle
     while(true) asm volatile("sti; hlt;");
 }
-
-int load_elf_err;
 
 void kernel_proc1() {
     int ret;
@@ -333,7 +327,7 @@ void kmain() {
 
     // do kernel stuff
 
-    int ret;
+    // int ret;
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, false);
     process_t* proc2 = process_new((uint32_t)kernel_proc2, false);
@@ -344,12 +338,8 @@ void kmain() {
     // if(uproc) {
     //     ELF_ERR load_err = elf_load_to_proc("hi.elf", uproc);
     //     if(load_err) {
-    //         if(load_elf_err == ERR_ELF_FILE_ERROR) {
-    //             FS_ERR ferr = elf_get_err();
-    //             printf("file err while loading %s: %d\n", "hi.elf", ferr);
-    //         } else {
-    //             printf("elf err while loading %s: %d\n", "hi.elf", load_err);
-    //         }
+    //         FS_ERR ferr = elf_get_err();
+    //         printf("file err while loading %s: %d\n", "hi.elf", ferr);
     //     } else {
     //         SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
     //         scheduler_add_process(uproc);

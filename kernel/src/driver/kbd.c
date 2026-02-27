@@ -259,8 +259,6 @@ static uint32_t kbd_handler(regs_t* r);
 static uint8_t interrupt_progress_cnt = 0;
 static uint8_t interrupt_loop_cnt = 0;
 static uint32_t kbd_trash_int_handler(regs_t* r) {
-    (void)(r); // avoid unused arg
-
     ps2_read_data();
     interrupt_progress_cnt++;
     // loop for sometime to discard useless interrupts
@@ -276,8 +274,6 @@ static uint32_t kbd_trash_int_handler(regs_t* r) {
 static volatile bool lastest_key_handled = true;
 static bool extended_byte = false;
 static uint32_t kbd_handler(regs_t* r) {
-    (void)(r); // avoid unused arg
-
     // data must be ready at this point
     // so no need for waiting
     uint8_t scancode = ps2_read_data();

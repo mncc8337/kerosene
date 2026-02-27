@@ -14,12 +14,6 @@ process_t* process_new(uint32_t eip, bool is_user) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
 
-    process_t* parent_proc = scheduler_get_current_process();
-
-    // user can only create user proc
-    if(parent_proc != kernel_process && !is_user)
-        return NULL;
-
     proc->state = PROCESS_STATE_READY;
     proc->alive_ticks = 0;
     proc->sleep_ticks = 0;
@@ -48,6 +42,7 @@ process_t* process_new(uint32_t eip, bool is_user) {
         proc->file_descriptor_table = fdt;
         proc->file_count = 0;
 
+        process_t* parent_proc = scheduler_get_current_process();
         proc->cwd = parent_proc->cwd;
     }
 
@@ -159,6 +154,34 @@ process_t* process_new(uint32_t eip, bool is_user) {
 
         proc->file_count = 2;
     }
+
+    return proc;
+}
+
+process_t* process_make_idle() {
+    process_t* proc = (process_t*)kmalloc(sizeof(process_t));
+    if(!proc) return NULL;
+
+    proc->state = PROCESS_STATE_READY;
+    proc->alive_ticks = 0;
+    proc->sleep_ticks = 0;
+    proc->next = NULL;
+
+    proc->page_directory = vmmngr_get_kernel_page_directory();
+    proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
+    proc->file_count = vfs_get_kernel_file_count();
+    proc->cwd = &vfs_getfs(RAMFS_DISK)->root_node;
+
+    // no need to allocate a new stack
+    // or set up registers
+    // proc->saved_esp = (uint32_t)regs;
+
+    // prevent interrupts to safely increment proc count
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+    proc->id = 1;
+    process_count = 1;
+    asm volatile("push %0; popf" : : "r"(eflags));
 
     return proc;
 }

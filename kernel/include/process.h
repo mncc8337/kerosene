@@ -45,6 +45,7 @@ typedef struct {
 
 // process.c
 process_t* process_new(uint32_t eip, bool is_user);
+process_t* process_make_idle();
 void process_delete(process_t* proc);
 
 // process_queue.c
