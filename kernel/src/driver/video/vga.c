@@ -191,7 +191,7 @@ static void scroll_screen(unsigned ammount) {
     video_vga_set_cursor(start);
 }
 
-void video_vga_print_char(char chr, int offset, int fg, int bg, bool move) {
+void video_vga_printc(char chr, int offset, int fg, int bg, bool move) {
     if(chr == 0) return;
 
     if(offset < 0) offset = video_vga_get_cursor();
@@ -209,6 +209,43 @@ void video_vga_print_char(char chr, int offset, int fg, int bg, bool move) {
         vid_mem[offset * 2] = chr;
         vid_mem[offset * 2 + 1] = attr;
         offset++;
+    }
+
+    if(move) {
+        video_vga_set_cursor(offset);
+        if(offset > text_rows * text_cols - 1) scroll_screen(1);
+    }
+}
+
+void video_vga_prints(char* str, int offset, int fg, int bg, bool move) {
+    if(offset < 0) offset = video_vga_get_cursor();
+
+    uint8_t attr = current_attr;
+    if(fg >= 0) attr = (attr & 0x0f) | fg;
+    if(bg >= 0) attr = (attr & 0xf0) | bg;
+
+    char chr = str[0];
+    while(chr) {
+        if(chr == '\n') {
+            offset += text_cols - (offset % text_cols);
+        } else if(chr == '\b') {
+            offset--;
+            vid_mem[offset * 2] = ' ';
+        } else {
+            vid_mem[offset * 2] = chr;
+            vid_mem[offset * 2 + 1] = attr;
+            offset++;
+        }
+
+        // FIXME:
+        // count the number of lines first, then scroll
+        if(offset > text_rows * text_cols - 1) {
+            scroll_screen(1);
+            offset = video_vga_get_cursor();
+        }
+
+        str++;
+        chr = *str;
     }
 
     if(move) {

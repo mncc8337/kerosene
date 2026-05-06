@@ -22,12 +22,20 @@ void video_preinit_cls(int color) {
     (void)(color);
     preinit_buffer_len = 0;
 }
-void video_preinit_print_char(char chr, int offset, int fg, int bg, bool move) {
+void video_preinit_printc(char chr, int offset, int fg, int bg, bool move) {
     (void)(fg); (void)(bg);
     if(offset < 0) offset = preinit_cursor;
     if((unsigned)offset >= preinit_buffer_len) preinit_buffer_len = offset + 1;
 
     preinit_buffer[offset++] = chr;
+    if(move) preinit_cursor = offset;
+}
+void video_preinit_prints(char* str, int offset, int fg, int bg, bool move) {
+    (void)(fg); (void)(bg);
+    if(offset < 0) offset = preinit_cursor;
+    if((unsigned)offset >= preinit_buffer_len) preinit_buffer_len = offset + 1;
+
+    preinit_buffer[offset++] = str[0];
     if(move) preinit_cursor = offset;
 }
 
@@ -38,36 +46,39 @@ int (*video_rgb)(int r, int g, int b) = video_preinit_rgb;
 int (*video_get_cursor)() = video_preinit_get_cursor;
 void (*video_set_cursor)(int offset) = video_preinit_set_cursor;
 void (*video_cls)(int color) = video_preinit_cls;
-void (*video_print_char)(char chr, int offset, int fg, int bg, bool move) = video_preinit_print_char;
+void (*video_printc)(char chr, int offset, int fg, int bg, bool move) = video_preinit_printc;
+void (*video_prints)(char* str, int offset, int fg, int bg, bool move) = video_preinit_prints;
 
 void video_vga_init(uint8_t cols, uint8_t rows) {
     linear_graphics_mode = false;
 
-    video_set_attr      = video_vga_set_attr;
-    video_get_size      = video_vga_get_size;
-    video_rgb           = video_vga_rgb;
-    video_get_cursor    = video_vga_get_cursor;
-    video_set_cursor    = video_vga_set_cursor;
-    video_cls           = video_vga_cls;
-    video_print_char    = video_vga_print_char;
+    video_set_attr   = video_vga_set_attr;
+    video_get_size   = video_vga_get_size;
+    video_rgb        = video_vga_rgb;
+    video_get_cursor = video_vga_get_cursor;
+    video_set_cursor = video_vga_set_cursor;
+    video_cls        = video_vga_cls;
+    video_printc     = video_vga_printc;
+    video_prints     = video_vga_prints;
 
     video_vga_set_size(cols, rows);
 
     if(preinit_buffer_len > 0) {
         for(unsigned i = 0; i < preinit_buffer_len; i++)
-            video_vga_print_char(preinit_buffer[i], -1, -1, -1, true);
+            video_vga_printc(preinit_buffer[i], -1, -1, -1, true);
     }
 }
 void video_framebuffer_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bpp) {
     linear_graphics_mode = true;
 
-    video_set_attr      = video_framebuffer_set_attr;
-    video_get_size      = video_framebuffer_get_size;
-    video_rgb           = video_framebuffer_rgb;
-    video_get_cursor    = video_framebuffer_get_cursor;
-    video_set_cursor    = video_framebuffer_set_cursor;
-    video_cls           = video_framebuffer_cls;
-    video_print_char    = video_framebuffer_print_char;
+    video_set_attr   = video_framebuffer_set_attr;
+    video_get_size   = video_framebuffer_get_size;
+    video_rgb        = video_framebuffer_rgb;
+    video_get_cursor = video_framebuffer_get_cursor;
+    video_set_cursor = video_framebuffer_set_cursor;
+    video_cls        = video_framebuffer_cls;
+    video_printc     = video_framebuffer_printc;
+    video_prints     = video_framebuffer_prints;
 
     video_framebuffer_set_size(pitch, bpp, width, height);
 
@@ -77,7 +88,7 @@ void video_framebuffer_init(uint32_t width, uint32_t height, uint32_t pitch, uin
 
     if(preinit_buffer_len > 0) {
         for(unsigned i = 0; i < preinit_buffer_len; i++)
-            video_framebuffer_print_char(preinit_buffer[i], -1, -1, -1, true);
+            video_framebuffer_printc(preinit_buffer[i], -1, -1, -1, true);
     }
 }
 

@@ -271,7 +271,7 @@ static uint32_t kbd_trash_int_handler(regs_t* r) {
     return (uint32_t)r;
 }
 
-static volatile bool lastest_key_handled = true;
+static volatile bool latest_key_handled = true;
 static bool extended_byte = false;
 static uint32_t kbd_handler(regs_t* r) {
     // data must be ready at this point
@@ -294,9 +294,13 @@ static uint32_t kbd_handler(regs_t* r) {
         return (uint32_t)r;
     }
 
-    if(extended_byte &&
-            (scancode == KBD_PRINTSCREEN_PRESSED_SCANCODE_2ND
-            || scancode == KBD_PRINTSCREEN_RELEASED_SCANCODE_2ND)) {
+    if(
+        extended_byte
+        && (
+            scancode == KBD_PRINTSCREEN_PRESSED_SCANCODE_2ND
+            || scancode == KBD_PRINTSCREEN_RELEASED_SCANCODE_2ND
+        )
+    ) {
         key_pressed[0x6e] = (scancode == KBD_PRINTSCREEN_PRESSED_SCANCODE_2ND);
         interrupt_loop_cnt = 2;
         irq_install_handler(1, kbd_trash_int_handler);
@@ -352,7 +356,7 @@ static uint32_t kbd_handler(regs_t* r) {
     current_key.keycode = kcode;
     current_key.mapped = mapped;
     current_key.released = released;
-    lastest_key_handled = false;
+    latest_key_handled = false;
     
     // reset extended_byte status
     extended_byte = false;
@@ -392,10 +396,14 @@ void kbd_set_led(bool scroll, bool num, bool caps) {
 
 // wait until key event occur
 void kbd_wait_key(key_t* k) {
-    lastest_key_handled = true; // make sure to get a new key
+    // TODO:
+    // use the blocking process flag to wait instead
+    // since this function is only intended to be called once the scheduler if initialized
+
+    latest_key_handled = true; // make sure to get a new key
     // wait until get a new key (unhandled)
-    while(lastest_key_handled) asm volatile("sti; hlt;");
-    lastest_key_handled = true;
+    while(latest_key_handled) asm volatile("sti; hlt;");
+    latest_key_handled = true;
     if(k) *k = current_key;
 }
 

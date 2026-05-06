@@ -2,11 +2,9 @@
 #include <system.h>
 #include <process.h>
 #include <filesystem.h>
-
 #include <time.h>
 
-#define ADD_SYSCALL(id, func) \
-syscalls[id] = func
+#define ADD_SYSCALL(id, func) syscalls[id] = func
 
 typedef int (*syscall_t)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 typedef uint32_t (*syscall_ctx_t)(regs_t*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
@@ -22,8 +20,8 @@ static uint32_t syscall_dispatcher(regs_t* regs) {
     if(!fn) return (uint32_t)regs;
 
     bool context_switcher = (
-        regs->eax == SYSCALL_KILL_PROCESS ||
-        regs->eax == SYSCALL_SLEEP
+        regs->eax == SYSCALL_KILL_PROCESS
+        || regs->eax == SYSCALL_SLEEP
     );
 
     if(!context_switcher) {

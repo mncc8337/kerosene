@@ -56,7 +56,7 @@ bool vfs_init() {
         return true;
 
     // prevent these from being delete from the tree
-    kern_glbout->refcount = 69429;
+    kern_glbout->refcount = 69420;
     kern_glbin->refcount = 69420;
     KERNEL_FILE_COUNT = 2;
 

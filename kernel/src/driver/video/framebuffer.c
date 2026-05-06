@@ -325,7 +325,7 @@ void video_framebuffer_cls(int bg) {
     cursor_posx = 0;
 }
 
-void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool move) {
+void video_framebuffer_printc(char chr, int offset, int fg, int bg, bool move) {
     if(chr == 0) return;
 
     int _cursor_posx = cursor_posx;
@@ -396,4 +396,17 @@ void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool mov
     }
 
     draw_cursor(load_cursor_buffer);
+}
+
+void video_framebuffer_prints(char* str, int offset, int fg, int bg, bool move) {
+    // TODO: optimize this
+
+    if(!(*str)) return;
+    video_framebuffer_printc(*str, offset, fg, bg, move);
+    str++;
+
+    while(*str) {
+        video_framebuffer_printc(*str, -1, -1, -1, move);
+        str++;
+    }
 }

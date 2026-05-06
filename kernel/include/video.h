@@ -52,7 +52,8 @@ int video_vga_rgb(int r, int g, int b);
 int video_vga_get_cursor();
 void video_vga_set_cursor(int offset);
 void video_vga_cls(int bg);
-void video_vga_print_char(char chr, int offset, int fg, int bg, bool move);
+void video_vga_printc(char chr, int offset, int fg, int bg, bool move);
+void video_vga_prints(char* str, int offset, int fg, int bg, bool move);
 
 // vesa.c
 void video_framebuffer_set_attr(int fg, int bg);
@@ -71,7 +72,8 @@ int video_framebuffer_rgb(int r, int g, int b);
 int video_framebuffer_get_cursor();
 void video_framebuffer_set_cursor(int offset);
 void video_framebuffer_cls(int bg);
-void video_framebuffer_print_char(char chr, int offset, int fg, int bg, bool move);
+void video_framebuffer_printc(char chr, int offset, int fg, int bg, bool move);
+void video_framebuffer_prints(char* str, int offset, int fg, int bg, bool move);
 
 // function pointers that are set to either text mode or linear graphics version of it
 // since they are pointers we need to use the keyword extern
@@ -81,7 +83,8 @@ extern int (*video_rgb)(int r, int g, int b);
 extern int (*video_get_cursor)();
 extern void (*video_set_cursor)(int offset);
 extern void (*video_cls)(int bg);
-extern void (*video_print_char)(char chr, int offset, int fg, int bg, bool move);
+extern void (*video_printc)(char chr, int offset, int fg, int bg, bool move);
+extern void (*video_prints)(char* str, int offset, int fg, int bg, bool move);
 
 // video_init.c
 void video_preinit_set_attr(int fg, int bg);
@@ -90,7 +93,8 @@ int  video_preinit_rgb(int r, int g, int b);
 int  video_preinit_get_cursor();
 void video_preinit_set_cursor(int offset);
 void video_preinit_cls(int color);
-void video_preinit_print_char(char chr, int offset, int fg, int bg, bool move);
+void video_preinit_printc(char chr, int offset, int fg, int bg, bool move);
+void video_preinit_prints(char* str, int offset, int fg, int bg, bool move);
 void video_vga_init(uint8_t cols, uint8_t rows);
 void video_framebuffer_init(uint32_t width, uint32_t height, uint32_t pitch, uint8_t bpp);
 bool video_using_framebuffer();
