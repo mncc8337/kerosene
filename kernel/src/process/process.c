@@ -48,6 +48,12 @@ process_t* process_new(uint32_t eip, bool is_user) {
 
     // allocate the new stack
     size_t stack_size;
+    
+    // disable interrupts before switching page directory
+    // so the scheduler won't switch task and clobber our CR3
+    uint32_t eflags_cr3;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags_cr3));
+
     if(is_user) {
         // switch page directory to create user heap
         vmmngr_switch_page_directory(proc->page_directory);
@@ -55,6 +61,7 @@ process_t* process_new(uint32_t eip, bool is_user) {
         heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
         if(!heap) {
             vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+            asm volatile("push %0; popf" : : "r"(eflags_cr3));
             vmmngr_free_page_directory(proc->page_directory);
             kfree(proc->file_descriptor_table);
             kfree(proc);
@@ -64,6 +71,7 @@ process_t* process_new(uint32_t eip, bool is_user) {
         proc->stack_addr = (uint32_t)heap_alloc(heap, USER_STACK_SIZE, false);
         if(!proc->stack_addr) {
             vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+            asm volatile("push %0; popf" : : "r"(eflags_cr3));
             vmmngr_free_page_directory(proc->page_directory);
             kfree(proc->file_descriptor_table);
             kfree(proc);
@@ -74,6 +82,7 @@ process_t* process_new(uint32_t eip, bool is_user) {
         proc->tss_esp0 = (uint32_t)kmalloc(KERNEL_STACK_SIZE);
         if(!proc->tss_esp0) {
             vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+            asm volatile("push %0; popf" : : "r"(eflags_cr3));
             vmmngr_free_page_directory(proc->page_directory);
             kfree(proc->file_descriptor_table);
             kfree(proc);
@@ -83,6 +92,7 @@ process_t* process_new(uint32_t eip, bool is_user) {
     } else {
         proc->stack_addr = (uint32_t)kmalloc(KERNEL_STACK_SIZE);
         if(!proc->stack_addr) {
+            asm volatile("push %0; popf" : : "r"(eflags_cr3));
             kfree(proc);
             return NULL;
         }
@@ -136,11 +146,11 @@ process_t* process_new(uint32_t eip, bool is_user) {
     // restore to kernel pd
     vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
 
-    // prevent interrupts to safely increment proc count
-    uint32_t eflags;
-    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+    // safely increment proc count while interrupts are still disabled
     proc->id = ++process_count;
-    asm volatile("push %0; popf" : : "r"(eflags));
+
+    // re-enable interrupts
+    asm volatile("push %0; popf" : : "r"(eflags_cr3));
 
     // create standard files
     if(is_user) {
@@ -154,7 +164,6 @@ process_t* process_new(uint32_t eip, bool is_user) {
 
         fs_node_t* proc_dir;
         if(vfs_find_and_create_node(buff, sysproc_dir, &proc_dir, true, false)) {
-            kfree((void*)proc->tss_esp0 - KERNEL_STACK_SIZE);
             process_delete(proc);
             return NULL;
         }

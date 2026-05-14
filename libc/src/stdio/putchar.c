@@ -12,7 +12,7 @@ int putchar(int ic) {
     video_printc((char)ic, -1, -1, -1, true);
 #else
     int ret;
-    SYSCALL_3P(SYSCALL_WRITE, ret, 0, (uint8_t*)&ic, 1);
+    SYSCALL_3P(SYSCALL_WRITE, ret, 1, (uint8_t*)&ic, 1);
 #endif
     return ic;
 }
