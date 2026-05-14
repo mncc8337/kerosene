@@ -7,6 +7,7 @@ A WIP hobby x86 monolithic OS.
 - ATA PIO mode
 - FAT32 filesystem
 - ramfs filesystem
+- virtual filesystem
 ## Build and run
 ### Prerequisite
 - A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors.
@@ -22,36 +23,36 @@ A WIP hobby x86 monolithic OS.
 > - some scripts in `script/` will need sudo privilege to setup loopback device for the hard disk image.
 
 make sure to source enviroment vars before doing anything. makefile and shell scripts depend heavily on them.
-```
+```sh
 cp example.env .env
 export $(grep -v '^#' .env | xargs)
 ```
 #### build
-```
+```sh
 chmod +x script/*.sh
 make all
 ```
 #### run
-```
+```sh
 make run
 ```
 #### make iso
-```
+```sh
 ./script/geniso.sh
 ```
 #### edit the fs files
 - first mount the disk device
-```
+```sh
 ./script/mount-device.sh
 cd mnt/
 ```
 - then do some stuffs in `mnt/`
 - finally unmount. you also want to run this if you ever encounter errors like disk image is in use or whatever
-```
+```sh
 ./script/umount-device.sh
 ```
 - if you want to copy some files/dirs and dont want to run mount-device and then umount-device
-```
+```sh
 ./script/cpyfile.sh file/or/directory/in/somewhere ./mnt/some/DIRECTORY/in/the/disk
 ```
 Files and directories in `fsfiles/` will be automatically copied into the disk image after running `make all`.
@@ -78,11 +79,9 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - memory manager
     + physical memory manager
         + [x] bitmap allocator
-        + [ ] better allocator
     + [x] virtual memory manager
     + heap
         + [x] first-fit allocator
-        + [ ] better allocator
 - ATA
     + [x] PIO mode
     + [ ] SATA
@@ -121,7 +120,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [x] TSS setup
 - [x] enter usermode
 - syscall
-    + [x] putchar()
+    + [x] putchar() and variants
     + [x] current time
     + [x] terminate process
     + [x] sleep()
@@ -135,15 +134,13 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
         + [ ] mkdir
         + [ ] remove dir
         + [ ] dir iteration
-- process manager
+- scheduler
     + [x] load process
     + [x] load and save process state
-    + [x] basic process scheduling
+    + [x] basic process scheduling (round robin)
     + [x] process terminate
     + [x] spinlock
 - [x] load and run ELF files
-## Known bugs
-- ATA PIO mode initialization occasionally failed: address mark not found
 ## Learning resources
 > [!Tip]
 > Anything related to osdev can be found on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
