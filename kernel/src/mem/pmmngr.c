@@ -18,7 +18,8 @@ static bool test_bit(uint32_t bit) {
 }
 
 static int find_first_free_block() {
-    for(unsigned i = 0; i < total_block/32; i++) {
+    size_t num_chunks = (total_block + 31) / 32;
+    for(unsigned i = 0; i < num_chunks; i++) {
         if(bitmap[i] == 0xffffffff) continue;
         for(int j = 0; j < 32; j++) {
             unsigned bit_index = i * 32 + j;
@@ -148,8 +149,7 @@ void* pmmngr_alloc_multi_block(size_t cnt) {
 
     return (void*)addr;
 }
-void pmmngr_free_block(void* base) {
-    physical_addr_t addr = (physical_addr_t)base;
+void pmmngr_free_block(physical_addr_t addr) {
     int frame = addr / MMNGR_PAGE_SIZE;
 
     if(frame == 0) return;
@@ -159,13 +159,13 @@ void pmmngr_free_block(void* base) {
         used_block--;
     }
 }
-void pmmngr_free_multi_block(void* base, size_t cnt) {
-    physical_addr_t addr = (physical_addr_t)base;
+void pmmngr_free_multi_block(physical_addr_t addr, size_t cnt) {
     int frame = addr / MMNGR_PAGE_SIZE;
 
     if(frame == 0) return;
 
     for(uint32_t i = 0; i < cnt; i++) {
+        if(frame + i >= total_block) break;
         if(test_bit(frame + i)) {
             unset_bit(frame + i);
             used_block--;
