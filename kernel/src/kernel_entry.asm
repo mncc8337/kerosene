@@ -87,7 +87,7 @@ kernel_entry:
     mov edi, page_table_kernel1 - KERNEL_START
     mov eax, 0x0
     or eax, 0b011
-    ; NOTE: .text and .rodata are actually should only be readable
+    ; FIXME: .text and .rodata are actually should only be readable
     ; but idk how to do it separately so just set them to read/write for now
     mov ecx, 1023 ; reserve the final entry of page_table_kernel1
 .loop_kernel1:

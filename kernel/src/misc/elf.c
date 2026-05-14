@@ -94,6 +94,8 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
     // now all the vaddrs in PHs are usable
     // switch to the modified pd to set stuff
 
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
     vmmngr_switch_page_directory(pd);
 
     for(unsigned i = 0; i < elf_header->ph_entry_count; i++) {
@@ -108,6 +110,7 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
     }
 
     vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+    asm volatile("push %0; popf" : : "r"(eflags));
 
     *entry = elf_header->program_entry;
     return ERR_ELF_SUCCESS;
@@ -140,10 +143,13 @@ ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
     // int exit_code = prog();
     // printf("program exited with code %d\n", exit_code);
     
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
     vmmngr_switch_page_directory(proc->page_directory);
     regs_t* regs = (regs_t*)proc->saved_esp;
     regs->eip = entry;
     vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+    asm volatile("push %0; popf" : : "r"(eflags));
 
     return ERR_ELF_SUCCESS;
 }

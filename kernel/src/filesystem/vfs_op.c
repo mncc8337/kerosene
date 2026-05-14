@@ -53,8 +53,7 @@ FS_ERR vfs_find_and_create_node(
 
     char* old = path;
     char* current_name = strtok(path, "/", &old);
-    // FIXME
-    // path should be copied, not override
+    // FIXME: path should be copied, not override
     bool create_file_flag = false;
     while(current_name) {
         if(!strcmp(current_name, "."))
@@ -188,7 +187,7 @@ int vfs_open(char* path, char* modestr) {
     if(proc->file_count >= MAX_FILE)
         return -1;
 
-    // NOTE: make sure that proc->cwd has been in the node tree already
+    // FIXME: make sure that proc->cwd has been in the node tree already
     fs_node_t* node;
     bool do_touch_file = (modestr[0] == 'w') || (modestr[0] == 'a');
     FS_ERR find_err = vfs_find_and_create_node(path, proc->cwd, &node, do_touch_file, true);
