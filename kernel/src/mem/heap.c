@@ -74,6 +74,8 @@ void heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header) 
     last_header->size -= page_count * MMNGR_PAGE_SIZE;
     while(page_count > 0) {
         heap->end -= MMNGR_PAGE_SIZE;
+        physical_addr_t phys = vmmngr_to_physical_addr(NULL, heap->end);
+        pmmngr_free_block(phys);
         vmmngr_unmap(NULL, heap->end);
         page_count--;
     }
