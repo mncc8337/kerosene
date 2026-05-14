@@ -85,8 +85,8 @@ void pmmngr_init_region(physical_addr_t base, size_t size);
 void pmmngr_deinit_region(physical_addr_t base, size_t size);
 void* pmmngr_alloc_block();
 void* pmmngr_alloc_multi_block(size_t cnt);
-void pmmngr_free_block(void* base);
-void pmmngr_free_multi_block(void* base, size_t cnt);
+void pmmngr_free_block(physical_addr_t addr);
+void pmmngr_free_multi_block(physical_addr_t addr, size_t cnt);
 void pmmngr_init(size_t size);
 
 // vmmngr.c
