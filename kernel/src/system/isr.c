@@ -110,17 +110,19 @@ static uint32_t exception_handler(regs_t* r) {
 
 // default ISR. every interrupt will be "handled" by this function
 // returned value is the next context's ESP
-uint32_t isr_handler(regs_t* reg) {
-    uint32_t (*handler)(regs_t*) = routines[reg->int_no];
-    if(handler) return handler(reg);
+uint32_t isr_handler(regs_t* regs) {
+    uint32_t ret = (uint32_t)regs;
+
+    uint32_t (*handler)(regs_t*) = routines[regs->int_no];
+    if(handler) ret = handler(regs);
 
     // if it is an IRQ
-    if(reg->int_no >= 32 && reg->int_no <= 47)
-        pic_send_eoi(reg->int_no - 32);
+    if(regs->int_no >= 32 && regs->int_no <= 47)
+        pic_send_eoi(regs->int_no - 32);
 
     // by default we will not switch context
-    // so return the original ESP
-    return (uint32_t)reg;
+    // so return the original ESP, which is the address of regs
+    return ret;
 }
 
 void irq_install_handler(int irq, uint32_t (*handler)(regs_t*)) {
