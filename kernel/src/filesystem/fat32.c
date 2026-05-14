@@ -3,6 +3,10 @@
 
 #include <string.h>
 
+// FIXME:
+// in almost all functions below, there is a stack allocated on the stack
+// since the process stack is very small, they should be dynamically allocated
+
 static void parse_lfn(fat_lfn_entry_t* lfn, char* buff, int offset, int* cnt) {
     *cnt = 0;
 
@@ -67,13 +71,41 @@ static void process_sfn_entry(
         name_pos++;
     }
     if((*temp_dir)->name[8] != ' ') {
-        *entry_name[name_pos++] = '.';
+        (*entry_name)[name_pos++] = '.';
         for(int i = 8; i < 11 && (*temp_dir)->name[i] != ' '; i++) {
-            *entry_name[name_pos++] = (*temp_dir)->name[i];
+            (*entry_name)[name_pos++] = (*temp_dir)->name[i];
         }
     }
     (*entry_name)[name_pos++] = '\0';
     *namelen = name_pos;
+}
+
+static bool is_valid_sfn(char* name) {
+    int len = strlen(name);
+    if(len == 0 || len > 12) return false;
+    
+    int dot_pos = -1;
+    for(int i = 0; i < len; i++) {
+        char c = name[i];
+        // lowercase, spaces, and special chars force an LFN
+        if(c >= 'a' && c <= 'z') return false; 
+        if(c == ' ' || c == '+' || c == ',' || c == ';' ||c == '=' || c == '[' || c == ']')
+            return false;
+           
+        if(c == '.') {
+            if(dot_pos != -1) return false; // multiple dots force an LFN
+            dot_pos = i;
+        }
+    }
+    
+    if(dot_pos == -1) {
+        if(len > 8) return false; // base name too long
+    } else {
+        if(dot_pos > 8) return false; // base name before dot too long
+        if(len - dot_pos - 1 > 3) return false; // extension too long
+        if(dot_pos == 0) return false; // starts with a dot aka dotfiles
+    }
+    return true;
 }
 
 static void set_FAT_entry(
@@ -749,6 +781,7 @@ FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
 
             // LFN name is already ready
             memcpy(ret_node->name, entry_name, namelen);
+            ret_node->name[namelen] = '\0';
 
             ret_node->fs = diriter->node->fs;
             ret_node->parent = diriter->node;
@@ -894,8 +927,10 @@ FS_ERR fat32_add_entry(
     namelen = strlen(name);
 
     // calculate the number of LFN entries will be generated
-    int lfn_entry_count = (namelen + 13) / 13; // include the null char
-    if(dotdot_entry) lfn_entry_count = 0; // no need to create LFN entry for . and ..
+    int lfn_entry_count = 0;
+    if(!dotdot_entry && !is_valid_sfn(name)) {
+        lfn_entry_count = (namelen + 12) / 13;
+    }
 
     // calculate how many clusters are needed to create
     int estimated_new_cluster_count = (lfn_entry_count - (cluster_size - start_index)/sizeof(fat_lfn_entry_t) + 17) / // TODO: wth is 17
@@ -1080,7 +1115,6 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = get_first_data_sector(bootrec);
     uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
-
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint8_t directory[cluster_size];
 
@@ -1114,7 +1148,15 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
 
     // now we are good to remove the entry
 
-    int lfn_entry_count = (strlen(remove_node->name) + 12) / 13;
+    // NOTE:
+    // this purely depends on the algorithm that generate lfn
+    // for example one could have every file generated with LFN although
+    // the file name fits perfectly on the SFN entry
+    // the implementation below follow windows/linux algo on how many lfn will be generated
+    int lfn_entry_count = 0;
+    if(strcmp(remove_node->name, ".") && strcmp(remove_node->name, "..") && !is_valid_sfn(remove_node->name)) {
+        lfn_entry_count = (strlen(remove_node->name) + 12) / 13;
+    }
 
     int node_index = remove_node->fat32.parent_cluster_index;
     uint32_t current_cluster = remove_node->fat32.parent_cluster;
