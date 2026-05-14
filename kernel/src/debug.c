@@ -35,6 +35,6 @@ void print_debug(int log_tag, const char* restrict format, ...) {
 
     va_list arg;
     va_start(arg, format);
-    printf(format, va_arg(arg, int));
+    vprintf(format, arg);
     va_end(arg);
 }
