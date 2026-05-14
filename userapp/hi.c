@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <syscall.h>
 
@@ -21,7 +22,7 @@ int main() {
     putchar('\n');
 
     puts("raw print test");
-    SYSCALL_3P(SYSCALL_WRITE, ret, 1, "\
+    SYSCALL_3P(SYSCALL_WRITE, ret, STDOUT_FILENO, "\
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Ut porttitor magna et mauris iaculis scelerisque. Vivamus vel semper quam. Mauris pharetra accumsan magna et elementum. Duis egestas, urna non eleifend finibus, tortor lorem pretium lacus, id iaculis massa ante eget sem. Suspendisse porta velit dapibus, pellentesque ex eu, porta mi. Nullam et dignissim nibh. Morbi enim risus, molestie ac ligula nec, lobortis placerat lorem. Vivamus sit amet libero porttitor, mattis mi in, volutpat lacus. Nullam venenatis, quam ut imperdiet iaculis, sapien purus consectetur dolor, a euismod libero felis quis lacus.\n\n\
 Proin luctus sodales mauris dictum tempor. Vestibulum quis pharetra lorem, id cursus libero. Vestibulum feugiat ante malesuada felis tincidunt, rutrum condimentum tortor lacinia. Phasellus vitae suscipit turpis, non tristique magna. Curabitur id sem suscipit, egestas est ac, blandit ante. Cras quis dolor ipsum. Nulla eget nisi ut nunc sagittis interdum. In vitae venenatis arcu. Ut sit amet mattis mauris. Curabitur ullamcorper eros eu nibh fermentum, at convallis mauris elementum. Mauris eu pulvinar nisi, eu volutpat lectus. Morbi vehicula tortor non enim dictum, vel lobortis nulla imperdiet. Morbi risus elit, elementum at bibendum vitae, mollis id eros.\n\n\
 Quisque lacinia orci vitae diam tempus finibus. Curabitur tincidunt et diam vel tincidunt. Maecenas sagittis odio et libero eleifend lacinia. Morbi arcu arcu, ornare euismod eros eu, convallis facilisis elit. Morbi pretium quam in ante semper molestie. Morbi semper quam cursus, tincidunt lectus at, sodales ligula. Nam in feugiat velit.\n\n\

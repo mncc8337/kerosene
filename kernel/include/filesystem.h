@@ -189,9 +189,10 @@ partition_entry_t mbr_get_partition_entry(unsigned int id);
 
 // vfs.c
 bool vfs_init();
+fs_node_t* vfs_get_dev();
+fs_node_t* vfs_get_stdout();
+fs_node_t* vfs_get_stdin();
 fs_node_t* vfs_get_proc_dir();
-fs_node_t* vfs_get_glbout();
-fs_node_t* vfs_get_glbin();
 fs_type_t vfs_detectfs(partition_entry_t* part);
 fs_t* vfs_getfs(int id);
 bool vfs_is_fs_available(int id);

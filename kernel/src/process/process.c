@@ -2,6 +2,7 @@
 #include <filesystem.h>
 #include <system.h>
 #include <mem.h>
+#include <sysfiles.h>
 
 #include <stdlib.h>
 
@@ -169,15 +170,13 @@ process_t* process_new(uint32_t eip, bool is_user) {
         }
 
         file_description_t* fdt = proc->file_descriptor_table;
-        file_description_t* stdin = fdt + 0;
-        file_description_t* stdout = fdt + 1;
 
         // should always success
-        file_open(stdin, vfs_get_glbin(), "a+");
-        file_open(stdout, vfs_get_glbout(), "a");
+        file_open(fdt + SYSFILE_FD_STDIN,  vfs_get_stdin(),  "r");
+        file_open(fdt + SYSFILE_FD_STDOUT, vfs_get_stdout(), "a");
 
-        fdt[0].node->refcount++;
-        fdt[1].node->refcount++;
+        fdt[SYSFILE_FD_STDIN].node->refcount++;
+        fdt[SYSFILE_FD_STDOUT].node->refcount++;
 
         proc->file_count = 2;
     }

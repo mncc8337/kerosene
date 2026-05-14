@@ -3,6 +3,7 @@
 #include <syscall.h>
 #include <video.h>
 #include <kbd.h>
+#include <sysfiles.h>
 
 static key_t key;
 
@@ -13,7 +14,7 @@ void kproc_stdin() {
 
         if(!key.released) {
             video_printc(key.mapped, -1, -1, -1, true);
-            vfs_write(0, &key.mapped, 1);
+            vfs_write(SYSFILE_FD_STDIN, &key.mapped, 1);
         }
     }
 }
