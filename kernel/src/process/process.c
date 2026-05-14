@@ -169,12 +169,12 @@ process_t* process_new(uint32_t eip, bool is_user) {
         }
 
         file_description_t* fdt = proc->file_descriptor_table;
-        file_description_t* stdout = fdt + 0;
-        file_description_t* stdin = fdt + 1;
+        file_description_t* stdin = fdt + 0;
+        file_description_t* stdout = fdt + 1;
 
         // should always success
-        file_open(stdout, vfs_get_glbout(), "a");
         file_open(stdin, vfs_get_glbin(), "a+");
+        file_open(stdout, vfs_get_glbout(), "a");
 
         fdt[0].node->refcount++;
         fdt[1].node->refcount++;

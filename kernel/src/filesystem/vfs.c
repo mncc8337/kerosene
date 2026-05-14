@@ -49,10 +49,10 @@ bool vfs_init() {
     if(vfs_find_and_create_node("/proc", &FS[RAMFS_DISK].root_node, &kern_proc, true, false))
         return true;
 
-    if(vfs_find_and_create_node("/glbout", &FS[RAMFS_DISK].root_node, &kern_glbout, true, true))
+    if(vfs_find_and_create_node("/glbin", &FS[RAMFS_DISK].root_node, &kern_glbin, true, true))
         return true;
 
-    if(vfs_find_and_create_node("/glbin", &FS[RAMFS_DISK].root_node, &kern_glbin, true, true))
+    if(vfs_find_and_create_node("/glbout", &FS[RAMFS_DISK].root_node, &kern_glbout, true, true))
         return true;
 
     // prevent these from being delete from the tree
@@ -61,8 +61,8 @@ bool vfs_init() {
     KERNEL_FILE_COUNT = 2;
 
     // should always success
-    file_open(KERNEL_FDT + 0, kern_glbout, "a+");
-    file_open(KERNEL_FDT + 1, kern_glbin, "a+");
+    file_open(KERNEL_FDT + 0, kern_glbin, "a+");
+    file_open(KERNEL_FDT + 1, kern_glbout, "a+");
 
     return false;
 }

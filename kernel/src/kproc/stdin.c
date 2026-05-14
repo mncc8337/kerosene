@@ -13,7 +13,7 @@ void kproc_stdin() {
 
         if(!key.released) {
             video_printc(key.mapped, -1, -1, -1, true);
-            vfs_write(1, &key.mapped, 1);
+            vfs_write(0, &key.mapped, 1);
         }
     }
 }
