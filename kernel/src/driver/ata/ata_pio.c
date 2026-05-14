@@ -9,6 +9,8 @@ static bool cable80;
 static uint32_t total_addressable_sec_LBA28;
 static uint64_t total_addressable_sec_LBA48;
 
+static volatile atomic_flag ata_lock = ATOMIC_FLAG_INIT;
+
 static char* error_msg[] = {
     "AMNF - Address mark not found",
     "TKZNF - Track zero not found",
@@ -58,6 +60,8 @@ static void software_reset() {
     port_outb(PORT_ATA_PIO_DEV_CTRL, 4);
     wait_400ns();
     port_outb(PORT_ATA_PIO_DEV_CTRL, 0);
+    wait_400ns();
+    wait_until_not_busy();
 }
 
 static ATA_PIO_ERR ata_pio_identify() {
@@ -105,6 +109,8 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
     if(!LBA28_mode) return ERR_ATA_PIO_METHOD_NOT_AVAILABLE;
     if(sector_cnt == 0) return ERR_ATA_PIO_INVALID_PARAMS;
 
+    spinlock_acquire(&ata_lock);
+
     const int slavebit = 0; // idk what is this
 
     port_outb(PORT_ATA_PIO_DEV_CTRL, 0x2);
@@ -128,7 +134,10 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
         port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_WRITE_SECTORS);
 
     ATA_PIO_ERR err = wait_ata(1);
-    if(err) return err;
+    if(err) {
+        spinlock_release(&ata_lock);
+        return err;
+    }
 
     uint16_t dat;
     for(unsigned int j = 0; j < sector_cnt; j++) {
@@ -143,12 +152,17 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
             }
         }
         err = wait_until_data_ready();
-        if(err) return err;
+        if(err) {
+            spinlock_release(&ata_lock);
+            return err;
+        }
     }
     if(!read_op)
         port_outb(PORT_ATA_PIO_COMM, ATA_PIO_CMD_CACHE_FLUSH);
 
     wait_ata(0);
+
+    spinlock_release(&ata_lock);
     return ERR_ATA_PIO_SUCCESS;
 }
 
@@ -157,14 +171,13 @@ ATA_PIO_ERR ata_pio_LBA28_access(bool read_op, uint32_t lba, unsigned int sector
 ATA_PIO_ERR ata_pio_init(uint16_t* buff) {
     uint8_t stat = port_inb(PORT_ATA_PIO_STAT);
     // 0xff is a illegal status return
-    // if it is ever returned that means there is no drive
+    // if it ever returned this meaning there is no drive
     if(stat == 0xff) return ERR_ATA_PIO_NO_DEV;
 
     software_reset();
 
     ATA_PIO_ERR dev_err = ata_pio_identify();
-    // the only error returned by this function is ERR_ATA_PIO_NO_DEV
-    if(dev_err) return ERR_ATA_PIO_NO_DEV;
+    if(dev_err) return dev_err;
 
     ATA_PIO_ERR err = wait_ata(1);
     if(err) return err;

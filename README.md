@@ -144,8 +144,6 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 - [x] load and run ELF files
 ## Known bugs
 - ATA PIO mode initialization occasionally failed: address mark not found
-- `video_framebuffer_print_char` sometime cause a pagefault
-- `print_debug` gives gliberrish result if put in many formats
 ## Learning resources
 > [!Tip]
 > Anything related to osdev can be found on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
