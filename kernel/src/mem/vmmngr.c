@@ -65,6 +65,9 @@ page_directory_t* vmmngr_get_kernel_page_directory() {
 physical_addr_t vmmngr_to_physical_addr(page_directory_t* page_directory, virtual_addr_t virt) {
     bool mapped_temp_table = false;
 
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+
     page_directory_t* virt_pd;
     if(page_directory == NULL) virt_pd = (page_directory_t*)VMMNGR_PD;
     else {
@@ -103,6 +106,9 @@ clean:
         unmap_temporary_pt();
     if(page_directory)
         unmap_temporary_pd();
+
+    asm volatile("push %0; popf" : : "r"(eflags));
+
     if(not_present)
         return 0;
 
@@ -244,7 +250,7 @@ MEM_ERR vmmngr_alloc_page(pte_t* pte) {
 }
 
 void vmmngr_free_page(pte_t* pte) {
-    void* p = (void*)(*pte & PAGE_FRAME_BITS);
+    physical_addr_t p = (physical_addr_t)(*pte & PAGE_FRAME_BITS);
     if(p) pmmngr_free_block(p);
 
     page_entry_del_attrib(pte, PTE_PRESENT);
@@ -254,6 +260,9 @@ page_directory_t* vmmngr_alloc_page_directory() {
     page_directory_t* pd = (page_directory_t*)pmmngr_alloc_block();
     if(pd == NULL) return NULL;
 
+    // always disable interrupts before mapping temp pd
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
     map_temporary_pd(pd);
     page_directory_t* virt_pd = (page_directory_t*)VMMNGR_TEMP_PD;
 
@@ -270,12 +279,15 @@ page_directory_t* vmmngr_alloc_page_directory() {
     vmmngr_map(pd, (physical_addr_t)pd, VMMNGR_PD, PTE_PRESENT | PTE_WRITABLE);
 
     unmap_temporary_pd();
+    asm volatile("push %0; popf" : : "r"(eflags));
 
     return pd;
 }
 
 // free all memory lower than KERNEL_START of page_directory and itself
 void vmmngr_free_page_directory(page_directory_t* page_directory) {
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
     map_temporary_pd(page_directory);
     page_directory_t* virt_pd = (page_directory_t*)VMMNGR_TEMP_PD;
 
@@ -285,24 +297,25 @@ void vmmngr_free_page_directory(page_directory_t* page_directory) {
 
         if(virt_pd->entry[i] == 0) continue;
         physical_addr_t phys_table = (virt_pd->entry[i] & PAGE_FRAME_BITS);
-        vmmngr_map(NULL, phys_table, VMMNGR_TEMP_TABLE, PTE_PRESENT | PTE_WRITABLE);
+        map_temporary_pt(phys_table);
         page_table_t* virt_table = (page_table_t*)VMMNGR_TEMP_TABLE;
 
         // free memory to map that page table
         for(int j = 0; j < 1024; j++) {
             physical_addr_t frame = virt_table->entry[j] & PAGE_FRAME_BITS;
             if(frame)
-                pmmngr_free_block((void*)frame);
+                pmmngr_free_block(frame);
         }
 
         // finally free the table
-        pmmngr_free_block((void*)phys_table);
+        pmmngr_free_block(phys_table);
         unmap_temporary_pt();
     }
 
-    pmmngr_free_block(page_directory);
+    pmmngr_free_block((physical_addr_t)page_directory);
 
     unmap_temporary_pd();
+    asm volatile("push %0; popf" : : "r"(eflags));
 }
 
 void vmmngr_switch_page_directory(page_directory_t* dir) {
