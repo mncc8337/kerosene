@@ -221,6 +221,8 @@ static bool capslock_on = false;
 static bool scrolllock_on = false;
 static bool numlock_on = false;
 
+// FIXME:
+// use a queue (or ring buffer) to store key strokes
 static key_t current_key;
 
 static void set_scancode_set() {
@@ -336,6 +338,10 @@ static uint32_t kbd_handler(regs_t* r) {
     //     numlock_on = !numlock_on;
     //     led_changed = true;
     // }
+
+    // FIXME:
+    // kbd_set_led() is slow, so it is unacceptable to be used on
+    // an interrupts handler, use a background process to handle it instead
     if(led_changed)
         kbd_set_led(scrolllock_on, numlock_on, capslock_on);
 
@@ -396,13 +402,15 @@ void kbd_set_led(bool scroll, bool num, bool caps) {
 
 // wait until key event occur
 void kbd_wait_key(key_t* k) {
-    // TODO:
+    latest_key_handled = true; // make sure to get a new key
+
+    // FIXME:
     // use the blocking process flag to wait instead
     // since this function is only intended to be called once the scheduler if initialized
 
-    latest_key_handled = true; // make sure to get a new key
     // wait until get a new key (unhandled)
     while(latest_key_handled) asm volatile("sti; hlt;");
+
     latest_key_handled = true;
     if(k) *k = current_key;
 }

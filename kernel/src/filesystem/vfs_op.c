@@ -43,12 +43,18 @@ FS_ERR vfs_find_and_create_node(
         path++;
     }
 
+    // FIXME:
+    // if this function is deeply nested, then the massive stack below would explode
+    // the process stack
+
     // it should not allocate more than 512 nodes right?
     fs_node_t* allocated[512];
     unsigned allocated_counter = 0;
 
     char* old = path;
     char* current_name = strtok(path, "/", &old);
+    // FIXME
+    // path should be copied, not override
     bool create_file_flag = false;
     while(current_name) {
         if(!strcmp(current_name, "."))
@@ -238,6 +244,9 @@ void vfs_close(int file_descriptor) {
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current_process();
 
+    // FIXME:
+    // check where buffer is belong to (kernel or user)
+
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return -1;
 
@@ -262,6 +271,9 @@ int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
 
 int vfs_write(int file_descriptor, uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current_process();
+
+    // FIXME:
+    // check where buffer is belong to (kernel or user)
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return -1;

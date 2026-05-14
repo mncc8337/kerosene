@@ -349,7 +349,7 @@ void kmain() {
         printf("failed to start uproc\n");
     }
 
-    SYSCALL_1P(SYSCALL_SLEEP, ret, 10000);
+    SYSCALL_1P(SYSCALL_SLEEP, ret, 7000);
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, false);
     if(proc1) scheduler_add_process(proc1);

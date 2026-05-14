@@ -77,6 +77,13 @@ uint32_t scheduler_set_sleep(regs_t* regs, unsigned ticks) {
 }
 
 uint32_t scheduler_switch(regs_t* regs) {
+    
+    // FIXME:
+    // dont delete process on the spot
+    // it is more ideal to have a dedicated process to clean up those zombies
+    // because upon deleting process it need to save opended files
+    // accessing files on an interrupts requests blocks system progress
+
     while(delete_queue.size)
         process_delete(process_queue_pop(&delete_queue));
 
