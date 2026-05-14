@@ -94,7 +94,26 @@ FS_ERR file_seek(file_description_t* file, size_t pos) {
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size) {
     if(!(file->mode & FILE_READ)) return ERR_FS_FAILED;
 
+    // handle pipe differently
+    if(FS_NODE_IS_PIPE(*file->node)) {
+        // pipe mode: node->size = bytes available; empty pipe returns 0, not EOF
+        if(file->node->size == 0) {
+            *actual_read_size = 0;
+            return ERR_FS_SUCCESS;
+        }
+        if(size > file->node->size)
+            size = file->node->size;
+        if(file->node->fs->type == FS_RAMFS) {
+            return ramfs_pipe_read(file, buffer, size, actual_read_size);
+        }
+        return ERR_FS_NOT_SUPPORTED;
+    }
+
     if(file->position == file->node->size) return ERR_FS_EOF;
+
+    if(file->position + size > file->node->size) {
+        size = file->node->size - file->position;
+    }
 
     FS_ERR err;
     switch(file->node->fs->type) {
@@ -139,11 +158,15 @@ FS_ERR file_write(
     }
     if(err) return err;
 
-    if(!(file->mode & FILE_APPEND)) {
+    if(file->mode & FILE_APPEND) {
+        file->node->size += (*actual_write_size);
+        file->position = file->node->size;
+    } else {
         file->position += (*actual_write_size);
+        if(file->position > file->node->size) {
+            file->node->size = file->position;
+        }
     }
-
-    file->node->size += (*actual_write_size);
     file->node->modified_timestamp = time(NULL);
     return ERR_FS_SUCCESS;
 }

@@ -19,15 +19,19 @@
 // this must be multiply of 4 and larger than 4
 #define RAMFS_DATANODE_SIZE 512
 
-#define FS_FLAG_DIRECTORY 1
-#define FS_FLAG_HIDDEN    2
+typedef enum {
+    FS_FLAG_DIRECTORY = (1 << 0),
+    FS_FLAG_HIDDEN    = (1 << 1),
+    FS_FLAG_PIPE      = (1 << 2),
+} fs_node_flag_t;
 
-#define FS_NODE_IS_VALID(node) ((node).flags & FS_FLAG_VALID)
+#define FS_NODE_IS_VALID(node) ((node).flags != 0)
 #define FS_NODE_IS_DIR(node) ((node).flags & FS_FLAG_DIRECTORY)
 #define FS_NODE_IS_HIDDEN(node) ((node).flags & FS_FLAG_HIDDEN)
+#define FS_NODE_IS_PIPE(node) ((node).flags & FS_FLAG_PIPE)
 
-#define FS_NODE_FLAG_SET(node, flag) ((node)->flags |= flag)
-#define FS_NODE_FLAG_UNSET(node, flag) ((node)->flags &= ~flag)
+#define FS_NODE_FLAG_SET(node, flag) ((node)->flags |= (flag))
+#define FS_NODE_FLAG_UNSET(node, flag) ((node)->flags &= ~(flag))
 
 typedef enum {
     ERR_FS_SUCCESS,
@@ -234,6 +238,7 @@ FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, cha
 FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
 
 FS_ERR ramfs_file_reset(fs_node_t* node);
+FS_ERR ramfs_pipe_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
 FS_ERR ramfs_seek(file_description_t* file, size_t pos);
 FS_ERR ramfs_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
 FS_ERR ramfs_write(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_write_size);

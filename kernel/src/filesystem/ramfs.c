@@ -199,7 +199,6 @@ static FS_ERR read_file(
 
     while(true) {
         unsigned read_size = (size < RAMFS_DATANODE_SIZE) ? size : RAMFS_DATANODE_SIZE;
-        // BUG: here
         memcpy(buffer, (*start_datanode)->data, read_size);
 
         size -= read_size;
@@ -631,6 +630,55 @@ FS_ERR ramfs_file_reset(fs_node_t* node) {
     datanode_chain->next = NULL;
 
     node->size = 0;
+    return ERR_FS_SUCCESS;
+}
+
+// pipe-mode read: consumes data from the head of the chain, freeing fully read
+// datanodes as it goes. node->size tracks bytes available (not total file size)
+// the last datanode is never freed — kept alive so the writer always has a tail
+FS_ERR ramfs_pipe_read(
+    file_description_t* file,
+    uint8_t* buffer,
+    size_t size,
+    size_t* actual_read_size
+) {
+    ramfs_node_t* ramnode = (ramfs_node_t*)file->node->ramfs.node_addr;
+    *actual_read_size = 0;
+
+    // file->position = byte offset within the current head datanode
+    unsigned head_offset = file->position;
+
+    while(size > 0) {
+        ramfs_datanode_t* head = ramnode->datanode_chain;
+        if(!head) break;
+
+        unsigned available = RAMFS_DATANODE_SIZE - head_offset;
+        unsigned to_read = (size < available) ? size : available;
+        if(to_read == 0) break;
+
+        memcpy(buffer, head->data + head_offset, to_read);
+        buffer += to_read;
+        size -= to_read;
+        *actual_read_size += to_read;
+        head_offset += to_read;
+
+        if(head_offset == RAMFS_DATANODE_SIZE) {
+            if(head->next) {
+                // fully consumed — free this datanode and advance chain
+                ramnode->datanode_chain = head->next;
+                kfree(head);
+            }
+            // whether freed or last node, reset offset for next iteration
+            head_offset = 0;
+        }
+    }
+
+    file->position = head_offset;
+    file->ramfs.current_datanode = (uint32_t)ramnode->datanode_chain;
+    file->node->size -= *actual_read_size;
+    // sync size back to the backing ramfs node
+    ramnode->size = file->node->size;
+
     return ERR_FS_SUCCESS;
 }
 

@@ -51,9 +51,11 @@ bool vfs_init() {
 
     if(vfs_find_and_create_node("/glbin", &FS[RAMFS_DISK].root_node, &kern_glbin, true, true))
         return true;
+    kern_glbin->flags |= FS_FLAG_PIPE;
 
     if(vfs_find_and_create_node("/glbout", &FS[RAMFS_DISK].root_node, &kern_glbout, true, true))
         return true;
+    kern_glbout->flags |= FS_FLAG_PIPE;
 
     // prevent these from being delete from the tree
     kern_glbout->refcount = 69420;
