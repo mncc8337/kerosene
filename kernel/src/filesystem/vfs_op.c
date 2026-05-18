@@ -8,93 +8,122 @@
 extern fs_t* FS;
 
 FS_ERR vfs_find_and_create_node(
-    char* path,
+    const char* path,
     fs_node_t* cwd,
     fs_node_t** ret_node,
     bool create_node,
     bool is_file
 ) {
+    // disable interrupts because we are heavily
+    // modifying the vfs tree
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+
     fs_node_t* current_node = cwd;
     fs_node_t* parent_node = current_node->parent;
     if(!parent_node) parent_node = current_node;
 
+    size_t pathlen = strlen(path);
+    char* pathcpy_pos = kmalloc(pathlen + 1);
+    if (!pathcpy_pos) return ERR_FS_NOT_ENOUGH_SPACE;
+
+    memcpy(pathcpy_pos, path, pathlen + 1);
+    char* pathcpy = pathcpy_pos;
+
+    FS_ERR ret_err = ERR_FS_SUCCESS;
+
+    const unsigned MAX_ALLOCATION = 512;
+    fs_node_t** search_stack = kmalloc(sizeof(fs_node_t*) * MAX_ALLOCATION);
+    if(!search_stack) {
+        ret_err = ERR_FS_NOT_ENOUGH_SPACE;
+        goto ret;
+    }
+    unsigned search_stack_counter = 0;
+
     // disk specified
-    if(path[0] == '(') {
+    if(pathcpy[0] == '(') {
         char diskid_string[MAX_DISK_ID_STRLEN + 1];
-        for(unsigned i = 0; i <= MAX_DISK_ID_STRLEN; i++) {
-            if(path[i + 1] != ')') {
-                diskid_string[i] = path[i + 1];
-            } else {
+        bool valid_disk_syntax = false;
+
+        for(unsigned i = 0; i < MAX_DISK_ID_STRLEN; i++) {
+            if(pathcpy[i + 1] == ')') {
                 diskid_string[i] = '\0';
+                valid_disk_syntax = true;
                 break;
             }
+            diskid_string[i] = pathcpy[i + 1];
+        }
+
+        if(!valid_disk_syntax) {
+            ret_err = ERR_FS_NOT_SUPPORTED;
+            goto ret;
         }
 
         unsigned diskid = atoi(diskid_string);
         if(FS[diskid].type != FS_EMPTY) {
             current_node = &FS[diskid].root_node;
             parent_node = current_node;
-        } else return ERR_FS_NOT_SUPPORTED;
+        } else {
+            ret_err = ERR_FS_NOT_SUPPORTED;
+            goto ret;
+        }
 
-        path += strlen(diskid_string) + 3;
-    } else if(path[0] == '/') {
+        pathcpy += strlen(diskid_string) + 3;
+    } else if(pathcpy[0] == '/') {
         current_node = &FS[RAMFS_DISK].root_node;
         parent_node = current_node;
-        path++;
+        pathcpy++;
     }
 
-    // FIXME:
-    // if this function is deeply nested, then the massive stack below would explode
-    // the process stack
-
-    // it should not allocate more than 512 nodes right?
-    fs_node_t* allocated[512];
-    unsigned allocated_counter = 0;
-
-    char* token = path;
-    char* current_name = strtok_r(path, "/", &token);
-    // FIXME: path should be copied, not override
+    char* token = pathcpy;
+    char* current_name = strtok_r(pathcpy, "/", &token);
     bool create_file_flag = false;
+    
     while(current_name) {
         if(!strcmp(current_name, "."))
-            goto skip;
+            goto skip_search;
 
-        // root_node does not has .. dir so we need to handle it separately
+        // root_node does not have .. dir so we need to handle it separately
         if(current_node->name[0] == '/' && !strcmp(current_name, ".."))
-            goto skip;
+            goto skip_search;
 
         parent_node = current_node;
         current_node = current_node->children;
+        
         while(current_node && strcmp(current_node->name, current_name))
             current_node = current_node->next_sibling;
 
         if(current_node == NULL) {
             // the node we need to find does not in the node tree yet
             // so we need to find it in the disk
+
+            if(search_stack_counter >= MAX_ALLOCATION) {
+                ret_err = ERR_FS_MAX_DEPTH_REACHED;
+                goto ret;
+            }
+
             fs_node_t* new_node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
             if(!new_node) {
-                for(unsigned i = 0; i < allocated_counter; i++)
-                    kfree(allocated[i]);
-                return ERR_FS_NOT_ENOUGH_SPACE;
+                ret_err = ERR_FS_NOT_ENOUGH_SPACE;
+                goto nuke_search_stack_and_ret;
             }
-            allocated[allocated_counter++] = new_node;
+            search_stack[search_stack_counter++] = new_node;
 
             FS_ERR find_err = fs_find(parent_node, current_name, new_node);
             if(find_err) {
-                for(unsigned i = 0; i < allocated_counter; i++)
-                    kfree(allocated[i]);
-                // we should clarify whether the target is not found or the dir in the middle is not found
                 if(find_err == ERR_FS_NOT_FOUND && strtok_r(NULL, "/", &token) == NULL) {
                     if(create_node) {
                         create_file_flag = true;
                         break;
                     }
-                    return ERR_FS_TARGET_NOT_FOUND;
+                    ret_err = ERR_FS_TARGET_NOT_FOUND;
+                    goto nuke_search_stack_and_ret;
                 }
-                return find_err;
+                ret_err = find_err;
+                goto nuke_search_stack_and_ret;
             }
 
-            // and then add it to the tree
+            // successfully found on disk, add to vfs tree
             if(!parent_node->children) {
                 parent_node->children = new_node;
             } else {
@@ -103,32 +132,30 @@ FS_ERR vfs_find_and_create_node(
                     current_sibling = current_sibling->next_sibling;
                 current_sibling->next_sibling = new_node;
             }
-            new_node->next_sibling = NULL;
-
             current_node = new_node;
         }
 
-        skip:
+        skip_search:
         current_name = strtok_r(NULL, "/", &token);
     }
 
     if(create_file_flag) {
         fs_node_t* new_node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
-        if(!new_node)
-            return ERR_FS_NOT_ENOUGH_SPACE;
+        if(!new_node) {
+            ret_err = ERR_FS_NOT_ENOUGH_SPACE;
+            goto nuke_search_stack_and_ret;
+        }
 
-        if(is_file) {
-            FS_ERR touch_err = fs_touch(parent_node, current_name, new_node);
-            if(touch_err) {
-                kfree(new_node);
-                return touch_err;
-            }
-        } else {
-            FS_ERR mkdir_err = fs_mkdir(parent_node, current_name, new_node);
-            if(mkdir_err) {
-                kfree(new_node);
-                return mkdir_err;
-            }
+        FS_ERR op_err;
+        if(is_file)
+            op_err = fs_touch(parent_node, current_name, new_node);
+        else
+            op_err = fs_mkdir(parent_node, current_name, new_node);
+                                
+        if(op_err) {
+            kfree(new_node);
+            ret_err = op_err;
+            goto nuke_search_stack_and_ret;
         }
 
         // link the new node to the tree
@@ -141,14 +168,40 @@ FS_ERR vfs_find_and_create_node(
             current_sibling->next_sibling = new_node;
         }
         new_node->next_sibling = NULL;
-
         current_node = new_node;
     }
 
-    // we should found the node and added it to the tree at this point
     *ret_node = current_node;
+    goto ret; // dont nuke search stack
 
-    return ERR_FS_SUCCESS;
+nuke_search_stack_and_ret:
+    if(search_stack_counter > 0) {
+        // unlink the first node on the search stack
+        fs_node_t* current_sibling = search_stack[0]->parent->children;
+        if(current_sibling == search_stack[0]) {
+            search_stack[0]->parent->children = current_sibling->next_sibling;
+        } else {
+            while(current_sibling->next_sibling != search_stack[0]) {
+                current_sibling = current_sibling->next_sibling;
+            }
+            current_sibling->next_sibling = search_stack[0]->next_sibling;
+        }
+
+        // now the whole search stack is unlinked from the vfs tree
+        // we can clean it by simply kfree all of them
+        // note that this is only possible if we block other processes
+        // from creating branches from search_stack's nodes
+        // which we have done by disabling interrupts
+
+        for(unsigned i = 0; i < search_stack_counter; i++)
+            kfree(search_stack[i]);
+    }
+
+ret:
+    kfree(search_stack);
+    kfree(pathcpy_pos);
+    asm volatile("push %0; popf" : : "r"(eflags));
+    return ret_err;
 }
 
 void vfs_cleanup_node_tree(fs_node_t* start_node) {
@@ -156,6 +209,7 @@ void vfs_cleanup_node_tree(fs_node_t* start_node) {
         return;
     if(start_node->children)
         return;
+
     // now it is safe to delete this node
     
     // remove node from tree

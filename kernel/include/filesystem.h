@@ -42,6 +42,7 @@ typedef enum {
     ERR_FS_TARGET_NOT_FOUND,
     ERR_FS_DIR_NOT_EMPTY,
     ERR_FS_INVALID_FSINFO,
+    ERR_FS_MAX_DEPTH_REACHED,
     ERR_FS_NOT_ENOUGH_SPACE,
     ERR_FS_NOT_FILE,
     ERR_FS_NOT_DIR,
@@ -200,7 +201,7 @@ file_description_t* vfs_get_kernel_file_descriptor_table();
 unsigned vfs_get_kernel_file_count();
 
 // vfs_op.c
-FS_ERR vfs_find_and_create_node(char* path, fs_node_t* cwd, fs_node_t** ret_node, bool create_node, bool is_file);
+FS_ERR vfs_find_and_create_node(const char* path, fs_node_t* cwd, fs_node_t** ret_node, bool create_node, bool is_file);
 void vfs_cleanup_node_tree(fs_node_t* start_node);
 int vfs_open(char* path, char* modestr);
 void vfs_close(int file_descriptor);
