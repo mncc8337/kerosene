@@ -217,7 +217,7 @@ void video_vga_printc(char chr, int offset, int fg, int bg, bool move) {
     }
 }
 
-void video_vga_prints(char* str, int offset, int fg, int bg, bool move) {
+void video_vga_prints(const char* str, int offset, int fg, int bg, bool move) {
     if(offset < 0) offset = video_vga_get_cursor();
 
     uint8_t attr = current_attr;

@@ -16,6 +16,6 @@ typedef struct {
     uint32_t width;
 } PSF_font_t;
 
-bool psf_load(char* font_data);
+bool psf_load(const char* font_data);
 void psf_get_font_geometry(int* width, int* height, int* bpg);
 char* psf_get_glyph(char chr);

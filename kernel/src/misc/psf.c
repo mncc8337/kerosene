@@ -5,7 +5,7 @@
 
 PSF_font_t* font = (PSF_font_t*)font_h_data;
 
-bool psf_load(char* font_data) {
+bool psf_load(const char* font_data) {
     PSF_font_t* temp = (PSF_font_t*)font_data;
 
     if(temp->magic != PSF_FONT_MAGIC)

@@ -30,7 +30,7 @@ void video_preinit_printc(char chr, int offset, int fg, int bg, bool move) {
     preinit_buffer[offset++] = chr;
     if(move) preinit_cursor = offset;
 }
-void video_preinit_prints(char* str, int offset, int fg, int bg, bool move) {
+void video_preinit_prints(const char* str, int offset, int fg, int bg, bool move) {
     (void)(fg); (void)(bg);
     if(offset < 0) offset = preinit_cursor;
     if((unsigned)offset >= preinit_buffer_len) preinit_buffer_len = offset + 1;
@@ -47,7 +47,7 @@ int (*video_get_cursor)() = video_preinit_get_cursor;
 void (*video_set_cursor)(int offset) = video_preinit_set_cursor;
 void (*video_cls)(int color) = video_preinit_cls;
 void (*video_printc)(char chr, int offset, int fg, int bg, bool move) = video_preinit_printc;
-void (*video_prints)(char* str, int offset, int fg, int bg, bool move) = video_preinit_prints;
+void (*video_prints)(const char* str, int offset, int fg, int bg, bool move) = video_preinit_prints;
 
 void video_vga_init(uint8_t cols, uint8_t rows) {
     linear_graphics_mode = false;
