@@ -436,7 +436,7 @@ void video_framebuffer_printc(char chr, int offset, int fg, int bg, bool move) {
 }
 
 void video_framebuffer_prints(const char* str, int offset, int fg, int bg, bool move) {
-    if(!(*str)) return;
+    if(*str == 0) return;
 
     load_cursor_buffer();
 

@@ -1,6 +1,31 @@
 #include <video.h>
 #include <system.h>
 
+#include <string.h>
+
+typedef struct {
+    uint8_t vga_val, r, g, b;
+} vga_color_t;
+
+static const vga_color_t vga_palette[] = {
+    {0, 0, 0, 0},
+    {1, 0, 0, 170},
+    {2, 0, 170, 0},
+    {3, 0, 170, 170},
+    {4, 170, 0, 0},
+    {5, 170, 0, 170},
+    {6, 170, 85, 0},
+    {7, 170, 170, 170},
+    {8, 85, 85, 85},
+    {9, 85, 85, 255},
+    {10, 85, 255, 85},
+    {11, 85, 255, 255},
+    {12, 255, 85, 85},
+    {13, 255, 85, 255},
+    {14, 255, 255, 85},
+    {15, 255, 255, 255}
+};
+
 static uint8_t* vid_mem = (uint8_t*)VIDEO_START;
 
 static uint8_t current_attr = 0x7;
@@ -44,107 +69,22 @@ static unsigned color_difference(unsigned r1, unsigned g1, unsigned b1, unsigned
 }
 
 int video_vga_rgb(int r, int g, int b) {
-    int ret = 0x7;
-    unsigned color_diff;
-    unsigned _color_diff;
+    int best_color = 7;
+    unsigned min_diff = 0xFFFFFFFF;
 
-    // is there a much more elegant way to do this lol
-
-    _color_diff = color_difference(r, g, b, VIDEO_BLACK);
-    color_diff = _color_diff;
-    ret = VIDEO_VGA_BLACK;
-
-    _color_diff = color_difference(r, g, b, VIDEO_BLUE);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_BLUE;
+    for (int i = 0; i < 16; i++) {
+        unsigned diff = color_difference(
+            r, g, b,
+            vga_palette[i].r,
+            vga_palette[i].g,
+            vga_palette[i].b
+        );
+        if(diff < min_diff) {
+            min_diff = diff;
+            best_color = vga_palette[i].vga_val;
+        }
     }
-
-    _color_diff = color_difference(r, g, b, VIDEO_GREEN);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_GREEN;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_CYAN);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_CYAN;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_RED);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_RED;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_MAGENTA);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_MAGENTA;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_YELLOW);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_YELLOW;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_GREY);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_LIGHT_GREY;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_DARK_GREY);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_DARK_GREY;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_BLUE);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_LIGHT_BLUE;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_GREEN);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_LIGHT_GREEN;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_CYAN);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_LIGHT_CYAN;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_RED);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_LIGHT_RED;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_MAGENTA);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_LIGHT_MAGENTA;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_LIGHT_YELLOW);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_LIGHT_YELLOW;
-    }
-
-    _color_diff = color_difference(r, g, b, VIDEO_WHITE);
-    if(_color_diff < color_diff) {
-        color_diff = _color_diff;
-        ret = VIDEO_VGA_WHITE;
-    }
-
-    return ret;
+    return best_color;
 }
 
 int video_vga_get_cursor() {
@@ -172,23 +112,45 @@ void video_vga_cls(int bg) {
 }
 
 static void scroll_screen(unsigned ammount) {
-    int end = video_vga_get_cursor();
-
-    int start = end - text_cols * ammount;
-    // already on top
-    if(end < text_cols) start = 0;
-
-    for(int i = 0; i < start; i++) {
-        vid_mem[i * 2] = vid_mem[i * 2 + text_cols * 2 * ammount];
-        vid_mem[i * 2 + 1] = vid_mem[i * 2 + text_cols * 2 * ammount + 1];
+    if((int)ammount >= text_rows) {
+        video_vga_cls(current_attr >> 4);
+        return;
     }
 
-    for(int i = start; i <= end; i++) {
-        vid_mem[i * 2] = ' ';
-        vid_mem[i * 2 + 1] = 0xf;
+    uint16_t* vga_buffer = (uint16_t*)vid_mem;
+    int total_cells = text_rows * text_cols;
+    int shift_cells = ammount * text_cols;
+
+    memmove(vga_buffer, vga_buffer + shift_cells, (total_cells - shift_cells) * 2);
+
+    uint16_t clear_val = (uint16_t)(current_attr << 8) | ' ';
+    for (int i = total_cells - shift_cells; i < total_cells; i++) {
+        vga_buffer[i] = clear_val;
     }
 
-    video_vga_set_cursor(start);
+    int current_pos = video_vga_get_cursor();
+    video_vga_set_cursor(current_pos < shift_cells ? 0 : current_pos - shift_cells);
+}
+
+static void printc(char chr, int* offset_ptr, uint8_t attr, bool calculate) {
+    int offset = *offset_ptr;
+
+    if(chr == '\n') {
+        offset += text_cols - (offset % text_cols);
+    } else if(chr == '\b') {
+        if(offset > 0) offset--;
+        if(!calculate) {
+            vid_mem[offset * 2] = ' ';
+        }
+    } else {
+        if(!calculate) {
+            vid_mem[offset * 2] = chr;
+            vid_mem[offset * 2 + 1] = attr;
+        }
+        offset++;
+    }
+
+    *offset_ptr = offset;
 }
 
 void video_vga_printc(char chr, int offset, int fg, int bg, bool move) {
@@ -200,16 +162,7 @@ void video_vga_printc(char chr, int offset, int fg, int bg, bool move) {
     if(fg >= 0) attr = (attr & 0x0f) | fg;
     if(bg >= 0) attr = (attr & 0xf0) | bg;
 
-    if(chr == '\n') {
-        offset += text_cols - (offset % text_cols);
-    } else if(chr == '\b') {
-        offset--;
-        vid_mem[offset * 2] = ' ';
-    } else {
-        vid_mem[offset * 2] = chr;
-        vid_mem[offset * 2 + 1] = attr;
-        offset++;
-    }
+    printc(chr, &offset, attr, false);
 
     if(move) {
         video_vga_set_cursor(offset);
@@ -218,38 +171,36 @@ void video_vga_printc(char chr, int offset, int fg, int bg, bool move) {
 }
 
 void video_vga_prints(const char* str, int offset, int fg, int bg, bool move) {
+    if(*str == 0) return;
+
     if(offset < 0) offset = video_vga_get_cursor();
 
     uint8_t attr = current_attr;
-    if(fg >= 0) attr = (attr & 0x0f) | fg;
-    if(bg >= 0) attr = (attr & 0xf0) | bg;
+    if(fg >= 0) attr = (attr & 0xf0) | (fg & 0x0f);
+    if(bg >= 0) attr = (attr & 0x0f) | ((bg & 0x0f) << 4);
 
-    char chr = str[0];
-    while(chr) {
-        if(chr == '\n') {
-            offset += text_cols - (offset % text_cols);
-        } else if(chr == '\b') {
-            offset--;
-            vid_mem[offset * 2] = ' ';
-        } else {
-            vid_mem[offset * 2] = chr;
-            vid_mem[offset * 2 + 1] = attr;
-            offset++;
+    if(move) {
+        int phantom = offset;
+        for(const char* p = str; *p; p++) {
+            printc(*p, &phantom, attr, true);
         }
 
-        // FIXME:
-        // count the number of lines first, then scroll
-        if(offset > text_rows * text_cols - 1) {
-            scroll_screen(1);
-            offset = video_vga_get_cursor();
+        if(phantom >= text_rows * text_cols) {
+            int rows_needed = (phantom / text_cols) - text_rows + 1;
+            scroll_screen(rows_needed);
+            
+            offset -= rows_needed * text_cols;
+            if(offset < 0) offset = 0;
         }
+    }
 
-        str++;
-        chr = *str;
+    const int screen_chars = text_rows * text_cols;
+    for(const char* p = str; *p; p++) {
+        if(offset >= screen_chars) break;
+        printc(*p, &offset, attr, false);
     }
 
     if(move) {
         video_vga_set_cursor(offset);
-        if(offset > text_rows * text_cols - 1) scroll_screen(1);
     }
 }
