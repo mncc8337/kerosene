@@ -86,14 +86,13 @@ void video_init(multiboot_info_t* mbd) {
                 break;
             case MULTIBOOT_FRAMEBUFFER_TYPE_RGB:
                 using_framebuffer = true;
-                // TODO: do sth with framebuffer color_info
+                // FIXME: do sth with framebuffer color_info
                 break;
             case MULTIBOOT_FRAMEBUFFER_TYPE_EGA_TEXT:
                 using_framebuffer = false;
                 break;
        }
-    }
-    else {
+    } else {
         using_framebuffer = false;
         video_addr = VIDEO_TEXTMODE_ADDRESS;
         video_width = 80;
@@ -119,10 +118,22 @@ void video_init(multiboot_info_t* mbd) {
             video_width, video_height,
             video_pitch, video_bpp
         );
-        print_debug(LT_OK, "VESA video initialised\n");
+        print_debug(
+            LT_OK,
+            "VESA video initialised with resolution %dx%d, %d bpp\n",
+            video_width,
+            video_height,
+            video_bpp
+        );
     } else {
         video_vga_init(video_width, video_height);
-        print_debug(LT_OK, "VGA video initialised\n");
+        print_debug(
+            LT_OK,
+            "VGA video initialised with resolution %dx%d, %d bpp\n",
+            video_width,
+            video_height,
+            video_bpp
+        );
     }
 }
 
@@ -342,6 +353,8 @@ void kmain() {
     // free now
 
     int ret;
+
+    SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
 
     process_t* uproc = process_new(0, true, NULL);
     if(uproc) {

@@ -24,7 +24,7 @@ static int font_height;
 static int font_bpg;
 
 // the pixels behind the cursor
-static int cursor_buffer[512];
+static int cursor_buffer[1024];
 static int cursor_buffer_posx = 0;
 static int cursor_buffer_posy = 0;
 
