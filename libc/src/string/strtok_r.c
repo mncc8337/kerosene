@@ -1,48 +1,48 @@
 #include <string.h>
 #include <stdbool.h>
 
-char* strtok_r(char* str, const char* delimiters, char** old_ptr) {
+char* strtok_r(char* str, const char* delimiters, char** token_ptr) {
     // dereference it to eliminate pointer nightmare
     // then only need to remember to sync it when return
-    char* old = *old_ptr;
+    char* token = *token_ptr;
     char* tok_start = NULL;
 
-    if(str != NULL) old = str;
-    else if(!old || *old == '\0') goto ret;
+    if(str != NULL) token = str;
+    else if(!token || *token == '\0') goto ret;
 
     // skip leading delimiters
-    while(old[0] != '\0') {
+    while(token[0] != '\0') {
         bool delimiters_exist = false;
         for(int i = 0; delimiters[i] != '\0'; i++) {
-            if(old[0] == delimiters[i]) {
+            if(token[0] == delimiters[i]) {
                 delimiters_exist = true;
                 break;
             }
         }
-        if(delimiters_exist) old++;
+        if(delimiters_exist) token++;
         else break;
     }
     // the string is full of delimiters
-    if(old[0] == '\0') goto ret;
+    if(token[0] == '\0') goto ret;
 
     int pos = 0;
-    while(old[pos] != '\0') {
+    while(token[pos] != '\0') {
         for(int i = 0; delimiters[i] != '\0'; i++) {
-            if(delimiters[i] != old[pos]) continue;
-            old[pos] = '\0';
-            tok_start = old;
-            old += pos + 1;
+            if(delimiters[i] != token[pos]) continue;
+            token[pos] = '\0';
+            tok_start = token;
+            token += pos + 1;
             goto ret;
         }
         pos++;
     }
 
     // reached the end of the string
-    tok_start = old;
-    old += pos;
+    tok_start = token;
+    token += pos;
 
 ret:
-    *old_ptr = old;
+    *token_ptr = token;
     return tok_start;
 }
 

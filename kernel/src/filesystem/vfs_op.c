@@ -51,8 +51,8 @@ FS_ERR vfs_find_and_create_node(
     fs_node_t* allocated[512];
     unsigned allocated_counter = 0;
 
-    char* old = path;
-    char* current_name = strtok_r(path, "/", &old);
+    char* token = path;
+    char* current_name = strtok_r(path, "/", &token);
     // FIXME: path should be copied, not override
     bool create_file_flag = false;
     while(current_name) {
@@ -84,7 +84,7 @@ FS_ERR vfs_find_and_create_node(
                 for(unsigned i = 0; i < allocated_counter; i++)
                     kfree(allocated[i]);
                 // we should clarify whether the target is not found or the dir in the middle is not found
-                if(find_err == ERR_FS_NOT_FOUND && strtok_r(NULL, "/", &old) == NULL) {
+                if(find_err == ERR_FS_NOT_FOUND && strtok_r(NULL, "/", &token) == NULL) {
                     if(create_node) {
                         create_file_flag = true;
                         break;
@@ -109,7 +109,7 @@ FS_ERR vfs_find_and_create_node(
         }
 
         skip:
-        current_name = strtok_r(NULL, "/", &old);
+        current_name = strtok_r(NULL, "/", &token);
     }
 
     if(create_file_flag) {
