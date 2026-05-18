@@ -11,7 +11,7 @@ static unsigned process_count = 0;
 // from kernel.c
 extern process_t* kernel_process;
 
-process_t* process_new(uint32_t eip, bool is_user) {
+process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
 
@@ -19,12 +19,13 @@ process_t* process_new(uint32_t eip, bool is_user) {
     proc->alive_ticks = 0;
     proc->sleep_ticks = 0;
     proc->next = NULL;
+    proc->is_user = is_user;
+    proc->cwd = cwd ? cwd : &vfs_getfs(RAMFS_DISK)->root_node;
 
     if(!is_user) {
         proc->page_directory = vmmngr_get_kernel_page_directory();
         proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
         proc->file_count = vfs_get_kernel_file_count();
-        proc->cwd = &vfs_getfs(RAMFS_DISK)->root_node;
     } else {
         // create a new page directory
         proc->page_directory = vmmngr_alloc_page_directory();
@@ -42,9 +43,6 @@ process_t* process_new(uint32_t eip, bool is_user) {
         }
         proc->file_descriptor_table = fdt;
         proc->file_count = 0;
-
-        process_t* parent_proc = scheduler_get_current_process();
-        proc->cwd = parent_proc->cwd;
     }
 
     // allocate the new stack

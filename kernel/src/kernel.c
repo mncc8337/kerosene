@@ -282,7 +282,7 @@ void kinit(multiboot_info_t* mbd) {
     scheduler_init(idle_proc);
     print_debug(LT_OK, "scheduler initialised\n");
 
-    kernel_process = process_new((uint32_t)kmain, false);
+    kernel_process = process_new((uint32_t)kmain, false, NULL);
     if(kernel_process) {
         scheduler_add_process(kernel_process);
         print_debug(LT_OK, "created kernel main process\n");
@@ -321,11 +321,11 @@ void kernel_proc2() {
 void kmain() {
     print_debug(LT_OK, "jumped into main kernel process\n");
 
-    process_t* proc_stdout = process_new((uint32_t)kproc_stdout, false);
+    process_t* proc_stdout = process_new((uint32_t)kproc_stdout, false, NULL);
     if(proc_stdout) scheduler_add_process(proc_stdout);
     else print_debug(LT_CR, "cannot start standard out process\n");
 
-    process_t* proc_stdin = process_new((uint32_t)kproc_stdin, false);
+    process_t* proc_stdin = process_new((uint32_t)kproc_stdin, false, NULL);
     if(proc_stdin) scheduler_add_process(proc_stdin);
     else print_debug(LT_CR, "cannot start standard in process\n");
 
@@ -334,7 +334,7 @@ void kmain() {
 
     int ret;
 
-    process_t* uproc = process_new(0, true);
+    process_t* uproc = process_new(0, true, NULL);
     if(uproc) {
         ELF_ERR load_err = elf_load_to_proc("hi.elf", uproc);
         if(load_err) {
@@ -351,10 +351,10 @@ void kmain() {
 
     SYSCALL_1P(SYSCALL_SLEEP, ret, 7000);
 
-    process_t* proc1 = process_new((uint32_t)kernel_proc1, false);
+    process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL);
     if(proc1) scheduler_add_process(proc1);
 
-    process_t* proc2 = process_new((uint32_t)kernel_proc2, false);
+    process_t* proc2 = process_new((uint32_t)kernel_proc2, false, NULL);
     if(proc2) scheduler_add_process(proc2);
 
     while(true) {

@@ -175,6 +175,7 @@ FS_ERR vfs_find_and_create_node(
     goto ret; // dont nuke search stack
 
 nuke_search_stack_and_ret:
+    // NOTE: do cached discovered nodes instead of cleaving them on site
     if(search_stack_counter > 0) {
         // unlink the first node on the search stack
         fs_node_t* current_sibling = search_stack[0]->parent->children;
@@ -241,7 +242,9 @@ int vfs_open(const char* path, const char* modestr) {
     if(proc->file_count >= MAX_FILE)
         return -1;
 
-    // FIXME: make sure that proc->cwd has been in the node tree already
+    if(!proc->cwd)
+        return -1;
+
     fs_node_t* node;
     bool do_touch_file = (modestr[0] == 'w') || (modestr[0] == 'a');
     FS_ERR find_err = vfs_find_and_create_node(path, proc->cwd, &node, do_touch_file, true);
@@ -264,6 +267,7 @@ int vfs_open(const char* path, const char* modestr) {
     FS_ERR open_err = file_open(fde, node, modestr);
     if(open_err) {
         fde->node = NULL;
+        // NOTE: dont nuke the whole tree after just failing to open a node
         vfs_cleanup_node_tree(node);
         return -1;
     }
@@ -288,6 +292,7 @@ void vfs_close(int file_descriptor) {
     file_sync(fde);
 
     fde->node->refcount--;
+    // NOTE: dont nuke the whole tree after just deleting one node
     vfs_cleanup_node_tree(fde->node);
 
     fde->node = NULL;
@@ -297,8 +302,21 @@ void vfs_close(int file_descriptor) {
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current_process();
 
-    // FIXME:
-    // check where buffer is belong to (kernel or user)
+    // prevent user process from writing into
+    // kernel's memory space
+    if(proc->is_user) {
+        void* start = (void*)buffer;
+        void* end = start + size;
+
+        // overflow check
+        if(end < start) {
+            return -1; // sus size
+        }
+
+        if(end > (void*)KERNEL_START) {
+            return -1; // leaking to kernel's memspace
+        }
+    }
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return -1;
@@ -325,8 +343,21 @@ int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
 int vfs_write(int file_descriptor, uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current_process();
 
-    // FIXME:
-    // check where buffer is belong to (kernel or user)
+    // prevent user process from writing into
+    // kernel's memory space
+    if(proc->is_user) {
+        void* start = (void*)buffer;
+        void* end = start + size;
+
+        // overflow check
+        if(end < start) {
+            return -1; // sus size
+        }
+
+        if(end > (void*)KERNEL_START) {
+            return -1; // leaking to kernel's memspace
+        }
+    }
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return -1;

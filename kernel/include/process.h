@@ -27,6 +27,7 @@ typedef struct process {
     uint64_t alive_ticks;
     uint64_t sleep_ticks;
     page_directory_t* page_directory;
+    bool is_user;
 
     uint32_t stack_addr; // stack addr used to freeing
     uint32_t saved_esp; // saved stack state of current process
@@ -48,7 +49,7 @@ typedef struct {
 #define PROCESS_QUEUE_INIT {NULL, NULL, 0}
 
 // process.c
-process_t* process_new(uint32_t eip, bool is_user);
+process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd);
 process_t* process_make_idle();
 void process_delete(process_t* proc);
 

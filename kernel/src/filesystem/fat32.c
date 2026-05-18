@@ -119,9 +119,11 @@ static void set_FAT_entry(
     int FAT_offset = cluster * 4;
     int FAT_sector = first_FAT_sector + FAT_offset / bootrec->bpb.bytes_per_sector;
     int entry_offset = FAT_offset % bootrec->bpb.bytes_per_sector;
+    // TODO: check for ata pio fault
     ata_pio_LBA28_access(true, fs->partition.LBA_start + FAT_sector, 1, FAT);
 
     *((uint32_t*)&(FAT[entry_offset])) = val;
+    // TODO: check for ata pio fault
     ata_pio_LBA28_access(false, fs->partition.LBA_start + FAT_sector, 1, FAT);
 }
 static uint32_t get_FAT_entry(
@@ -134,6 +136,7 @@ static uint32_t get_FAT_entry(
     int FAT_offset = cluster * 4;
     int FAT_sector = first_FAT_sector + FAT_offset / bootrec->bpb.bytes_per_sector;
     int entry_offset = FAT_offset % bootrec->bpb.bytes_per_sector;
+    // TODO: check for ata pio fault
     ata_pio_LBA28_access(true, fs->partition.LBA_start + FAT_sector, 1, FAT);
 
     return *((uint32_t*)&(FAT[entry_offset])) & 0x0fffffff;
@@ -150,16 +153,20 @@ static uint8_t gen_checksum(char* shortname) {
 }
 
 static void get_bootrec(partition_entry_t part, uint8_t* bootrec) {
+    // TODO: check for ata pio fault
     ata_pio_LBA28_access(true, part.LBA_start, 1, bootrec);
 }
 // static void update_bootrecord(fs_t* fs) {
+//     // TODO: check for ata pio fault
 //     ata_pio_LBA28_access(false, fs->partition.LBA_start, 1, fs->info_table1);
 // }
 
 static void get_fsinfo(partition_entry_t part, fat32_bootrecord_t* bootrec, uint8_t* fsinfo) {
+    // TODO: check for ata pio fault
     ata_pio_LBA28_access(true, part.LBA_start + bootrec->ebpb.fsinfo_sector, 1, fsinfo);
 }
 static void update_fsinfo(fs_t* fs) {
+    // TODO: check for ata pio fault
     ata_pio_LBA28_access(
         false,
         fs->partition.LBA_start + fs->fat32_info.bootrec.ebpb.fsinfo_sector,
@@ -286,9 +293,11 @@ static uint32_t copy_cluster_chain(fs_t* fs, uint32_t start_cluster) {
     uint32_t copied_current_cluster = copied_start_cluster;
     while(true) {
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, data);
 
         first_sector = ((copied_current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, data);
 
         current_cluster = get_FAT_entry(bootrec, fs, first_FAT_sector, current_cluster);
@@ -319,6 +328,7 @@ static void fix_empty_entries(fs_t* fs, uint32_t start_cluster, uint32_t end_clu
     int cluster_count = 0;
     while(true) {
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 
         for(int index = 0; (unsigned)index < cluster_size; index += sizeof(fat_directory_entry_t)) {
@@ -348,6 +358,7 @@ static void fix_empty_entries(fs_t* fs, uint32_t start_cluster, uint32_t end_clu
 
         // also read back the "first" cluster
         uint32_t first_sector = ((trash_start_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(true, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
     }
 
@@ -359,6 +370,7 @@ static void fix_empty_entries(fs_t* fs, uint32_t start_cluster, uint32_t end_clu
 
     // write changes
     uint32_t first_sector = ((trash_start_cluster - 2) * sectors_per_cluster) + first_data_sector;
+    // TODO: check for ata pio fault
     ata_pio_LBA28_access(false, fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
 }
 
@@ -429,6 +441,7 @@ static FS_ERR read_file(
     if(cluster_offset > 0) {
         // align buffer to cluster size
         uint32_t first_sector = (((*current_cluster) - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(
             true,
             fs->partition.LBA_start + first_sector,
@@ -464,6 +477,7 @@ static FS_ERR read_file(
         uint32_t first_sector = (((*current_cluster) - 2) * sectors_per_cluster) + first_data_sector;
 
         if((unsigned)size >= cluster_size) {
+            // TODO: check for ata pio fault
             ata_pio_LBA28_access(
                 true,
                 fs->partition.LBA_start + first_sector,
@@ -471,6 +485,7 @@ static FS_ERR read_file(
                 buffer
             );
         } else {
+            // TODO: check for ata pio fault
             ata_pio_LBA28_access(
                 true,
                 fs->partition.LBA_start + first_sector,
@@ -545,6 +560,7 @@ static FS_ERR write_file(
     if(cluster_offset > 0) {
         // align buffer to cluster size
         uint32_t first_sector = (((*current_cluster) - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(
             true,
             fs->partition.LBA_start + first_sector,
@@ -555,6 +571,7 @@ static FS_ERR write_file(
         unsigned remain_size =  cluster_size - cluster_offset;
         bool write_all = size <= remain_size;
         memcpy(ext_buffer + cluster_offset, buffer, write_all ? size : remain_size);
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(
             false,
             fs->partition.LBA_start + first_sector,
@@ -582,6 +599,7 @@ static FS_ERR write_file(
         uint32_t first_sector = (((*current_cluster) - 2) * sectors_per_cluster) + first_data_sector;
         // write
         if(size >= cluster_size) {
+            // TODO: check for ata pio fault
             ata_pio_LBA28_access(
                 false,
                 fs->partition.LBA_start + first_sector,
@@ -590,6 +608,7 @@ static FS_ERR write_file(
             );
         } else {
             if(next_position <= file_size) {
+                // TODO: check for ata pio fault
                 ata_pio_LBA28_access(
                     true,
                     fs->partition.LBA_start +
@@ -601,6 +620,7 @@ static FS_ERR write_file(
                 memcpy(ext_buffer, buffer, size);
                 memset(ext_buffer + size, 0, cluster_size - size);
             }
+            // TODO: check for ata pio fault
             ata_pio_LBA28_access(
                 false,
                 fs->partition.LBA_start +
@@ -668,6 +688,7 @@ uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count, bool clear) {
 
             if(clear) {
                 uint32_t first_sector = ((prev_cluster - 2) * sectors_per_cluster) + first_data_sector;
+                // TODO: check for ata pio fault
                 ata_pio_LBA28_access(
                     true,
                     fs->partition.LBA_start + first_sector,
@@ -755,6 +776,7 @@ FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
 
     while(true) {
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(
             true,
             diriter->node->fs->partition.LBA_start + first_sector,
@@ -875,6 +897,7 @@ FS_ERR fat32_add_entry(
             // so we only need to clear the buffer, no reading needed
             memset(directory, 0, cluster_size);
         } else {
+            // TODO: check for ata pio fault
             ata_pio_LBA28_access(
                 true,
                 parent->fs->partition.LBA_start + first_sector,
@@ -1081,6 +1104,7 @@ FS_ERR fat32_add_entry(
         start_index += sizeof(fat_directory_entry_t);
         if(start_index >= cluster_size) { // current cluster is exceeded
             uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+            // TODO: check for ata pio fault
             ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector,
                     sectors_per_cluster, directory);
             // the next cluster is always valid because we have created it before
@@ -1095,6 +1119,7 @@ FS_ERR fat32_add_entry(
             directory[i] = 0x0;
 
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(
             false,
             parent->fs->partition.LBA_start + first_sector,
@@ -1123,6 +1148,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
     if(FS_NODE_IS_DIR(*remove_node) && remove_content) {
         // check if it has any child entry
         uint32_t first_sector = ((remove_node->fat32.start_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(
             true,
             parent->fs->partition.LBA_start + first_sector,
@@ -1166,6 +1192,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
     if((unsigned)node_index + 32 < cluster_size) {
         // read current cluster
         uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(
             true,
             parent->fs->partition.LBA_start + first_sector,
@@ -1184,6 +1211,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
         } else {
             int first_sector = ((FAT_val - 2) * sectors_per_cluster) + first_data_sector;
             // read the very next sector
+            // TODO: check for ata pio fault
             ata_pio_LBA28_access(true, parent->fs->partition.LBA_start + first_sector, 1, directory);
             // now check
             if(directory[0] == 0x0)
@@ -1194,6 +1222,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
 
     // read the cluster that contain the node
     uint32_t first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+    // TODO: check for ata pio fault
     ata_pio_LBA28_access(
         true,
         parent->fs->partition.LBA_start + first_sector,
@@ -1220,6 +1249,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
 
         // write
         int first_sector = ((current_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(false, parent->fs->partition.LBA_start + first_sector, sectors_per_cluster, directory);
     }
     if(go_back > 0) {
@@ -1236,6 +1266,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
 
         // read the previous cluster
         int first_sector = ((last_cluster - 2) * sectors_per_cluster) + first_data_sector;
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(
             true,
             parent->fs->partition.LBA_start + first_sector,
@@ -1248,6 +1279,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
             directory[start_index + i*sizeof(fat_directory_entry_t)] = clear_val;
 
         // write
+        // TODO: check for ata pio fault
         ata_pio_LBA28_access(
             false,
             parent->fs->partition.LBA_start + first_sector,
@@ -1277,6 +1309,7 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
     uint8_t directory[cluster_size];
 
     uint32_t first_sector = ((node->fat32.parent_cluster - 2) * sectors_per_cluster) + first_data_sector;
+    // TODO: check for ata pio fault
     ata_pio_LBA28_access(
         true,
         node->fs->partition.LBA_start + first_sector,
@@ -1307,6 +1340,7 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
     // just add a new entry and delete the old one
 
     // write changes
+    // TODO: check for ata pio fault
     ata_pio_LBA28_access(
         false,
         node->fs->partition.LBA_start + first_sector,
