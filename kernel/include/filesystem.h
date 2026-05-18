@@ -203,7 +203,7 @@ unsigned vfs_get_kernel_file_count();
 // vfs_op.c
 FS_ERR vfs_find_and_create_node(const char* path, fs_node_t* cwd, fs_node_t** ret_node, bool create_node, bool is_file);
 void vfs_cleanup_node_tree(fs_node_t* start_node);
-int vfs_open(char* path, char* modestr);
+int vfs_open(const char* path, const char* modestr);
 void vfs_close(int file_descriptor);
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size);
 int vfs_write(int file_descriptor, uint8_t* buffer, size_t size);
@@ -213,14 +213,14 @@ void vfs_printtree();
 FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR fs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node);
-FS_ERR fs_mkdir(fs_node_t* parent, char* name, fs_node_t* new_node);
-FS_ERR fs_touch(fs_node_t* parent, char* name, fs_node_t* new_node);
+FS_ERR fs_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node);
+FS_ERR fs_touch(fs_node_t* parent, const char* name, fs_node_t* new_node);
 FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node);
-FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
-FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
+FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
+FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
 
 // file_op.c
-FS_ERR file_open(file_description_t* file, fs_node_t* node, char* modestr);
+FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr);
 FS_ERR file_seek(file_description_t* file, size_t pos);
 FS_ERR file_write(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_write_size);
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
@@ -231,13 +231,13 @@ ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear);
 ramfs_datanode_t* ramfs_get_last_datanote_of_chain(ramfs_datanode_t* datanode);
 FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR ramfs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
-FS_ERR ramfs_add_entry(fs_node_t* parent, char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size, fs_node_t* new_node);
+FS_ERR ramfs_add_entry(fs_node_t* parent, const char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size, fs_node_t* new_node);
 FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
 FS_ERR ramfs_update_entry(fs_node_t* node);
-FS_ERR ramfs_mkdir(fs_node_t* parent, char* name, uint32_t flags, fs_node_t* new_node);
-FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
-FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
-FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
+FS_ERR ramfs_mkdir(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node);
+FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
+FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
+FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
 
 FS_ERR ramfs_file_reset(fs_node_t* node);
 FS_ERR ramfs_pipe_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
@@ -253,12 +253,12 @@ uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster);
 
 FS_ERR fat32_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
-FS_ERR fat32_add_entry(fs_node_t* parent, char* name, uint32_t start_cluster, uint8_t attr, size_t size, fs_node_t* new_node);
+FS_ERR fat32_add_entry(fs_node_t* parent, const char* name, uint32_t start_cluster, uint8_t attr, size_t size, fs_node_t* new_node);
 FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
 FS_ERR fat32_update_entry(fs_node_t* node);
-FS_ERR fat32_mkdir(fs_node_t* parent, char* name, uint8_t attr, fs_node_t* new_node);
-FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name);
-FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name);
+FS_ERR fat32_mkdir(fs_node_t* parent, const char* name, uint8_t attr, fs_node_t* new_node);
+FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
+FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
 
 FS_ERR fat32_file_reset(fs_node_t* node);
 FS_ERR fat32_seek(file_description_t* file, size_t pos);

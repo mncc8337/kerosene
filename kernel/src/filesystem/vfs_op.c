@@ -235,7 +235,7 @@ void vfs_cleanup_node_tree(fs_node_t* start_node) {
 // TODO:
 // specify the error when failed
 
-int vfs_open(char* path, char* modestr) {
+int vfs_open(const char* path, const char* modestr) {
     process_t* proc = scheduler_get_current_process();
 
     if(proc->file_count >= MAX_FILE)

@@ -80,7 +80,7 @@ static void process_sfn_entry(
     *namelen = name_pos;
 }
 
-static bool is_valid_sfn(char* name) {
+static bool is_valid_sfn(const char* name) {
     int len = strlen(name);
     if(len == 0 || len > 12) return false;
     
@@ -839,7 +839,7 @@ FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
 // add a new entry to parent
 FS_ERR fat32_add_entry(
     fs_node_t* parent,
-    char* name,
+    const char* name,
     uint32_t start_cluster,
     uint8_t attr,
     size_t size,
@@ -1320,7 +1320,7 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
 // make a directory in parent node
 // return valid node when success
 // return invalid node when node with the same name has already exists / cannot find free cluster
-FS_ERR fat32_mkdir(fs_node_t* parent, char* name, uint8_t attr, fs_node_t* new_node) {
+FS_ERR fat32_mkdir(fs_node_t* parent, const char* name, uint8_t attr, fs_node_t* new_node) {
     new_node->flags = 0;
 
     uint32_t start_cluster = fat32_allocate_clusters(parent->fs, 1, true);
@@ -1353,7 +1353,7 @@ FS_ERR fat32_mkdir(fs_node_t* parent, char* name, uint8_t attr, fs_node_t* new_n
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
+FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
     fs_node_t copied;
     FS_ERR copy_err = fat32_add_entry(
         new_parent, new_name,
@@ -1373,7 +1373,7 @@ FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
+FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
     uint32_t start_cluster = copy_cluster_chain(new_parent->fs, node->fat32.start_cluster);
     if(!start_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
 

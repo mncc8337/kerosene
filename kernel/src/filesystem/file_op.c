@@ -13,7 +13,7 @@ FS_ERR file_reset(fs_node_t* node) {
     }
 }
 
-FS_ERR file_open(file_description_t* file, fs_node_t* node, char* modestr) {
+FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr) {
     if(FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_FILE;
 
     int mode = 0;

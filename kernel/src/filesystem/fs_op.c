@@ -5,7 +5,7 @@
 #define UNIVERSAL_COPY_SIZE 512
 
 // copy file from any filesystem to another filesystem
-static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
+static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
     FS_ERR touch_err = fs_touch(new_parent, new_name, copied);
     if(touch_err) return touch_err;
 
@@ -91,7 +91,7 @@ FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
 }
 
 // make a directory in parent node
-FS_ERR fs_mkdir(fs_node_t* parent, char* name, fs_node_t* new_node) {
+FS_ERR fs_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
     if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
 
     new_node->flags = 0;
@@ -106,7 +106,7 @@ FS_ERR fs_mkdir(fs_node_t* parent, char* name, fs_node_t* new_node) {
     }
 }
 
-FS_ERR fs_touch(fs_node_t* parent, char* name, fs_node_t* new_node) {
+FS_ERR fs_touch(fs_node_t* parent, const char* name, fs_node_t* new_node) {
     if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
 
     new_node->flags = 0;
@@ -142,7 +142,7 @@ FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node) {
 }
 
 // set new_name to NULL to reuse the old name
-FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* new_name) {
+FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
     if(!FS_NODE_IS_DIR(*new_parent)) return ERR_FS_NOT_DIR;
     if(FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_FILE;
 
@@ -167,7 +167,7 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, char* 
 // move a node to a new parent
 // only works when moving to the same disk
 // set new_name to NULL to reuse the old name
-FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, char* new_name) {
+FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
     if(!FS_NODE_IS_DIR(*new_parent)) return ERR_FS_NOT_DIR;
     if(node->fs != new_parent->fs) return ERR_FS_NOT_SUPPORTED;
 
