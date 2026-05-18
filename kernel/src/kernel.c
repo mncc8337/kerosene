@@ -103,8 +103,17 @@ void video_init(multiboot_info_t* mbd) {
     }
 
     // map video ptr
-    for(unsigned i = 0; i < video_height * video_pitch; i += MMNGR_PAGE_SIZE)
-        vmmngr_map(NULL, video_addr + i, VIDEO_START + i, PTE_WRITABLE);
+    uint32_t total_size = video_height * video_pitch;
+    uint32_t total_pages = (total_size + MMNGR_PAGE_SIZE - 1) / MMNGR_PAGE_SIZE;
+    for(unsigned p = 0; p < total_pages; p++) {
+        unsigned offset = p * MMNGR_PAGE_SIZE;
+        vmmngr_map(
+            NULL,
+            video_addr + offset,
+            VIDEO_START + offset,
+            PTE_WRITABLE | PTE_WRITETHROUGH
+        );
+    }
     if(using_framebuffer) {
         video_framebuffer_init(
             video_width, video_height,

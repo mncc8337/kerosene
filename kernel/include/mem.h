@@ -21,7 +21,7 @@ typedef uint32_t virtual_addr_t;
 #define PTE_PRESENT       1
 #define PTE_WRITABLE      2
 #define PTE_USER          4
-#define PTE_WRITETHOUGH   8
+#define PTE_WRITETHROUGH  8
 #define PTE_NOT_CACHEABLE 0x10
 #define PTE_ACCESSED      0x20
 #define PTE_DIRTY         0x40
