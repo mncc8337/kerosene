@@ -37,8 +37,8 @@ kernel_stack_top:
 section .data
 multiboot_ptr: dd 0
 align 4096
-global kernel_pd_virt
-kernel_pd_virt:
+global kernel_pd_data
+kernel_pd_data:
     times 1024 dd 0x00000000
 page_table_4mib:
     times 1024 dd 0x00000000
@@ -60,17 +60,17 @@ kernel_entry:
     ; the system will process the page directory as a page table
     ; thus mapping all the page table address for us
     ; isn't it genius?
-    mov eax, kernel_pd_virt - KERNEL_START
+    mov eax, kernel_pd_data - KERNEL_START
     or eax, 0b011
-    mov [kernel_pd_virt - KERNEL_START + 1023 * 4], eax
+    mov [kernel_pd_data - KERNEL_START + 1023 * 4], eax
 
     mov eax, page_table_4mib - KERNEL_START
     or eax, 0b011
-    mov [kernel_pd_virt - KERNEL_START + phys_to_virt(0)], eax
+    mov [kernel_pd_data - KERNEL_START + phys_to_virt(0)], eax
 
     mov eax, page_table_kernel1 - KERNEL_START
     or eax, 0b011
-    mov [kernel_pd_virt - KERNEL_START + phys_to_virt(KERNEL_START)], eax
+    mov [kernel_pd_data - KERNEL_START + phys_to_virt(KERNEL_START)], eax
 
     ; map the first 4mb
     mov edi, page_table_4mib - KERNEL_START
@@ -89,21 +89,19 @@ kernel_entry:
     or eax, 0b011
     ; FIXME: .text and .rodata are actually should only be readable
     ; but idk how to do it separately so just set them to read/write for now
-    mov ecx, 1023 ; reserve the final entry of page_table_kernel1
+    mov ecx, 1024
 .loop_kernel1:
     mov [edi], eax
     add edi, 4
     add eax, 4096
     loop .loop_kernel1
 
-    ; map kernel_pd_virt using the final entry
-    ; this will be mapped to 0xc03ff000 (VMMNGR_PD)
-    mov eax, kernel_pd_virt - KERNEL_START
-    or eax, 0b011
-    mov [edi], eax
+    ; note that we dont need to map kernel_pd_data
+    ; since we had recursively mapped it (see above code)
+    ; and is always accessible though VMMNGR_PD (0xfffff000) address
 
     ; load page directory
-    mov eax, kernel_pd_virt - KERNEL_START
+    mov eax, kernel_pd_data - KERNEL_START
     mov cr3, eax
 
     ; enable paging
@@ -117,7 +115,7 @@ kernel_entry:
 
 higher_half:
     ; unmap the first 4MiB identity
-    mov dword [kernel_pd_virt], 0x0
+    mov dword [kernel_pd_data], 0x0
     invlpg [0]
 
     mov esp, kernel_stack_top

@@ -18,6 +18,8 @@ typedef uint32_t virtual_addr_t;
 
 #define MMNGR_PAGE_SIZE 4096
 
+#define VMMNGR_PD ((page_directory_t*)0xfffff000)
+
 #define PTE_PRESENT       1
 #define PTE_WRITABLE      2
 #define PTE_USER          4
@@ -93,8 +95,8 @@ void pmmngr_init(size_t size);
 page_directory_t* vmmngr_get_page_directory();
 page_directory_t* vmmngr_get_kernel_page_directory();
 physical_addr_t vmmngr_to_physical_addr(page_directory_t* page_directory, virtual_addr_t virt);
-MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags);
-void vmmngr_unmap(page_directory_t* page_directory, virtual_addr_t virt);
+MEM_ERR vmmngr_map(const page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags);
+void vmmngr_unmap(const page_directory_t* page_directory, virtual_addr_t virt);
 MEM_ERR vmmngr_alloc_page(pte_t* pte);
 void vmmngr_free_page(pte_t* pte);
 page_directory_t* vmmngr_alloc_page_directory();

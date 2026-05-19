@@ -33,6 +33,10 @@
 
 #define DIRECTORY_ENTRY_COUNT (RAMFS_DATANODE_SIZE / sizeof(uint32_t))
 
+// TODO:
+// add another kind of ramfs_node_t that specify data size and data location
+// so that we can implement framebuffer access via vfs
+
 static heap_t* rheap;
 
 static void* rmalloc(size_t size) {

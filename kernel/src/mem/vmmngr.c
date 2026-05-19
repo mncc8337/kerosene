@@ -11,10 +11,11 @@
 #define PAGE_TABLE_ADDR(idx) (page_table_t*)(0xffc00000 + idx * MMNGR_PAGE_SIZE)
 
 // from kernel_entry.asm
-extern void* kernel_pd_virt;
+// this contains data of the kernel pd, premapped (since it located in the higher half)
+extern void* kernel_pd_data;
 
 static page_directory_t* current_page_directory = 0;
-static page_directory_t* kernel_page_directory = (page_directory_t*)((unsigned)&kernel_pd_virt - KERNEL_START);
+static page_directory_t* kernel_page_directory = (page_directory_t*)((unsigned)&kernel_pd_data - KERNEL_START);
 
 static void page_entry_set_frame(uint32_t* pe, physical_addr_t addr) {
     *pe = (*pe & ~PAGE_FRAME_BITS) | addr;
@@ -26,7 +27,7 @@ static void page_entry_del_attrib(uint32_t* pe, uint16_t attrib) {
     *pe &= ~(attrib & 0xfff);
 }
 
-static void map_temporary_pd(page_directory_t* pd) {
+static void map_temporary_pd(const page_directory_t* pd) {
     // manual mapping for efficiency
     page_table_t* pt = PAGE_TABLE_ADDR(PAGE_DIRECTORY_INDEX(VMMNGR_TEMP_PD));
     pte_t* pte = PAGE_TABLE_LOOKUP(pt, VMMNGR_TEMP_PD);
@@ -69,7 +70,7 @@ physical_addr_t vmmngr_to_physical_addr(page_directory_t* page_directory, virtua
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
 
     page_directory_t* virt_pd;
-    if(page_directory == NULL) virt_pd = (page_directory_t*)VMMNGR_PD;
+    if(page_directory == NULL) virt_pd = VMMNGR_PD;
     else {
         map_temporary_pd(page_directory);
         virt_pd = (page_directory_t*)VMMNGR_TEMP_PD;
@@ -115,12 +116,12 @@ clean:
     return (physical_addr_t)(*pte & PAGE_FRAME_BITS);
 }
 
-MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags) {
+MEM_ERR vmmngr_map(const page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags) {
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
 
     page_directory_t* virt_pd;
-    if(page_directory == NULL) virt_pd = (page_directory_t*)VMMNGR_PD;
+    if(page_directory == NULL) virt_pd = VMMNGR_PD;
     else {
         map_temporary_pd(page_directory);
         virt_pd = (page_directory_t*)VMMNGR_TEMP_PD;
@@ -183,7 +184,8 @@ MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtu
     page_entry_add_attrib(pte, PTE_PRESENT | flags);
     page_entry_set_frame(pte, phys);
 
-    vmmngr_flush_tlb_entry(virt);
+    if(virt_pd == VMMNGR_PD)
+        vmmngr_flush_tlb_entry(virt);
 
     // unmap the temporary page table
     if(mapped_temp_table) 
@@ -195,14 +197,14 @@ MEM_ERR vmmngr_map(page_directory_t* page_directory, physical_addr_t phys, virtu
     return ERR_MEM_SUCCESS;
 }
 
-void vmmngr_unmap(page_directory_t* page_directory, virtual_addr_t virt) {
+void vmmngr_unmap(const page_directory_t* page_directory, virtual_addr_t virt) {
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
 
     bool mapped_temp_table = false;
 
     page_directory_t* virt_pd;
-    if(page_directory == NULL) virt_pd = (page_directory_t*)VMMNGR_PD;
+    if(page_directory == NULL) virt_pd = VMMNGR_PD;
     else {
         map_temporary_pd(page_directory);
         virt_pd = (page_directory_t*)VMMNGR_TEMP_PD;
@@ -228,7 +230,8 @@ void vmmngr_unmap(page_directory_t* page_directory, virtual_addr_t virt) {
     // clear all attrib
     *pte = 0x0;
 
-    vmmngr_flush_tlb_entry(virt);
+    if(virt_pd == VMMNGR_PD)
+        vmmngr_flush_tlb_entry(virt);
 
 clean:
     if(mapped_temp_table)
@@ -266,17 +269,22 @@ page_directory_t* vmmngr_alloc_page_directory() {
     map_temporary_pd(pd);
     page_directory_t* virt_pd = (page_directory_t*)VMMNGR_TEMP_PD;
 
-    // copy the current page directory
-    page_directory_t* kernel_pd = (page_directory_t*)VMMNGR_PD;
+    // FIXME:
+    // as kernel processes map stuff to the higher half
+    // old user pds isnt updated
+    // we need a solution to sync the higher half to every created user pd
+    // for example sync on page faulting at higher half address (sync on demand)
+
+    // copy the kernel pd to it so that we can access higher half memory
+    // on interrupts
+    page_directory_t* kernel_pd = (page_directory_t*)&kernel_pd_data;
     memcpy(virt_pd, kernel_pd, sizeof(page_directory_t));
 
     // set final entry to itself for recursive paging
-    pde_t* pde = &virt_pd->entry[1023];
-    page_entry_add_attrib(pde, PDE_PRESENT | PDE_WRITABLE);
-    page_entry_set_frame(pde, (physical_addr_t)pd);
-
-    // map itself to VMMNGR_PD
-    vmmngr_map(pd, (physical_addr_t)pd, VMMNGR_PD, PTE_PRESENT | PTE_WRITABLE);
+    // this also map itself to VMMNGR_PD (0xfffff000)
+    pde_t* final_pde = &virt_pd->entry[1023];
+    page_entry_add_attrib(final_pde, PDE_PRESENT | PDE_WRITABLE);
+    page_entry_set_frame(final_pde, (physical_addr_t)pd);
 
     unmap_temporary_pd();
     asm volatile("push %0; popf" : : "r"(eflags));
