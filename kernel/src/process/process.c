@@ -101,7 +101,19 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
         proc->tss_esp0 = 0;
     }
 
-    uint32_t stack_top = proc->stack_addr + stack_size;
+    // shift the stack top down by sizeof(virtual_addr_t) to reserve a slot for
+    // the root funcion dummy return address
+    // why? when the root function execute its standard prolouge (push ebp; move ebp, esp)
+    // its stack frame expects a return address at ebp + sizeof(virtual_address_t)
+    // which originally aligned with stack_top
+    // without the shift, reading ebp + sizeof(virtual_addr_t) would access the adj memory
+    // belong to the next heap block, which is the magic number field as the return address
+    // (or worse, an unmapped memory region)
+    // so we shift it by sizeof(virtual_addr_t) to safely contain
+    // the stack within the allocated block
+    // and set stack_top to 0 for the backtracer to return gracefully
+    uint32_t stack_top = proc->stack_addr + stack_size - sizeof(virtual_addr_t);
+    *(uint32_t*)stack_top = 0;
 
     // `push` default register states
     regs_t* regs;

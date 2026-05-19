@@ -23,6 +23,11 @@ void stack_trace(stackframe_t* stk) {
         uint32_t addr = stk->eip;
         printf("[0x%x] ", addr);
 
+        if(!addr) {
+            puts("stack end");
+            return;
+        }
+
         unsigned function_addr;
         char* function_name = kernel_find_symbol(addr, ELF_STT_FUNC, &function_addr);
 
@@ -37,7 +42,7 @@ void stack_trace(stackframe_t* stk) {
 
         stk = stk->ebp;
     }
-    if(stk != 0) puts("..."); // reached max frames limit
+    if(stk) puts("..."); // reached max frames limit
 }
 
 void kernel_set_strtab_ptr(uint32_t ptr) {

@@ -205,6 +205,7 @@ ret:
     return ret_err;
 }
 
+// FIXME: unroll to iteractive loop
 void vfs_cleanup_node_tree(fs_node_t* start_node) {
     if(start_node->refcount > 0)
         return;
