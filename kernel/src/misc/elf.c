@@ -80,7 +80,7 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
     required_pages += (prog_size % MMNGR_PAGE_SIZE) > 0;
 
     unsigned flags = PTE_WRITABLE;
-    if(pd != vmmngr_get_kernel_page_directory())
+    if(pd != KERNEL_PAGE_DIRECTORY)
         flags |= PTE_USER;
 
     // TODO: check and apply flags for each section
@@ -109,7 +109,7 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
             memset((void*)ph->vaddr + ph->file_segment_size, 0, ph->mem_segment_size - ph->file_segment_size);
     }
 
-    vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+    vmmngr_switch_page_directory(KERNEL_PAGE_DIRECTORY);
     asm volatile("push %0; popf" : : "r"(eflags));
 
     *entry = elf_header->program_entry;
@@ -148,7 +148,7 @@ ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
     vmmngr_switch_page_directory(proc->page_directory);
     regs_t* regs = (regs_t*)proc->saved_esp;
     regs->eip = entry;
-    vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+    vmmngr_switch_page_directory(KERNEL_PAGE_DIRECTORY);
     asm volatile("push %0; popf" : : "r"(eflags));
 
     return ERR_ELF_SUCCESS;

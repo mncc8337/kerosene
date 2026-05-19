@@ -4,6 +4,8 @@
 #include <string.h>
 #include <video.h>
 
+#include <mem.h>
+
 static void* routines[IDT_MAX_DESCRIPTORS];
 // from isr.asm
 extern void* isr_table[IDT_MAX_DESCRIPTORS];
@@ -43,10 +45,43 @@ static char* exception_message[] = {
     "Reserved"
 };
 
+// default exception handler
+static uint32_t exception_handler(regs_t* r) {
+    video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
+    printf("Exception: ");
+    video_set_attr(video_rgb(VIDEO_LIGHT_RED), video_rgb(VIDEO_BLACK));
+    puts(exception_message[r->int_no]);
+    video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
+    printf("Error code: 0b%b\n", r->err_code);
+
+    stackframe_t stk = {(stackframe_t*)r->ebp, r->eip};
+    kernel_panic(&stk);
+
+    return (uint32_t)r;
+}
+
 static uint32_t page_fault_handler(regs_t* r) {
     // the faulting address is stored in the CR2 register
     uint32_t faulting_address;
     asm volatile("mov %%cr2, %0" : "=r" (faulting_address));
+
+    // resolve lazy pde desync
+    if(faulting_address >= KERNEL_START) {
+        pde_t* cpy_pde = PAGE_DIRECTORY_LOOKUP(VMMNGR_PD, faulting_address);
+        const pde_t* src_pde = PAGE_DIRECTORY_LOOKUP(KERNEL_PAGE_DIRECTORY_DATA, faulting_address);
+        if(!((*cpy_pde) & PDE_PRESENT) && ((*src_pde) & PDE_PRESENT)) {
+            *cpy_pde = *src_pde;
+            vmmngr_flush_tlb_entry(faulting_address);
+            return (uint32_t)r;
+        }
+    }
+
+    // TODO: handle on demand paging and other features
+
+    // TODO:
+    // segfault if is user, else panick
+
+    // nah just panick
 
     bool p    = r->err_code & 0x1;
     bool rw   = r->err_code & 0x2;
@@ -57,7 +92,11 @@ static uint32_t page_fault_handler(regs_t* r) {
     bool ss   = r->err_code & 0x40;
     bool sgx  = r->err_code & 0x8000;
 
-    printf("page fault at address 0x%x\n", faulting_address);
+    video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
+    printf("page fault at address ");
+    video_set_attr(video_rgb(VIDEO_LIGHT_RED), video_rgb(VIDEO_BLACK));
+    printf("0x%x\n", faulting_address);
+    video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
     printf("flags: ");
 
     if(p) printf("present, ");
@@ -79,34 +118,43 @@ static uint32_t page_fault_handler(regs_t* r) {
     if(sgx) printf("SGX violation, ");
 
     putchar('\n');
-
-    return (uint32_t)r;
+    return exception_handler(r);
 }
 
 static void* exception_handlers[] = {
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
     page_fault_handler,
-    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
+    exception_handler,
 };
-
-// default exception handler
-static uint32_t exception_handler(regs_t* r) {
-    video_framebuffer_set_cursor(0);
-    video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
-    printf("Exception: ");
-    video_set_attr(video_rgb(VIDEO_LIGHT_RED), video_rgb(VIDEO_BLACK));
-    puts(exception_message[r->int_no]);
-    video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
-    printf("Error code: 0b%b\n", r->err_code);
-
-    void (*handler)(regs_t*) = exception_handlers[r->int_no];
-    if(handler) handler(r);
-
-    stackframe_t stk = {(stackframe_t*)r->ebp, r->eip};
-    kernel_panic(&stk);
-
-    return (uint32_t)r;
-}
 
 // default ISR. every interrupt will be "handled" by this function
 // returned value is the next context's ESP
@@ -143,7 +191,7 @@ void isr_init() {
     // set exception handler
     for(unsigned char vector = 0; vector < 32; vector++) {
         idt_set_descriptor(vector, isr_table[vector], 0x8f);
-        routines[vector] = exception_handler;
+        routines[vector] = exception_handlers[vector];
     }
 
     // set IRQ handler

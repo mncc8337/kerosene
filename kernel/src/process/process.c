@@ -23,7 +23,7 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
     proc->cwd = cwd ? cwd : &vfs_getfs(RAMFS_DISK)->root_node;
 
     if(!is_user) {
-        proc->page_directory = vmmngr_get_kernel_page_directory();
+        proc->page_directory = (page_directory_t*)KERNEL_PAGE_DIRECTORY;
         proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
         proc->file_count = vfs_get_kernel_file_count();
     } else {
@@ -59,7 +59,7 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
 
         heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
         if(!heap) {
-            vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+            vmmngr_switch_page_directory(KERNEL_PAGE_DIRECTORY);
             asm volatile("push %0; popf" : : "r"(eflags_cr3));
             vmmngr_free_page_directory(proc->page_directory);
             kfree(proc->file_descriptor_table);
@@ -69,7 +69,7 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
 
         proc->stack_addr = (uint32_t)heap_alloc(heap, USER_STACK_SIZE, false);
         if(!proc->stack_addr) {
-            vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+            vmmngr_switch_page_directory(KERNEL_PAGE_DIRECTORY);
             asm volatile("push %0; popf" : : "r"(eflags_cr3));
             vmmngr_free_page_directory(proc->page_directory);
             kfree(proc->file_descriptor_table);
@@ -80,7 +80,7 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
 
         proc->tss_esp0 = (uint32_t)kmalloc(KERNEL_STACK_SIZE);
         if(!proc->tss_esp0) {
-            vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+            vmmngr_switch_page_directory(KERNEL_PAGE_DIRECTORY);
             asm volatile("push %0; popf" : : "r"(eflags_cr3));
             vmmngr_free_page_directory(proc->page_directory);
             kfree(proc->file_descriptor_table);
@@ -143,7 +143,7 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
     proc->saved_esp = (uint32_t)regs;
 
     // restore to kernel pd
-    vmmngr_switch_page_directory(vmmngr_get_kernel_page_directory());
+    vmmngr_switch_page_directory(KERNEL_PAGE_DIRECTORY);
 
     // safely increment proc count while interrupts are still disabled
     proc->id = ++process_count;
@@ -191,7 +191,7 @@ process_t* process_make_idle() {
     proc->sleep_ticks = 0;
     proc->next = NULL;
 
-    proc->page_directory = vmmngr_get_kernel_page_directory();
+    proc->page_directory = (page_directory_t*)KERNEL_PAGE_DIRECTORY;
     proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
     proc->file_count = vfs_get_kernel_file_count();
     proc->cwd = &vfs_getfs(RAMFS_DISK)->root_node;

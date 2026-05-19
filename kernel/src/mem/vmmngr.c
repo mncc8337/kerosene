@@ -10,12 +10,7 @@
 // we need to use virtual address because accessing a physical address will result in a page fault
 #define PAGE_TABLE_ADDR(idx) (page_table_t*)(0xffc00000 + idx * MMNGR_PAGE_SIZE)
 
-// from kernel_entry.asm
-// this contains data of the kernel pd, premapped (since it located in the higher half)
-extern void* kernel_pd_data;
-
 static page_directory_t* current_page_directory = 0;
-static page_directory_t* kernel_page_directory = (page_directory_t*)((unsigned)&kernel_pd_data - KERNEL_START);
 
 static void page_entry_set_frame(uint32_t* pe, physical_addr_t addr) {
     *pe = (*pe & ~PAGE_FRAME_BITS) | addr;
@@ -57,10 +52,6 @@ static void unmap_temporary_pt() {
 
 page_directory_t* vmmngr_get_page_directory() {
     return current_page_directory;
-}
-
-page_directory_t* vmmngr_get_kernel_page_directory() {
-    return kernel_page_directory;
 }
 
 physical_addr_t vmmngr_to_physical_addr(page_directory_t* page_directory, virtual_addr_t virt) {
@@ -269,16 +260,16 @@ page_directory_t* vmmngr_alloc_page_directory() {
     map_temporary_pd(pd);
     page_directory_t* virt_pd = (page_directory_t*)VMMNGR_TEMP_PD;
 
-    // FIXME:
-    // as kernel processes map stuff to the higher half
-    // old user pds isnt updated
-    // we need a solution to sync the higher half to every created user pd
-    // for example sync on page faulting at higher half address (sync on demand)
-
     // copy the kernel pd to it so that we can access higher half memory
     // on interrupts
     page_directory_t* kernel_pd = (page_directory_t*)&kernel_pd_data;
     memcpy(virt_pd, kernel_pd, sizeof(page_directory_t));
+
+    // NOTE:
+    // as kernel processes map stuff to the higher half
+    // old user page directories isnt updated
+    // this is solved via lazy pde sync
+    // on kernel/src/system/isr.c page_fault_handler()
 
     // set final entry to itself for recursive paging
     // this also map itself to VMMNGR_PD (0xfffff000)
@@ -326,10 +317,10 @@ void vmmngr_free_page_directory(page_directory_t* page_directory) {
     asm volatile("push %0; popf" : : "r"(eflags));
 }
 
-void vmmngr_switch_page_directory(page_directory_t* dir) {
+void vmmngr_switch_page_directory(const page_directory_t* dir) {
     if(current_page_directory == dir) return;
 
-    current_page_directory = dir;
+    current_page_directory = (page_directory_t*)dir;
     asm volatile("mov %0, %%cr3" : : "r" (dir));
 }
 
@@ -338,5 +329,5 @@ void vmmngr_flush_tlb_entry(virtual_addr_t addr) {
 }
 
 void vmmngr_init() {
-    current_page_directory = kernel_page_directory;
+    current_page_directory = (page_directory_t*)KERNEL_PAGE_DIRECTORY;
 }

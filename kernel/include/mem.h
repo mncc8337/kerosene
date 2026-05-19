@@ -20,6 +20,12 @@ typedef uint32_t virtual_addr_t;
 
 #define VMMNGR_PD ((page_directory_t*)0xfffff000)
 
+// from kernel_entry.asm
+// this contains data of the kernel pd, premapped (since it located in the higher half)
+extern void* kernel_pd_data;
+#define KERNEL_PAGE_DIRECTORY_DATA ((const page_directory_t*)&kernel_pd_data)
+#define KERNEL_PAGE_DIRECTORY ((const page_directory_t*)((unsigned)&kernel_pd_data - KERNEL_START))
+
 #define PTE_PRESENT       1
 #define PTE_WRITABLE      2
 #define PTE_USER          4
@@ -93,7 +99,6 @@ void pmmngr_init(size_t size);
 
 // vmmngr.c
 page_directory_t* vmmngr_get_page_directory();
-page_directory_t* vmmngr_get_kernel_page_directory();
 physical_addr_t vmmngr_to_physical_addr(page_directory_t* page_directory, virtual_addr_t virt);
 MEM_ERR vmmngr_map(const page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags);
 void vmmngr_unmap(const page_directory_t* page_directory, virtual_addr_t virt);
@@ -101,7 +106,7 @@ MEM_ERR vmmngr_alloc_page(pte_t* pte);
 void vmmngr_free_page(pte_t* pte);
 page_directory_t* vmmngr_alloc_page_directory();
 void vmmngr_free_page_directory(page_directory_t* page_directory);
-void vmmngr_switch_page_directory(page_directory_t* dir);
+void vmmngr_switch_page_directory(const page_directory_t* dir);
 void vmmngr_flush_tlb_entry(virtual_addr_t addr);
 void vmmngr_init();
 
