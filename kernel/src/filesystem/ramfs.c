@@ -741,7 +741,10 @@ FS_ERR ramfs_write(
 ) {
     int position = file->position;
     ramfs_datanode_t** datanode_ptr = (ramfs_datanode_t**)&file->ramfs.current_datanode;
-    if(file->mode & FILE_APPEND) {
+
+    if(FS_NODE_IS_PIPE(*file->node)) {
+        datanode_ptr = (ramfs_datanode_t**)&file->ramfs.last_datanode;
+    } else if(file->mode & FILE_APPEND) {
         position = file->node->size;
         datanode_ptr = (ramfs_datanode_t**)&file->ramfs.last_datanode;
     }

@@ -158,7 +158,10 @@ FS_ERR file_write(
     }
     if(err) return err;
 
-    if(file->mode & FILE_APPEND) {
+    if(FS_NODE_IS_PIPE(*file->node)) {
+        file->node->size += (*actual_write_size);
+        file->position += (*actual_write_size);
+    } else if(file->mode & FILE_APPEND) {
         file->node->size += (*actual_write_size);
         file->position = file->node->size;
     } else {
