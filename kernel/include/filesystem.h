@@ -207,7 +207,7 @@ void vfs_cleanup_node_tree(fs_node_t* start_node);
 int vfs_open(const char* path, const char* modestr);
 void vfs_close(int file_descriptor);
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size);
-int vfs_write(int file_descriptor, uint8_t* buffer, size_t size);
+int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size);
 void vfs_printtree();
 
 // fs_op.c
@@ -223,7 +223,7 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
 // file_op.c
 FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr);
 FS_ERR file_seek(file_description_t* file, size_t pos);
-FS_ERR file_write(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_write_size);
+FS_ERR file_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
 FS_ERR file_sync(file_description_t* file);
 
@@ -244,7 +244,7 @@ FS_ERR ramfs_file_reset(fs_node_t* node);
 FS_ERR ramfs_pipe_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
 FS_ERR ramfs_seek(file_description_t* file, size_t pos);
 FS_ERR ramfs_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
-FS_ERR ramfs_write(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_write_size);
+FS_ERR ramfs_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
 
 FS_ERR ramfs_init(fs_t* fs);
 
@@ -264,6 +264,6 @@ FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, con
 FS_ERR fat32_file_reset(fs_node_t* node);
 FS_ERR fat32_seek(file_description_t* file, size_t pos);
 FS_ERR fat32_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
-FS_ERR fat32_write(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_write_size);
+FS_ERR fat32_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
 
 FS_ERR fat32_init(fs_t* fs, partition_entry_t part);

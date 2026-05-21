@@ -344,7 +344,7 @@ int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
         return -1;
 }
 
-int vfs_write(int file_descriptor, uint8_t* buffer, size_t size) {
+int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current_process();
 
     // prevent user process from writing into

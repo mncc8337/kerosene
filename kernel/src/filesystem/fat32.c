@@ -520,7 +520,7 @@ static FS_ERR read_file(
 static FS_ERR write_file(
     fs_t* fs,
     uint32_t* start_cluster,
-    uint8_t* buffer,
+    const uint8_t* buffer,
     size_t size,
     size_t* actual_write_size,
     int cluster_offset,
@@ -604,7 +604,7 @@ static FS_ERR write_file(
                 false,
                 fs->partition.LBA_start + first_sector,
                 sectors_per_cluster,
-                buffer
+                (uint8_t*)buffer
             );
         } else {
             if(next_position <= file_size) {
@@ -1501,7 +1501,7 @@ FS_ERR fat32_read(
 
 FS_ERR fat32_write(
     file_description_t* file,
-    uint8_t* data,
+    const uint8_t* data,
     size_t size,
     size_t* actual_write_size
 ) {

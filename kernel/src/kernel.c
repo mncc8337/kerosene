@@ -1,4 +1,3 @@
-#include "kproc.h"
 #include <multiboot.h>
 
 #include <video.h>
@@ -10,12 +9,14 @@
 
 #include <system.h>
 #include <process.h>
+#include <kproc.h>
 #include <syscall.h>
 #include <mem.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/syscall.h>
 #include <debug.h>
 
 #include <misc/elf.h>
@@ -322,20 +323,18 @@ void kinit(multiboot_info_t* mbd) {
 }
 
 void kernel_proc1() {
-    int ret;
     while(true) {
-        SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
+        syscall_sleep(100);
         video_framebuffer_fill_rectangle(20, 20, 40, 40, video_framebuffer_rgb(VIDEO_GREEN));
     }
-    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
+    syscall_kill_process();
 }
 void kernel_proc2() {
-    int ret;
     while(true) {
-        SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
+        syscall_sleep(100);
         video_framebuffer_fill_rectangle(20, 20, 40, 40, video_framebuffer_rgb(VIDEO_RED));
     }
-    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
+    syscall_kill_process();
 }
 
 void kmain() {
@@ -352,9 +351,7 @@ void kmain() {
     print_debug(LT_IF, "done initialising\n");
     // free now
 
-    int ret;
-
-    SYSCALL_1P(SYSCALL_SLEEP, ret, 1000);
+    syscall_sleep(1000);
 
     process_t* uproc = process_new(0, true, NULL);
     if(uproc) {
@@ -363,7 +360,7 @@ void kmain() {
             FS_ERR ferr = elf_get_err();
             printf("file err while loading %s: %d\n", "hi.elf", ferr);
         } else {
-            SYSCALL_1P(SYSCALL_SLEEP, ret, 100);
+            syscall_sleep(100);
             scheduler_add_process(uproc);
             puts("uproc started");
         }
@@ -371,7 +368,7 @@ void kmain() {
         printf("failed to start uproc\n");
     }
 
-    SYSCALL_1P(SYSCALL_SLEEP, ret, 7000);
+    syscall_sleep(7000);
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL);
     if(proc1) scheduler_add_process(proc1);

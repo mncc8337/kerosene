@@ -5,7 +5,7 @@
 #if defined(__is_libk)
 #define CLOCKS_PER_SEC TIMER_FREQUENCY
 #else
-// this is just a placeholder
+// FIXME: this is just a placeholder
 #define CLOCKS_PER_SEC 1000
 #endif
 

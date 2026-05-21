@@ -218,7 +218,7 @@ static FS_ERR read_file(
 
 static FS_ERR write_file(
     ramfs_datanode_t** start_datanode,
-    uint8_t* buffer,
+    const uint8_t* buffer,
     size_t size,
     size_t* actual_write_size,
     int data_offset
@@ -735,7 +735,7 @@ FS_ERR ramfs_read(
 
 FS_ERR ramfs_write(
     file_description_t* file,
-    uint8_t* buffer,
+    const uint8_t* buffer,
     size_t size,
     size_t* actual_write_size
 ) {

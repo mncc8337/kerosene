@@ -4,16 +4,17 @@
 #if defined(__is_libk)
 #include <timer.h>
 #else
-#include <syscall.h>
+#include <sys/syscall.h>
 #endif
 
 time_t time(time_t* timer) {
-    time_t curr_time = -1;
 
 #if defined(__is_libk)
-    curr_time = timer_get_current_time();
+    time_t curr_time = timer_get_current_time();
 #else
-    SYSCALL_1P(SYSCALL_TIME, curr_time, timer);
+    // the line below will call the line above
+    // but in a different function lmao
+    time_t curr_time = syscall_time(timer);
 #endif
 
     if(timer != NULL)

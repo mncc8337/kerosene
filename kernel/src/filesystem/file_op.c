@@ -138,7 +138,7 @@ FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t*
 
 FS_ERR file_write(
     file_description_t* file,
-    uint8_t* buffer,
+    const uint8_t* buffer,
     size_t size,
     size_t* actual_write_size
 ) {

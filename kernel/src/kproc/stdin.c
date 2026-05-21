@@ -1,6 +1,5 @@
 #include <kproc.h>
 #include <filesystem.h>
-#include <syscall.h>
 #include <video.h>
 #include <kbd.h>
 #include <sysfiles.h>
