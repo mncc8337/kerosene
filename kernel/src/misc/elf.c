@@ -96,6 +96,9 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
 
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+
+    // save active pd for reverting
+    page_directory_t* active_pd = vmmngr_get_page_directory();
     vmmngr_switch_page_directory(pd);
 
     for(unsigned i = 0; i < elf_header->ph_entry_count; i++) {
@@ -109,7 +112,7 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
             memset((void*)ph->vaddr + ph->file_segment_size, 0, ph->mem_segment_size - ph->file_segment_size);
     }
 
-    vmmngr_switch_page_directory(KERNEL_PAGE_DIRECTORY);
+    vmmngr_switch_page_directory(active_pd);
     asm volatile("push %0; popf" : : "r"(eflags));
 
     *entry = elf_header->program_entry;
@@ -145,10 +148,11 @@ ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
     
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+    page_directory_t* active_pd = vmmngr_get_page_directory();
     vmmngr_switch_page_directory(proc->page_directory);
     regs_t* regs = (regs_t*)proc->saved_esp;
     regs->eip = entry;
-    vmmngr_switch_page_directory(KERNEL_PAGE_DIRECTORY);
+    vmmngr_switch_page_directory(active_pd);
     asm volatile("push %0; popf" : : "r"(eflags));
 
     return ERR_ELF_SUCCESS;
