@@ -25,7 +25,10 @@ FS_ERR vfs_find_and_create_node(
 
     size_t pathlen = strlen(path);
     char* pathcpy_pos = kmalloc(pathlen + 1);
-    if (!pathcpy_pos) return ERR_FS_NOT_ENOUGH_SPACE;
+    if(!pathcpy_pos) {
+        asm volatile("push %0; popf" : : "r"(eflags));
+        return ERR_FS_NOT_ENOUGH_SPACE;
+    }
 
     memcpy(pathcpy_pos, path, pathlen + 1);
     char* pathcpy = pathcpy_pos;
