@@ -42,7 +42,7 @@ kernel_pd_data:
     times 1024 dd 0x00000000
 page_table_4mib:
     times 1024 dd 0x00000000
-page_table_kernel1: ; extend if exceed 4MiB
+page_table_kernel1: ; extend if kernel exceed 2MiB
     times 1024 dd 0x00000000
 
 section .text
@@ -72,7 +72,7 @@ kernel_entry:
     or eax, 0b011
     mov [kernel_pd_data - KERNEL_START + phys_to_virt(KERNEL_START)], eax
 
-    ; map the first 4mb
+    ; identity map the first 4MiB
     mov edi, page_table_4mib - KERNEL_START
     mov eax, 0x0
     or eax, 0b011
@@ -83,12 +83,15 @@ kernel_entry:
     add eax, 4096
     loop .loop_4mib
 
-    ; map kernel to 0xc0000000
+    ; map the first 4MiB to 0xc0000000
+    ; this includes BIOS/GRUB stuff (first 2MiB)
+    ; and our kernel (next 2MiB)
     mov edi, page_table_kernel1 - KERNEL_START
     mov eax, 0x0
+    ; temporary map all kernel data as rw
+    ; upon reaching kinit() we will set
+    ; the correct permission for each part (text and rodata)
     or eax, 0b011
-    ; FIXME: .text and .rodata are actually should only be readable
-    ; but idk how to do it separately so just set them to read/write for now
     mov ecx, 1024
 .loop_kernel1:
     mov [edi], eax
@@ -116,7 +119,8 @@ kernel_entry:
 higher_half:
     ; unmap the first 4MiB identity
     mov dword [kernel_pd_data], 0x0
-    invlpg [0]
+    mov eax, cr3
+    mov cr3, eax
 
     mov esp, kernel_stack_top
     push dword [multiboot_ptr]

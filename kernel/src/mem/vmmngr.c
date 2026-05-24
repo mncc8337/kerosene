@@ -4,12 +4,6 @@
 
 #define PAGE_FRAME_BITS 0xfffff000
 
-// our page table VIRTUAL address can be get by adding 0xffc00000 (4*1024*1024*1023)
-// with page directory index multiply by page size
-// we can do this because we have recursive paging (see kernel_entry.asm)
-// we need to use virtual address because accessing a physical address will result in a page fault
-#define PAGE_TABLE_ADDR(idx) (page_table_t*)(0xffc00000 + idx * MMNGR_PAGE_SIZE)
-
 static page_directory_t* current_page_directory = 0;
 
 static void page_entry_set_frame(uint32_t* pe, physical_addr_t addr) {
@@ -139,14 +133,6 @@ MEM_ERR vmmngr_map(const page_directory_t* page_directory, physical_addr_t phys,
         page_entry_add_attrib(pde, flags | PDE_PRESENT); // the first few PDE and PTE flags are the same so we can do this
         page_entry_set_frame(pde, new_phys);
         
-        // reloading cr3 to flush the entire directory cache
-        // to clear the non-presen state in the cache
-        // else it will give a page fault when accessing this same pde on
-        // the same iteration
-        if(!page_directory) {
-            asm volatile("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "eax", "memory");
-        }
-
         // we cant access the new table via its final recursive address.
         // we must map its physical page (new_phys) to another temporary
         // virtual address that is valid in the current page directory.
@@ -326,6 +312,10 @@ void vmmngr_switch_page_directory(const page_directory_t* dir) {
 
 void vmmngr_flush_tlb_entry(virtual_addr_t addr) {
     asm volatile("invlpg %0" : : "m" (*(char*)addr) : "memory");
+}
+
+void vmmngr_flush_tlb() {
+    asm volatile("mov %%cr3, %%eax; mov %%eax, %%cr3" ::: "eax", "memory");
 }
 
 void vmmngr_init() {

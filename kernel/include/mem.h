@@ -53,6 +53,11 @@ extern void* kernel_pd_data;
 #define PAGE_TABLE_LOOKUP(page, addr) (&(page)->entry[PAGE_TABLE_INDEX(addr)])
 #define PAGE_DIRECTORY_LOOKUP(page, addr) (&(page)->entry[PAGE_DIRECTORY_INDEX(addr)])
 
+// our page table VIRTUAL address can be get by adding 0xffc00000 (4*1024*1024*1023)
+// with page directory index multiply by page size
+// we can do this because we have recursive paging (see kernel_entry.asm)
+#define PAGE_TABLE_ADDR(idx) (page_table_t*)(0xffc00000 + (idx) * MMNGR_PAGE_SIZE)
+
 #define HEAP_SUPERVISOR 0b01
 #define HEAP_READONLY   0b10
 
@@ -108,6 +113,7 @@ page_directory_t* vmmngr_alloc_page_directory();
 void vmmngr_free_page_directory(page_directory_t* page_directory);
 void vmmngr_switch_page_directory(const page_directory_t* dir);
 void vmmngr_flush_tlb_entry(virtual_addr_t addr);
+void vmmngr_flush_tlb();
 void vmmngr_init();
 
 // heap.c

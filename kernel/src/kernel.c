@@ -1,4 +1,3 @@
-#include "unistd.h"
 #include <multiboot.h>
 
 #include <video.h>
@@ -193,8 +192,8 @@ void disk_init() {
 
 void kinit(multiboot_info_t* mbd) {
     // from kernel_entry.asm
-    extern char kernel_start;
-    extern char kernel_end;
+    extern uint32_t kernel_start;
+    extern uint32_t kernel_end;
     kernel_size = &kernel_end - &kernel_start;
 
     // greeting msg to let us know we are in the kernel
@@ -222,6 +221,25 @@ void kinit(multiboot_info_t* mbd) {
 
     if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) kernel_panic(NULL);
     mem_init((void*)mbd->mmap_addr + KERNEL_START, mbd->mmap_length);
+
+    // correctly set kernel data region permissions
+    extern uint32_t kernel_text_start;
+    extern uint32_t kernel_text_end;
+    extern uint32_t kernel_rodata_start;
+    extern uint32_t kernel_rodata_end;
+    uint32_t kernel_text_start_addr = (uint32_t)&kernel_text_start;
+    uint32_t kernel_text_end_addr = (uint32_t)&kernel_text_end;
+    uint32_t kernel_rodata_start_addr = (uint32_t)&kernel_rodata_start;
+    uint32_t kernel_rodata_end_addr = (uint32_t)&kernel_rodata_end;
+    for(uint32_t addr = kernel_text_start_addr; addr < kernel_text_end_addr; addr += MMNGR_PAGE_SIZE) {
+        pte_t* pte = (pte_t*)(0xffc00000 + ((addr >> 12) * 4));
+        *pte &= ~PTE_WRITABLE; // unset writable
+    }
+    for(uint32_t addr = kernel_rodata_start_addr; addr < kernel_rodata_end_addr; addr += MMNGR_PAGE_SIZE) {
+        pte_t* pte = (pte_t*)(0xffc00000 + ((addr >> 12) * 4));
+        *pte &= ~PTE_WRITABLE; // unset writable
+    }
+    vmmngr_flush_tlb();
 
     video_init(mbd);
 
