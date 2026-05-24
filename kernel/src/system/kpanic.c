@@ -1,8 +1,9 @@
 #include <system.h>
+#include <process.h>
 #include <mem.h>
-#include <misc/elf.h>
 #include <stdio.h>
 #include <video.h>
+#include <misc/elf.h>
 
 #define MAX_FRAMES 30
 
@@ -82,6 +83,12 @@ void kernel_panic(stackframe_t* stk) {
     video_set_attr(video_rgb(VIDEO_LIGHT_RED), video_rgb(VIDEO_BLACK));
     puts("kernel panicked!");
     video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
+
+    process_t* current_process = scheduler_get_current_process();
+    if(current_process) {
+        printf("current process: 0x%x (id %d)\n", current_process, current_process->id);
+    }
+
     puts("stack trace:");
     stack_trace(stk);
     puts("system halted!");
