@@ -7,6 +7,32 @@
 // from vfs.c
 extern fs_t* FS;
 
+static bool validate_user_buffer(const process_t* current_process, const void* buf, size_t size) {
+    if(!current_process->is_user) return true;
+
+    const char* start = (const char*)buf;
+    const char* end = start + size;
+
+    if (end < start) return false;
+    if ((uint32_t)end > KERNEL_START) return false;
+
+    return true;
+}
+
+static bool validate_user_string(const process_t* current_process, const char* str) {
+    if(!current_process->is_user) return true;
+
+    if((uint32_t)str >= KERNEL_START) return false;
+
+    const char* p = str;
+    while ((uint32_t)p < KERNEL_START) {
+        if (*p == '\0') return true;
+        p++;
+    }
+
+    return false;
+}
+
 FS_ERR vfs_find_and_create_node(
     const char* path,
     fs_node_t* cwd,
@@ -243,6 +269,9 @@ void vfs_cleanup_node_tree(fs_node_t* start_node) {
 int vfs_open(const char* path, const char* modestr) {
     process_t* proc = scheduler_get_current_process();
 
+    if(!validate_user_string(proc, path) || validate_user_string(proc, modestr))
+        return -1;
+
     if(proc->file_count >= MAX_FILE)
         return -1;
 
@@ -306,21 +335,8 @@ void vfs_close(int file_descriptor) {
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current_process();
 
-    // prevent user process from writing into
-    // kernel's memory space
-    if(proc->is_user) {
-        void* start = (void*)buffer;
-        void* end = start + size;
-
-        // overflow check
-        if(end < start) {
-            return -1; // sus size
-        }
-
-        if(end > (void*)KERNEL_START) {
-            return -1; // leaking to kernel's memspace
-        }
-    }
+    if(!validate_user_buffer(proc, buffer, size))
+        return -1;
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return -1;
@@ -347,21 +363,8 @@ int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
 int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current_process();
 
-    // prevent user process from writing into
-    // kernel's memory space
-    if(proc->is_user) {
-        void* start = (void*)buffer;
-        void* end = start + size;
-
-        // overflow check
-        if(end < start) {
-            return -1; // sus size
-        }
-
-        if(end > (void*)KERNEL_START) {
-            return -1; // leaking to kernel's memspace
-        }
-    }
+    if(!validate_user_buffer(proc, buffer, size))
+        return -1;
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return -1;
