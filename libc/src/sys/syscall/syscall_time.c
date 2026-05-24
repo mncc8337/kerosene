@@ -1,11 +1,9 @@
+#include <stdint.h>
 #include <sys/syscall.h>
 
-time_t syscall_time(time_t* timer) {
-    time_t curr_time = -1;
-    SYSCALL_1P(SYSCALL_TIME, curr_time, timer);
-
-    if(timer != NULL)
-        *timer = curr_time;
-    return curr_time;
+uint64_t syscall_time() {
+    int dummy_ret;
+    uint64_t ret = 0;
+    SYSCALL_1P(SYSCALL_TIME, dummy_ret, &ret);
+    return ret;
 }
-

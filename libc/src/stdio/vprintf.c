@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <string.h>
+#include <stdbool.h>
 
 static bool print(const char* data, size_t length) {
     const unsigned char* bytes = (const unsigned char*)data;

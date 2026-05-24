@@ -2,7 +2,7 @@
 #include <system.h>
 #include <process.h>
 #include <filesystem.h>
-#include <time.h>
+#include <timer.h>
 
 #define ADD_SYSCALL(id, func) syscalls[id] = func
 
@@ -36,7 +36,7 @@ static uint32_t syscall_dispatcher(regs_t* regs) {
 }
 
 void syscall_init() {
-    ADD_SYSCALL(SYSCALL_TIME, time);
+    ADD_SYSCALL(SYSCALL_TIME, timer_get_current_time_syscall);
 
     ADD_SYSCALL(SYSCALL_KILL_PROCESS, scheduler_kill_process);
     ADD_SYSCALL(SYSCALL_SLEEP, scheduler_set_sleep);

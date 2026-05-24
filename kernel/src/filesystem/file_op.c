@@ -1,4 +1,5 @@
 #include <filesystem.h>
+#include <timer.h>
 
 #include <stdint.h>
 #include <string.h>
@@ -70,7 +71,7 @@ FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr)
             return ERR_FS_NOT_SUPPORTED;
     }
 
-    node->accessed_timestamp = time(NULL);
+    node->accessed_timestamp = timer_get_current_time();
 
     return ERR_FS_SUCCESS;
 }
@@ -200,7 +201,7 @@ FS_ERR file_write(
             file->node->size = file->position;
         }
     }
-    file->node->modified_timestamp = time(NULL);
+    file->node->modified_timestamp = timer_get_current_time();
     return ERR_FS_SUCCESS;
 }
 

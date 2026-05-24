@@ -1,10 +1,11 @@
 #pragma once
 
-#include <time.h>
+#include <stdint.h>
 
-time_t timer_get_start_time();
-time_t timer_get_current_time();
-time_t timer_get_seconds_since_start();
-unsigned timer_get_current_ticks();
+uint64_t timer_get_start_time();
+uint64_t timer_get_current_time();
+void timer_get_current_time_syscall(uint64_t* time);
+uint64_t timer_get_seconds_since_start();
+uint64_t timer_get_current_ticks();
 
 void timer_init();

@@ -4,9 +4,9 @@
 #include <rtc.h>
 #include <process.h>
 
-static unsigned ticks = 0;
-static time_t start_timestamp;
-static time_t seconds_since_start = 0;
+static uint64_t ticks = 0;
+static uint64_t start_timestamp;
+static uint64_t seconds_since_start = 0;
 
 static uint32_t tick_handler(regs_t* r) {
     ticks++;
@@ -20,19 +20,37 @@ static uint32_t tick_handler(regs_t* r) {
     return scheduler_switch(r);
 }
 
-time_t timer_get_start_time() {
+uint64_t timer_get_start_time() {
     return start_timestamp;
 }
 
-time_t timer_get_current_time() {
-    return start_timestamp + seconds_since_start;
+uint64_t timer_get_current_time() {
+    // because we are now using uint64_t
+    // the adding operation is not atomic any more
+    // so disabling interrupts is required
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+
+    uint64_t value = start_timestamp + seconds_since_start;
+
+    asm volatile("push %0; popf" : : "r"(eflags));
+    return value;
 }
 
-time_t timer_get_seconds_since_start() {
+void timer_get_current_time_syscall(uint64_t* time) {
+    if(!time) return;
+
+    process_t* proc = scheduler_get_current_process();
+    if(proc->is_user && (uint32_t)time >= KERNEL_START) return;
+
+    *time = timer_get_current_time();
+}
+
+uint64_t timer_get_seconds_since_start() {
     return seconds_since_start;
 }
 
-unsigned timer_get_current_ticks() {
+uint64_t timer_get_current_ticks() {
     return ticks;
 }
 

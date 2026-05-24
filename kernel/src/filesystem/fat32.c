@@ -1,5 +1,6 @@
 #include <filesystem.h>
 #include <ata.h>
+#include <timer.h>
 
 #include <string.h>
 
@@ -1041,7 +1042,7 @@ FS_ERR fat32_add_entry(
         new_node->flags |= FS_FLAG_HIDDEN;
 
     new_node->creation_milisecond = (clock() % CLOCKS_PER_SEC) * 1000 / CLOCKS_PER_SEC;
-    new_node->creation_timestamp = time(NULL);
+    new_node->creation_timestamp = timer_get_current_time();
     new_node->modified_timestamp = 0;
     new_node->accessed_timestamp = 0;
 
@@ -1432,7 +1433,7 @@ FS_ERR fat32_file_reset(fs_node_t* node) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_seek_absolute(file_description_t* file, uint64_t seek_position) {
+FS_ERR fat32_seek_absolute(file_description_t* file, int64_t seek_position) {
     if(file->position == seek_position)
         return ERR_FS_SUCCESS;
 

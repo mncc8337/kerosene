@@ -1,6 +1,6 @@
 #include <stdio.h>
-#include <time.h>
 #include <unistd.h>
+#include <time.h>
 #include <sys/syscall.h>
 
 int buffer[512];

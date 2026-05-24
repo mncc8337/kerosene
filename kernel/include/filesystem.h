@@ -247,7 +247,7 @@ FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* c
 
 FS_ERR ramfs_file_reset(fs_node_t* node);
 FS_ERR ramfs_pipe_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
-FS_ERR ramfs_seek_absolute(file_description_t* file, uint64_t seek_position);
+FS_ERR ramfs_seek_absolute(file_description_t* file, int64_t seek_position);
 FS_ERR ramfs_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
 FS_ERR ramfs_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
 
@@ -267,7 +267,7 @@ FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
 FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
 
 FS_ERR fat32_file_reset(fs_node_t* node);
-FS_ERR fat32_seek_absolute(file_description_t* file, uint64_t seek_position);
+FS_ERR fat32_seek_absolute(file_description_t* file, int64_t seek_position);
 FS_ERR fat32_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
 FS_ERR fat32_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
 

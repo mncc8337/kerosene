@@ -14,7 +14,7 @@ static uint8_t read_reg(uint8_t reg) {
 
 // NOTE:
 // when using RTC IRQ
-// please include these lines to the handler
+// you need to include these lines to the handler
 //     port_outb(PORT_RTC_SELECT_REG, RTC_REG_C);
 //     port_inb(PORT_RTC_DAT);
 // this is because the register C need to be read
