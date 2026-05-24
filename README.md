@@ -129,7 +129,7 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
         + [x] close file
         + [x] read file
         + [x] write file
-        + [ ] file seek
+        + [x] file seek
         + [ ] remove file
         + [ ] mkdir
         + [ ] remove dir

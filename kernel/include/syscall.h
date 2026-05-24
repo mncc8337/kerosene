@@ -8,6 +8,7 @@ enum {
     SYSCALL_CLOSE,
     SYSCALL_READ,
     SYSCALL_WRITE,
+    SYSCALL_SEEK,
     MAX_SYSCALL
 };
 

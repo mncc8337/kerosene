@@ -39,7 +39,8 @@ DEFINES := -DKERNEL_START=$(KERNEL_START) \
 		  -DUHEAP_MAX_SIZE=$(UHEAP_MAX_SIZE) \
 
 CFLAGS = $(DEFINES) -ffreestanding -O0 -Wall -Wextra -g -MMD -MP
-LDFLAGS = -T linker.ld -nostdlib -lgcc
+LDFLAGS = -T linker.ld -nostdlib
+LDLIBS = -lgcc
 ASFLAGS = $(DEFINES) -f elf32 -F dwarf
 
 ifdef NO_CROSS_COMPILER
@@ -85,12 +86,12 @@ $(OBJ_DIR)kernel/%.asm.o: kernel/src/%.asm
 	$(AS) $(ASFLAGS) -o $@ $<
 $(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(OBJ) $(BIN_DIR)libk.a
 	# use GCC to link instead of LD because LD cannot find the libgcc
-	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lk
+	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lk $(LDLIBS)
 
 # user app
 fsfiles/%.elf: userapp/%.c
 	# TODO: remove -I./kernel/include
-	$(CC) -I./libc/include -I./kernel/include -ffreestanding -nostdlib -lgcc -e main -o $@ $< -L./bin -lc
+	$(CC) $(DEFINES) -I./libc/include -I./kernel/include -ffreestanding -nostdlib -e main -o $@ $< -L./bin -lc -lgcc
 
 libc: $(BIN_DIR)libc.a
 

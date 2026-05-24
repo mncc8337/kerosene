@@ -1432,8 +1432,8 @@ FS_ERR fat32_file_reset(fs_node_t* node) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_seek(file_description_t* file, size_t pos) {
-    if(file->position == pos)
+FS_ERR fat32_seek_absolute(file_description_t* file, uint64_t seek_position) {
+    if(file->position == seek_position)
         return ERR_FS_SUCCESS;
 
     uint32_t current_cluster = file->node->fat32.start_cluster;
@@ -1444,14 +1444,15 @@ FS_ERR fat32_seek(file_description_t* file, size_t pos) {
     uint32_t cluster_size = sectors_per_cluster * bootrec->bpb.bytes_per_sector;
     uint32_t first_FAT_sector = get_first_FAT_sector(bootrec);
 
-    if(file->position <= pos) {
+    if(file->position <= seek_position) {
         current_cluster = file->fat32.current_cluster;
-        current_size = file->position - (file->position % cluster_size);
+        // aligning down
+        current_size = file->position & ~((uint64_t)cluster_size - 1);
     }
 
     while(true) {
         current_size += cluster_size;
-        if(current_size >= pos) {
+        if(current_size >= seek_position) {
             current_size -= cluster_size;
             break;
         }
@@ -1465,10 +1466,10 @@ FS_ERR fat32_seek(file_description_t* file, size_t pos) {
         current_cluster = FAT_val;
     }
 
-    if(current_size + RAMFS_DATANODE_SIZE < pos)
+    if(current_size + cluster_size < seek_position)
         file->position = file->node->size;
     else
-        file->position = pos;
+        file->position = seek_position;
 
     file->fat32.current_cluster = current_cluster;
 

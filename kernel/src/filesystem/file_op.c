@@ -1,5 +1,6 @@
 #include <filesystem.h>
 
+#include <stdint.h>
 #include <string.h>
 
 FS_ERR file_reset(fs_node_t* node) {
@@ -74,21 +75,50 @@ FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr)
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR file_seek(file_description_t* file, size_t pos) {
+// seek to absolute position
+FS_ERR file_seek(
+    file_description_t* file,
+    int64_t offset,
+    int whence,
+    int64_t* final_position
+) {
     // TODO:
     // support a+ mode
 
     if(file->mode & FILE_APPEND)
         return ERR_FS_FAILED;
 
+    uint64_t absolute_position = 0;
+
+    switch(whence) {
+        case SEEK_ABSOLUTE:
+            absolute_position = offset;
+            break;
+        case SEEK_RELATIVE:
+            absolute_position = file->node->size + offset;
+            break;
+        case SEEK_END:
+            absolute_position = file->node->size;
+            break;
+    }
+
+    FS_ERR err;
+
     switch(file->node->fs->type) {
         case FS_RAMFS:
-            return ramfs_seek(file, pos);
+            err = ramfs_seek_absolute(file, absolute_position);
+            break;
         case FS_FAT32:
-            return fat32_seek(file, pos);
+            err = fat32_seek_absolute(file, absolute_position);
+            break;
         default:
-            return ERR_FS_NOT_SUPPORTED;
+            err = ERR_FS_NOT_SUPPORTED;
     }
+
+    if(!err && final_position)
+        *final_position = file->position;
+
+    return err;
 }
 
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size) {

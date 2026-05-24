@@ -1,3 +1,4 @@
+#include "unistd.h"
 #include <multiboot.h>
 
 #include <video.h>

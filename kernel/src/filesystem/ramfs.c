@@ -684,18 +684,18 @@ FS_ERR ramfs_pipe_read(
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR ramfs_seek(file_description_t* file, size_t pos) {
+FS_ERR ramfs_seek_absolute(file_description_t* file, uint64_t seek_position) {
     ramfs_datanode_t* current_datanode = ((ramfs_node_t*)file->node->ramfs.node_addr)->datanode_chain;
     size_t current_size = 0;
 
-    if(file->position < pos) {
+    if(file->position < seek_position) {
         current_datanode = (ramfs_datanode_t*)file->ramfs.current_datanode;
         current_size = file->position - (file->position % RAMFS_DATANODE_SIZE);
     }
 
     while(true) {
         current_size += RAMFS_DATANODE_SIZE;
-        if(current_size >= pos) {
+        if(current_size >= seek_position) {
             current_size -= RAMFS_DATANODE_SIZE;
             break;
         }
@@ -704,10 +704,10 @@ FS_ERR ramfs_seek(file_description_t* file, size_t pos) {
         else break;
     }
 
-    if(current_size + RAMFS_DATANODE_SIZE < pos)
+    if(current_size + RAMFS_DATANODE_SIZE < seek_position)
         file->position = file->node->size;
     else
-        file->position = pos;
+        file->position = seek_position;
 
     file->ramfs.current_datanode = (uint32_t)current_datanode;
 

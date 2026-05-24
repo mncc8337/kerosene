@@ -13,8 +13,8 @@ static bool validate_user_buffer(const process_t* current_process, const void* b
     const char* start = (const char*)buf;
     const char* end = start + size;
 
-    if (end < start) return false;
-    if ((uint32_t)end > KERNEL_START) return false;
+    if(end < start) return false;
+    if((uint32_t)end > KERNEL_START) return false;
 
     return true;
 }
@@ -25,7 +25,7 @@ static bool validate_user_string(const process_t* current_process, const char* s
     if((uint32_t)str >= KERNEL_START) return false;
 
     const char* p = str;
-    while ((uint32_t)p < KERNEL_START) {
+    while((uint32_t)p < KERNEL_START) {
         if (*p == '\0') return true;
         p++;
     }
@@ -269,7 +269,7 @@ void vfs_cleanup_node_tree(fs_node_t* start_node) {
 int vfs_open(const char* path, const char* modestr) {
     process_t* proc = scheduler_get_current_process();
 
-    if(!validate_user_string(proc, path) || validate_user_string(proc, modestr))
+    if(!validate_user_string(proc, path) || !validate_user_string(proc, modestr))
         return -1;
 
     if(proc->file_count >= MAX_FILE)
@@ -384,4 +384,35 @@ int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size) {
         return write_size;
     else
         return -1;
+}
+
+int64_t vfs_seek(int file_descriptor, int64_t offset, int whence) {
+    process_t* proc = scheduler_get_current_process();
+
+    if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
+        return -1;
+
+    file_description_t* fde = proc->file_descriptor_table + file_descriptor;
+
+    if(fde->node == NULL)
+        return -1;
+
+    int64_t ret;
+    FS_ERR seek_err = file_seek(fde, offset, whence, &ret);
+    if(seek_err == ERR_FS_SUCCESS)
+        return ret;
+    else
+        return -1;
+}
+
+void vfs_seek_syscall(
+    int file_descriptor,
+    uint32_t hoff,
+    uint32_t loff,
+    int whence,
+    int64_t* position
+) {
+    int64_t pos = ((uint64_t)(hoff & 0xffffffff) << 32) | (loff & 0xffffffff);
+    int64_t ret = vfs_seek(file_descriptor, pos, whence);
+    *position = ret;
 }

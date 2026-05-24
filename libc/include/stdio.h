@@ -2,6 +2,7 @@
 
 #include <sys/cdefs.h>
 #include <stdarg.h>
+#include <bits/seek.h>
 
 #define EOF (-1)
 
