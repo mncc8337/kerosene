@@ -137,6 +137,7 @@ FS_ERR vfs_find_and_create_node(
                 goto nuke_search_stack_and_ret;
             }
             search_stack[search_stack_counter++] = new_node;
+            new_node->parent = NULL;
 
             FS_ERR find_err = fs_find(parent_node, current_name, new_node);
             if(find_err) {
@@ -207,14 +208,16 @@ nuke_search_stack_and_ret:
     // NOTE: do cached discovered nodes instead of cleaving them on site
     if(search_stack_counter > 0) {
         // unlink the first node on the search stack
-        fs_node_t* current_sibling = search_stack[0]->parent->children;
-        if(current_sibling == search_stack[0]) {
-            search_stack[0]->parent->children = current_sibling->next_sibling;
-        } else {
-            while(current_sibling->next_sibling != search_stack[0]) {
-                current_sibling = current_sibling->next_sibling;
+        if(search_stack[0]->parent) {
+            fs_node_t* current_sibling = search_stack[0]->parent->children;
+            if(current_sibling == search_stack[0]) {
+                search_stack[0]->parent->children = current_sibling->next_sibling;
+            } else {
+                while(current_sibling->next_sibling != search_stack[0]) {
+                    current_sibling = current_sibling->next_sibling;
+                }
+                current_sibling->next_sibling = search_stack[0]->next_sibling;
             }
-            current_sibling->next_sibling = search_stack[0]->next_sibling;
         }
 
         // now the whole search stack is unlinked from the vfs tree
@@ -284,6 +287,10 @@ int vfs_open(const char* path, const char* modestr) {
     if(!validate_user_string(proc, path) || !validate_user_string(proc, modestr))
         return -1;
 
+    // return early, prevent searching for the entire table and found nothing
+    // NOTE:
+    // this does not guarantee us to find a slot, it only shows that there is
+    // some slots available but other processes may take it if we dont fast enough
     if(proc->file_count >= MAX_FILE)
         return -1;
 
@@ -299,9 +306,11 @@ int vfs_open(const char* path, const char* modestr) {
     int file_descriptor = -1;
     file_description_t* fde = NULL;
 
+    // prevent other process to hijack our free slot if there is one
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+
     // find a hole to insert new file descriptor
-    // it should always found one
-    // since we must not exceed max file limit at this point
     for(file_descriptor = 0; file_descriptor < MAX_FILE; file_descriptor++) {
         if(proc->file_descriptor_table[file_descriptor].node == NULL) {
             fde = proc->file_descriptor_table + file_descriptor;
@@ -309,17 +318,25 @@ int vfs_open(const char* path, const char* modestr) {
         }
     }
 
+    if(!fde) {
+        vfs_cleanup_node_tree(node);
+        asm volatile("push %0; popf" : : "r"(eflags));
+        return -1;
+    }
+
     FS_ERR open_err = file_open(fde, node, modestr);
     if(open_err) {
         fde->node = NULL;
         // NOTE: dont nuke the whole tree after just failing to open a node
         vfs_cleanup_node_tree(node);
+        asm volatile("push %0; popf" : : "r"(eflags));
         return -1;
     }
 
     node->refcount++;
     proc->file_count++;
 
+    asm volatile("push %0; popf" : : "r"(eflags));
     return file_descriptor;
 }
 
@@ -336,12 +353,17 @@ void vfs_close(int file_descriptor) {
 
     file_sync(fde);
 
+    uint32_t eflags;
+    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
+
     fde->node->refcount--;
     // NOTE: dont nuke the whole tree after just deleting one node
     vfs_cleanup_node_tree(fde->node);
 
     fde->node = NULL;
     proc->file_count--;
+
+    asm volatile("push %0; popf" : : "r"(eflags));
 }
 
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {

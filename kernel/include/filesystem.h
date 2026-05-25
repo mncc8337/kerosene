@@ -23,6 +23,7 @@ typedef enum {
     FS_FLAG_DIRECTORY = (1 << 0),
     FS_FLAG_HIDDEN    = (1 << 1),
     FS_FLAG_PIPE      = (1 << 2),
+    FS_FLAG_MEMORY    = (1 << 3),
 } fs_node_flag_t;
 
 #define FS_NODE_IS_VALID(node) ((node).flags != 0)
@@ -98,7 +99,10 @@ typedef struct {
     time_t accessed_timestamp;
     uint32_t name_length;
     uint32_t flags;
-    ramfs_datanode_t* datanode_chain;
+    union {
+        ramfs_datanode_t* datanode_chain; // standard files/directories
+        void* mem_addr; // FS_FLAG_MEMORY nodes
+    };
 } ramfs_node_t;
 
 #include <fat_type.h>
@@ -238,6 +242,7 @@ ramfs_datanode_t* ramfs_get_last_datanote_of_chain(ramfs_datanode_t* datanode);
 FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR ramfs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR ramfs_add_entry(fs_node_t* parent, const char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size, fs_node_t* new_node);
+FS_ERR ramfs_add_memory_entry(fs_node_t* parent, const char* name, void* mem_addr, size_t mem_size, fs_node_t* new_node);
 FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
 FS_ERR ramfs_update_entry(fs_node_t* node);
 FS_ERR ramfs_mkdir(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node);

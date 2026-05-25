@@ -1434,6 +1434,10 @@ FS_ERR fat32_file_reset(fs_node_t* node) {
 }
 
 FS_ERR fat32_seek_absolute(file_description_t* file, int64_t seek_position) {
+    if(seek_position < 0) {
+        seek_position = 0;
+    }
+
     if(file->position == seek_position)
         return ERR_FS_SUCCESS;
 

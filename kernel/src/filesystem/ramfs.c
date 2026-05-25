@@ -34,7 +34,7 @@
 
 #define DIRECTORY_ENTRY_COUNT (RAMFS_DATANODE_SIZE / sizeof(uint32_t))
 
-// TODO:
+// JOB:
 // add another kind of ramfs_node_t that specify data size and data location
 // so that we can implement framebuffer access via vfs
 
@@ -44,7 +44,12 @@ static void* rmalloc(size_t size) {
     return heap_alloc(rheap, size, false);
 }
 
-static ramfs_node_t* create_new_node(const char* name, uint32_t flags, size_t size, ramfs_datanode_t* datanode_chain) {
+static ramfs_node_t* create_new_node(
+    const char* name,
+    uint32_t flags,
+    size_t size,
+    ramfs_datanode_t* datanode_chain
+) {
     unsigned namelen = strlen(name);
     if(namelen >= FILENAME_LIMIT)
         namelen = FILENAME_LIMIT - 1;
@@ -360,7 +365,14 @@ FS_ERR ramfs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR ramfs_add_entry(fs_node_t* parent, const char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size, fs_node_t* new_node) {
+FS_ERR ramfs_add_entry(
+    fs_node_t* parent,
+    const char* name,
+    ramfs_datanode_t* datanode_chain,
+    uint32_t flags,
+    size_t size,
+    fs_node_t* new_node
+) {
     new_node->flags = 0;
 
     ramfs_node_t* parent_ramnode = (ramfs_node_t*)parent->ramfs.node_addr;
@@ -425,6 +437,24 @@ FS_ERR ramfs_add_entry(fs_node_t* parent, const char* name, ramfs_datanode_t* da
     return ERR_FS_SUCCESS;
 }
 
+FS_ERR ramfs_add_memory_entry(
+    fs_node_t* parent,
+    const char* name,
+    void* mem_addr,
+    size_t mem_size,
+    fs_node_t* new_node
+) {
+    // just a simple wrapper since datanode_chain is a union with mem_addr
+    return ramfs_add_entry(
+        parent,
+        name,
+        mem_addr,
+        FS_FLAG_MEMORY,
+        mem_size,
+        new_node
+    );
+}
+
 FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content) {
     if(!strcmp(remove_node->name, ".") || !strcmp(remove_node->name, ".."))
         return ERR_FS_FAILED;
@@ -485,7 +515,7 @@ FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
     // entry_id, entry_list now hold the infomation of
     // the remove entry
 
-    if(remove_content)
+    if(!(remove_ramnode->flags & FS_FLAG_MEMORY) && remove_content)
         remove_datanode_chain(remove_ramnode->datanode_chain);
 
     kfree((void*)remove_ramnode);
@@ -628,6 +658,9 @@ FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* c
 }
 
 FS_ERR ramfs_file_reset(fs_node_t* node) {
+    if(node->flags & FS_FLAG_MEMORY)
+       return ERR_FS_SUCCESS;
+
     ramfs_datanode_t* datanode_chain = ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain;
     remove_datanode_chain(datanode_chain->next);
     datanode_chain->next = NULL;
@@ -686,6 +719,18 @@ FS_ERR ramfs_pipe_read(
 }
 
 FS_ERR ramfs_seek_absolute(file_description_t* file, int64_t seek_position) {
+    if(seek_position < 0) {
+        seek_position = 0;
+    }
+
+    if(file->node->flags & FS_FLAG_MEMORY) {
+        if(seek_position > file->node->size)
+           file->position = file->node->size;
+        else
+            file->position = seek_position;
+        return ERR_FS_SUCCESS;
+    }
+
     ramfs_datanode_t* current_datanode = ((ramfs_node_t*)file->node->ramfs.node_addr)->datanode_chain;
     size_t current_size = 0;
 
@@ -721,6 +766,26 @@ FS_ERR ramfs_read(
     size_t size,
     size_t* actual_read_size
 ) {
+    if(file->node->flags & FS_FLAG_MEMORY) {
+        void* addr = ((ramfs_node_t*)file->node->ramfs.node_addr)->mem_addr;
+        addr += file->position;
+
+        size_t remain_size = file->node->size - file->position;
+        if(file->position >= file->node->size) {
+            file->position = file->node->size;
+            return ERR_FS_EOF;
+        }
+
+        size_t safe_size = size;
+        if(safe_size > remain_size)
+            safe_size = remain_size;
+
+        memcpy(buffer, addr, safe_size);
+
+        *actual_read_size = safe_size;
+        return ERR_FS_SUCCESS;
+    }
+
     int offset = file->position % RAMFS_DATANODE_SIZE;
     if(file->position != 0 && offset == 0)
         offset = RAMFS_DATANODE_SIZE;
@@ -740,6 +805,25 @@ FS_ERR ramfs_write(
     size_t size,
     size_t* actual_write_size
 ) {
+    if(file->node->flags & FS_FLAG_MEMORY) {
+        void* addr = ((ramfs_node_t*)file->node->ramfs.node_addr)->mem_addr;
+        addr += file->position;
+
+        size_t remain_size = file->node->size - file->position;
+        if(file->position >= file->node->size) {
+            file->position = file->node->size;
+            return ERR_FS_EOF;
+        }
+
+        size_t safe_size = size;
+        if(safe_size > remain_size)
+            safe_size = remain_size;
+
+        memcpy(addr, buffer, safe_size);
+        *actual_write_size = safe_size;
+        return ERR_FS_SUCCESS;
+    }
+
     int position = file->position;
     ramfs_datanode_t** datanode_ptr = (ramfs_datanode_t**)&file->ramfs.current_datanode;
 

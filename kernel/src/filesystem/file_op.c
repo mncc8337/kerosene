@@ -47,6 +47,9 @@ FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr)
 
     switch(node->fs->type) {
         case FS_RAMFS:
+            if(node->flags & FS_FLAG_MEMORY) {
+                break;
+            }
             if(mode & FILE_WRITE || mode & FILE_READ) {
                 file->ramfs.current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain;
             }
@@ -89,14 +92,17 @@ FS_ERR file_seek(
     if(file->mode & FILE_APPEND)
         return ERR_FS_FAILED;
 
-    uint64_t absolute_position = 0;
+    int64_t absolute_position = 0;
 
     switch(whence) {
         case SEEK_ABSOLUTE:
             absolute_position = offset;
             break;
         case SEEK_RELATIVE:
-            absolute_position = file->node->size + offset;
+            absolute_position = file->position + offset;
+            if(absolute_position < 0) {
+                absolute_position = 0;
+            }
             break;
         case SEEK_END:
             absolute_position = file->node->size;
@@ -125,7 +131,6 @@ FS_ERR file_seek(
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size) {
     if(!(file->mode & FILE_READ)) return ERR_FS_FAILED;
 
-    // handle pipe differently
     if(FS_NODE_IS_PIPE(*file->node)) {
         // pipe mode: node->size = bytes available; empty pipe returns 0, not EOF
         if(file->node->size == 0) {
