@@ -310,7 +310,7 @@ void kinit(multiboot_info_t* mbd) {
     timer_init();
     print_debug(LT_OK, "timer initialised\n");
 
-    // idle process takes its creater eip to continue
+    // idle process takes its creator eip to continue
     // which is this function
     process_t* idle_proc = process_make_idle();
     if(!idle_proc) {

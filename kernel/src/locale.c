@@ -1,5 +1,9 @@
 #include <locale.h>
 
+// TODO:
+// this should be a job for a userspace app
+// remove this from the kernel
+
 static int kbd_layout = -1;
 static int timezone = TIMEZONE_NONE;
 

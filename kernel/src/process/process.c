@@ -59,43 +59,42 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
     if(is_user) {
         // switch page directory to create user heap
         vmmngr_switch_page_directory(proc->page_directory);
+        bool clean_up = false;
 
         heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
         if(!heap) {
-            vmmngr_switch_page_directory(active_pd);
-            asm volatile("push %0; popf" : : "r"(eflags_cr3));
-            vmmngr_free_page_directory(proc->page_directory);
-            kfree(proc->file_descriptor_table);
-            kfree(proc);
-            return NULL;
+            clean_up = true;
+            goto clean_up;
         }
 
         proc->stack_addr = (uint32_t)heap_alloc(heap, USER_STACK_SIZE, false);
         if(!proc->stack_addr) {
-            vmmngr_switch_page_directory(active_pd);
-            asm volatile("push %0; popf" : : "r"(eflags_cr3));
-            vmmngr_free_page_directory(proc->page_directory);
-            kfree(proc->file_descriptor_table);
-            kfree(proc);
-            return NULL;
+            clean_up = true;
+            goto clean_up;
         }
         stack_size = USER_STACK_SIZE;
 
         proc->tss_esp0 = (uint32_t)kmalloc(KERNEL_STACK_SIZE);
         if(!proc->tss_esp0) {
+            clean_up = true;
+            goto clean_up;
+        }
+        proc->tss_esp0 += KERNEL_STACK_SIZE;
+
+        clean_up:
+        if(clean_up) {
             vmmngr_switch_page_directory(active_pd);
-            asm volatile("push %0; popf" : : "r"(eflags_cr3));
             vmmngr_free_page_directory(proc->page_directory);
             kfree(proc->file_descriptor_table);
             kfree(proc);
+            asm volatile("push %0; popf" : : "r"(eflags_cr3));
             return NULL;
         }
-        proc->tss_esp0 += KERNEL_STACK_SIZE;
     } else {
         proc->stack_addr = (uint32_t)kmalloc(KERNEL_STACK_SIZE);
         if(!proc->stack_addr) {
-            asm volatile("push %0; popf" : : "r"(eflags_cr3));
             kfree(proc);
+            asm volatile("push %0; popf" : : "r"(eflags_cr3));
             return NULL;
         }
         stack_size = KERNEL_STACK_SIZE;
@@ -198,6 +197,7 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
 }
 
 process_t* process_make_idle() {
+    // make the process that called this an idle process
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
 
@@ -213,7 +213,6 @@ process_t* process_make_idle() {
 
     // no need to allocate a new stack
     // or set up registers
-    // proc->saved_esp = (uint32_t)regs;
 
     // prevent interrupts to safely increment proc count
     uint32_t eflags;
