@@ -234,33 +234,45 @@ ret:
     return ret_err;
 }
 
-// FIXME: unroll to iteractive loop
 void vfs_cleanup_node_tree(fs_node_t* start_node) {
-    if(start_node->refcount > 0)
-        return;
-    if(start_node->children)
-        return;
+    fs_node_t* target = start_node;
 
-    // now it is safe to delete this node
-    
-    // remove node from tree
-    fs_node_t* parent_node = start_node->parent;
-    if(parent_node->children == start_node) {
-        if(start_node->next_sibling)
-            parent_node->children = start_node->next_sibling;
-        else {
-            parent_node->children = NULL;
-            // parent directory maybe unused at this point
-            vfs_cleanup_node_tree(parent_node);
+    while(target != NULL) {
+        if(target->refcount > 0 || target->children != NULL) {
+            return;
         }
-    } else {
-        fs_node_t* current_node = parent_node->children;
-        while(current_node->next_sibling != start_node)
-            current_node = current_node->next_sibling;
-        current_node->next_sibling = start_node->next_sibling;
-    }
 
-    kfree(start_node);
+        fs_node_t* parent = target->parent;
+        bool parent_became_empty = false;
+
+        if(parent != NULL) {
+            if(parent->children == target) {
+                parent->children = target->next_sibling;
+
+                if(parent->children == NULL) {
+                    parent_became_empty = true;
+                }
+            } else {
+                fs_node_t* current = parent->children;
+
+                while(current != NULL && current->next_sibling != target) {
+                    current = current->next_sibling;
+                }
+
+                if(current != NULL) {
+                    current->next_sibling = target->next_sibling;
+                }
+            }
+        }
+
+        kfree(target);
+
+        if(parent_became_empty) {
+            target = parent;
+        } else {
+            break;
+        }
+    }
 }
 
 // TODO:
