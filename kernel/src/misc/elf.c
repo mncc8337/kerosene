@@ -126,17 +126,17 @@ ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
         return ERR_ELF_FILE_ERROR;
     }
 
-    fs_node_t elf;
-    errcode = fs_find(&fs->root_node, path, &elf);
+    fs_node_t* elf;
+    errcode = vfs_find_and_create_node(path, &fs->root_node, &elf, false, true);
     if(errcode)
         return ERR_ELF_FILE_ERROR;
 
-    void* addr = kmalloc(elf.size);
+    void* addr = kmalloc(elf->size);
     if(!addr)
         return ERR_ELF_OOM;
 
     uint32_t entry;
-    errcode = elf_load(&elf, addr, proc->page_directory, &entry);
+    errcode = elf_load(elf, addr, proc->page_directory, &entry);
     kfree(addr);
     if(errcode)
         return errcode;
