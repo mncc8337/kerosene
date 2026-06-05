@@ -49,8 +49,10 @@ void scheduler_add_process(process_t* proc) {
 }
 
 // put current process to delete queue, delete it later
-uint32_t scheduler_kill_process(regs_t* regs) {
+uint32_t scheduler_kill_process(regs_t* regs, int exit_code) {
     if(current_process->id == 1) return (uint32_t)regs; // avoid deleting idle process
+
+    current_process->exit_code = exit_code;
 
     // because we are using the stack of the process
     // and process_delete() will free the stack

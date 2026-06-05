@@ -5,7 +5,7 @@
 #include <syscall.h>
 
 uint64_t syscall_time();
-void syscall_kill_process();
+void syscall_kill_process(int exit_code);
 void syscall_sleep(unsigned ticks);
 int syscall_open(const char* path, const char* modestr);
 void syscall_close(int file_descriptor);

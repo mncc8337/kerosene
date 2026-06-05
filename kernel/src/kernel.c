@@ -346,14 +346,12 @@ void kernel_proc1() {
         syscall_sleep(100);
         video_framebuffer_fill_rectangle(20, 20, 40, 40, video_framebuffer_rgb(VIDEO_GREEN));
     }
-    syscall_kill_process();
 }
 void kernel_proc2() {
     while(true) {
         syscall_sleep(100);
         video_framebuffer_fill_rectangle(20, 20, 40, 40, video_framebuffer_rgb(VIDEO_RED));
     }
-    syscall_kill_process();
 }
 
 void kmain() {

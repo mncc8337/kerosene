@@ -91,7 +91,7 @@ $(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(OBJ) $(BIN_DIR)lib
 # user app
 fsfiles/%.elf: userapp/%.c
 	# TODO: remove -I./kernel/include
-	$(CC) $(DEFINES) -I./libc/include -I./kernel/include -ffreestanding -nostdlib -e main -o $@ $< -L./bin -lc -lgcc
+	$(CC) $(DEFINES) -I./libc/include -I./kernel/include -ffreestanding -nostdlib -e _start -o $@ $< -L./bin -lc -lgcc
 
 libc: $(BIN_DIR)libc.a
 

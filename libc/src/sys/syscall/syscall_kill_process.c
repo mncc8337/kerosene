@@ -1,7 +1,7 @@
 #include <sys/syscall.h>
 
-void syscall_kill_process() {
+void syscall_kill_process(int exit_code) {
     int ret;
-    SYSCALL_0P(SYSCALL_KILL_PROCESS, ret);
+    SYSCALL_1P(SYSCALL_KILL_PROCESS, ret, exit_code);
 }
 

@@ -30,6 +30,5 @@ Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vitae lorem moll
 
     printf("current time: %d\n", time(NULL));
 
-    syscall_kill_process();
     return 0;
 }
