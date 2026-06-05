@@ -739,7 +739,7 @@ FS_ERR fat32_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* 
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
+FS_ERR fat32_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node) {
     fat32_bootrecord_t* bootrec = &(diriter->node->fs->fat32_info.bootrec);
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = get_first_data_sector(bootrec);
@@ -1146,7 +1146,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
 
     int namelen; (void)(namelen); // avoid unused param
     char entry_name[FILENAME_LIMIT];
-    if(FS_NODE_IS_DIR(*remove_node) && remove_content) {
+    if(FS_NODE_IS_DIR(remove_node) && remove_content) {
         // check if it has any child entry
         uint32_t first_sector = ((remove_node->fat32.start_cluster - 2) * sectors_per_cluster) + first_data_sector;
         // TODO: check for ata pio fault

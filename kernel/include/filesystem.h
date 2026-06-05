@@ -1,14 +1,14 @@
 #pragma once
 
+#include <sys/limits.h>
+#include <sys/dirent.h>
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdatomic.h>
 
 #include <time.h>
-
-// filename limit including null char
-#define FILENAME_LIMIT 256
 
 #define MAX_FS 32
 #define MAX_DISK_ID_STRLEN 2
@@ -26,13 +26,13 @@ typedef enum {
     FS_FLAG_MEMORY    = (1 << 3),
 } fs_node_flag_t;
 
-#define FS_NODE_IS_VALID(node) ((node).flags != 0)
-#define FS_NODE_IS_DIR(node) ((node).flags & FS_FLAG_DIRECTORY)
-#define FS_NODE_IS_HIDDEN(node) ((node).flags & FS_FLAG_HIDDEN)
-#define FS_NODE_IS_PIPE(node) ((node).flags & FS_FLAG_PIPE)
+#define FS_NODE_IS_VALID(node_ptr) ((node_ptr)->flags != 0)
+#define FS_NODE_IS_DIR(node_ptr) ((node_ptr)->flags & FS_FLAG_DIRECTORY)
+#define FS_NODE_IS_HIDDEN(node_ptr) ((node_ptr)->flags & FS_FLAG_HIDDEN)
+#define FS_NODE_IS_PIPE(node_ptr) ((node_ptr)->flags & FS_FLAG_PIPE)
 
-#define FS_NODE_FLAG_SET(node, flag) ((node)->flags |= (flag))
-#define FS_NODE_FLAG_UNSET(node, flag) ((node)->flags &= ~(flag))
+#define FS_NODE_FLAG_SET(node_ptr, flag) ((node_ptr)->flags |= (flag))
+#define FS_NODE_FLAG_UNSET(node_ptr, flag) ((node_ptr)->flags &= ~(flag))
 
 typedef enum {
     ERR_FS_SUCCESS,
@@ -172,7 +172,11 @@ typedef struct fs {
 typedef struct {
     fs_node_t* node;
     int mode;
-    int64_t position;
+
+    union {
+        int64_t position; // files
+        int32_t current_index; // directories (for iteration)
+    };
 
     // fs depended field
     union {
@@ -221,7 +225,7 @@ void vfs_seek_syscall(int file_descriptor, uint32_t hoff, uint32_t loff, int whe
 
 // fs_op.c
 FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
-FS_ERR fs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
+FS_ERR fs_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node);
 FS_ERR fs_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node);
 FS_ERR fs_touch(fs_node_t* parent, const char* name, fs_node_t* new_node);
@@ -230,6 +234,9 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const 
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
 
 // file_op.c
+FS_ERR file_setup_directory_iterator(file_description_t* dir);
+FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent);
+FS_ERR file_reset(file_description_t* file);
 FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr);
 FS_ERR file_seek(file_description_t* file, int64_t offset, int whence, int64_t* final_position);
 FS_ERR file_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
@@ -240,7 +247,7 @@ FS_ERR file_sync(file_description_t* file);
 ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear);
 ramfs_datanode_t* ramfs_get_last_datanote_of_chain(ramfs_datanode_t* datanode);
 FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
-FS_ERR ramfs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
+FS_ERR ramfs_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR ramfs_add_entry(fs_node_t* parent, const char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size, fs_node_t* new_node);
 FS_ERR ramfs_add_memory_entry(fs_node_t* parent, const char* name, void* mem_addr, size_t mem_size, fs_node_t* new_node);
 FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
@@ -263,7 +270,7 @@ uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count, bool clear);
 uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster);
 
 FS_ERR fat32_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
-FS_ERR fat32_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node);
+FS_ERR fat32_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR fat32_add_entry(fs_node_t* parent, const char* name, uint32_t start_cluster, uint8_t attr, size_t size, fs_node_t* new_node);
 FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
 FS_ERR fat32_update_entry(fs_node_t* node);

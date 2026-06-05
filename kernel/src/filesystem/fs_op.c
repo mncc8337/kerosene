@@ -43,7 +43,7 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
 }
 
 FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
-    if(!FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIR(node)) return ERR_FS_NOT_DIR;
 
     switch(node->fs->type) {
         case FS_RAMFS:
@@ -55,19 +55,19 @@ FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* nod
     }
 }
 
-FS_ERR fs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
+FS_ERR fs_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node) {
     switch(diriter->node->fs->type) {
         case FS_RAMFS:
-            return ramfs_read_dir(diriter, ret_node);
+            return ramfs_iterate_directory(diriter, ret_node);
         case FS_FAT32:
-            return fat32_read_dir(diriter, ret_node);
+            return fat32_iterate_directory(diriter, ret_node);
         default:
             return ERR_FS_NOT_SUPPORTED;
     }
 }
 
 FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
-    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
 
     FS_ERR last_err;
     ret_node->flags = 0;
@@ -79,7 +79,7 @@ FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
     int (*cmpcmd)(const char*, const char*) = strcmp;
     if(parent->fs->type == FS_FAT32) cmpcmd = strcmp_case_insensitive;
 
-    while(!(last_err = fs_read_dir(&diriter, ret_node))) {
+    while(!(last_err = fs_iterate_directory(&diriter, ret_node))) {
         if(!cmpcmd(nodename, ret_node->name))
             return ERR_FS_SUCCESS;
     }
@@ -92,7 +92,7 @@ FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
 
 // make a directory in parent node
 FS_ERR fs_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
-    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
 
     new_node->flags = 0;
 
@@ -107,7 +107,7 @@ FS_ERR fs_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
 }
 
 FS_ERR fs_touch(fs_node_t* parent, const char* name, fs_node_t* new_node) {
-    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
 
     new_node->flags = 0;
 
@@ -129,7 +129,7 @@ FS_ERR fs_touch(fs_node_t* parent, const char* name, fs_node_t* new_node) {
 }
 
 FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node) {
-    if(!FS_NODE_IS_DIR(*parent)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
 
     switch(parent->fs->type) {
         case FS_RAMFS:
@@ -143,8 +143,8 @@ FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node) {
 
 // set new_name to NULL to reuse the old name
 FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
-    if(!FS_NODE_IS_DIR(*new_parent)) return ERR_FS_NOT_DIR;
-    if(FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_FILE;
+    if(!FS_NODE_IS_DIR(new_parent)) return ERR_FS_NOT_DIR;
+    if(FS_NODE_IS_DIR(node)) return ERR_FS_NOT_FILE;
 
     if(!new_name) new_name = node->name;
 
@@ -168,7 +168,7 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const 
 // only works when moving to the same disk
 // set new_name to NULL to reuse the old name
 FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
-    if(!FS_NODE_IS_DIR(*new_parent)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIR(new_parent)) return ERR_FS_NOT_DIR;
     if(node->fs != new_parent->fs) return ERR_FS_NOT_SUPPORTED;
 
     if(!new_name) new_name = node->name;

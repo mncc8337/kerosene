@@ -34,10 +34,6 @@
 
 #define DIRECTORY_ENTRY_COUNT (RAMFS_DATANODE_SIZE / sizeof(uint32_t))
 
-// JOB:
-// add another kind of ramfs_node_t that specify data size and data location
-// so that we can implement framebuffer access via vfs
-
 static heap_t* rheap;
 
 static void* rmalloc(size_t size) {
@@ -334,7 +330,7 @@ FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* 
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR ramfs_read_dir(directory_iterator_t* diriter, fs_node_t* ret_node) {
+FS_ERR ramfs_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node) {
     ramfs_datanode_t* datanode = (ramfs_datanode_t*)diriter->ramfs.current_datanode;
     ramfs_datanode_entry_t* entry_list = (void*)datanode->data;
 
@@ -463,7 +459,7 @@ FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
     ramfs_node_t* remove_ramnode = (ramfs_node_t*)remove_node->ramfs.node_addr;
 
     // check if the dir is empty
-    if(FS_NODE_IS_DIR(*remove_node) && remove_content) {
+    if(FS_NODE_IS_DIR(remove_node) && remove_content) {
         ramfs_datanode_t* datanode = remove_ramnode->datanode_chain;
         ramfs_datanode_entry_t* entry_list = (void*)datanode->data;
         while(true) {
@@ -827,7 +823,7 @@ FS_ERR ramfs_write(
     int position = file->position;
     ramfs_datanode_t** datanode_ptr = (ramfs_datanode_t**)&file->ramfs.current_datanode;
 
-    if(FS_NODE_IS_PIPE(*file->node)) {
+    if(FS_NODE_IS_PIPE(file->node)) {
         datanode_ptr = (ramfs_datanode_t**)&file->ramfs.last_datanode;
     } else if(file->mode & FILE_APPEND) {
         position = file->node->size;

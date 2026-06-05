@@ -1,33 +1,122 @@
+#include "sys/dirent.h"
 #include <filesystem.h>
 #include <timer.h>
 
 #include <stdint.h>
 #include <string.h>
 
-FS_ERR file_reset(fs_node_t* node) {
-    switch(node->fs->type) {
+static FS_ERR make_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter) {
+    diriter->current_index = dir->current_index;
+    switch(dir->node->fs->type) {
         case FS_RAMFS:
-            return ramfs_file_reset(node);
+             diriter->ramfs.current_datanode = dir->ramfs.current_datanode;
+            break;
         case FS_FAT32:
-            return fat32_file_reset(node);
+             diriter->fat32.current_cluster = dir->fat32.current_cluster;
+            break;
+        default:
+            return ERR_FS_NOT_SUPPORTED;
+    }
+    return ERR_FS_SUCCESS;
+}
+
+static FS_ERR save_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter) {
+    dir->current_index = diriter->current_index;
+    switch(dir->node->fs->type) {
+        case FS_RAMFS:
+            dir->ramfs.current_datanode = diriter->ramfs.current_datanode;
+            break;
+        case FS_FAT32:
+            dir->fat32.current_cluster = diriter->fat32.current_cluster;
+            break;
+        default:
+            return ERR_FS_NOT_SUPPORTED;
+    }
+    return ERR_FS_SUCCESS;
+}
+
+FS_ERR file_setup_directory_iterator(file_description_t* dir) {
+    if(!FS_NODE_IS_DIR(dir->node))
+        return ERR_FS_NOT_DIR;
+
+    if(dir->mode != FILE_READ)
+        return ERR_FS_NOT_DIR;
+
+    FS_ERR err;
+
+    directory_iterator_t diriter;
+    err = fs_setup_directory_iterator(&diriter, dir->node);
+    if(err) return err;
+
+    err = save_diriter_adapter(dir, &diriter);
+    if(err) return err;
+
+    return ERR_FS_SUCCESS;
+}
+
+FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent) {
+    if(!FS_NODE_IS_DIR(dir->node))
+        return ERR_FS_NOT_DIR;
+
+    if(dir->mode != FILE_READ)
+        return ERR_FS_NOT_DIR;
+
+    FS_ERR err;
+
+    // make an adapter
+    directory_iterator_t diriter;
+    err = make_diriter_adapter(dir, &diriter);
+    if(err) return err;
+
+    fs_node_t ret_node;
+    err = fs_iterate_directory(&diriter, &ret_node);
+    if(err) return err;
+
+    err = save_diriter_adapter(dir, &diriter);
+    if(err) return err;
+
+    dirent->d_ino = 0; // TODO: figure out what should i put here
+
+    if(FS_NODE_IS_DIR(&ret_node))
+        dirent->d_type = DT_DIR;
+    else if(FS_NODE_IS_PIPE(&ret_node))
+        dirent->d_type = DT_FIFO;
+    else
+        dirent->d_type = DT_REG;
+
+    strcpy(dirent->d_name, ret_node.name);
+
+    return ERR_FS_SUCCESS;
+}
+
+FS_ERR file_reset(file_description_t* file) {
+    switch(file->node->fs->type) {
+        case FS_RAMFS:
+            return ramfs_file_reset(file->node);
+        case FS_FAT32:
+            return fat32_file_reset(file->node);
         default:
             return ERR_FS_NOT_SUPPORTED;
     }
 }
 
 FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr) {
-    if(FS_NODE_IS_DIR(*node)) return ERR_FS_NOT_FILE;
-
     int mode = 0;
 
     if(modestr[0] == 'w') {
         mode = FILE_WRITE;
-        file_reset(node);
+        file_reset(file);
     } else if(modestr[0] == 'r') {
         mode = FILE_READ;
     } else if(modestr[0] == 'a') {
         mode = FILE_APPEND;
     } else return ERR_FS_FAILED;
+
+    if(FS_NODE_IS_DIR(node)) {
+        if(mode != FILE_READ) {
+            return ERR_FS_NOT_FILE;
+        }
+    }
 
     if(modestr[1] != '\0') {
         if(modestr[1] == '+') {
@@ -131,7 +220,7 @@ FS_ERR file_seek(
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size) {
     if(!(file->mode & FILE_READ)) return ERR_FS_FAILED;
 
-    if(FS_NODE_IS_PIPE(*file->node)) {
+    if(FS_NODE_IS_PIPE(file->node)) {
         // pipe mode: node->size = bytes available; empty pipe returns 0, not EOF
         if(file->node->size == 0) {
             *actual_read_size = 0;
@@ -194,7 +283,7 @@ FS_ERR file_write(
     }
     if(err) return err;
 
-    if(FS_NODE_IS_PIPE(*file->node)) {
+    if(FS_NODE_IS_PIPE(file->node)) {
         file->node->size += (*actual_write_size);
         file->position += (*actual_write_size);
     } else if(file->mode & FILE_APPEND) {
