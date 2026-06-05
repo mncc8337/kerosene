@@ -2,7 +2,7 @@
 #include <filesystem.h>
 #include <system.h>
 #include <mem.h>
-#include <sysfiles.h>
+#include <sys/files.h>
 
 #include <stdlib.h>
 

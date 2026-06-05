@@ -1,7 +1,7 @@
 #include <filesystem.h>
 #include <ata.h>
 #include <mem.h>
-#include <sysfiles.h>
+#include <sys/files.h>
 
 fs_t* FS;
 static file_description_t KERNEL_FDT[MAX_FILE];

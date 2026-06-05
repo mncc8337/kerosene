@@ -2,7 +2,7 @@
 #include <filesystem.h>
 #include <video.h>
 #include <kbd.h>
-#include <sysfiles.h>
+#include <sys/files.h>
 
 static key_t key;
 

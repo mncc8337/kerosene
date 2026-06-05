@@ -10,7 +10,6 @@
 #include <system.h>
 #include <process.h>
 #include <kproc.h>
-#include <syscall.h>
 #include <mem.h>
 
 #include <stdio.h>

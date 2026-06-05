@@ -1,5 +1,5 @@
-#include <syscall.h>
 #include <system.h>
+#include <sys/syscall.h>
 #include <process.h>
 #include <filesystem.h>
 #include <timer.h>

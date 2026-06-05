@@ -63,7 +63,6 @@ all: libk libc userapp kernel disk copyfs
 $(OBJ_DIR)libk/%.o: libc/src/%.c
 	mkdir -p $$(dirname $@)
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $< -D__is_libk
-
 $(BIN_DIR)libk.a: $(LIBK_OBJ)
 	$(AR) rcs $@ $^
 	@echo done building libk
@@ -90,8 +89,7 @@ $(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(OBJ) $(BIN_DIR)lib
 
 # user app
 fsfiles/%.elf: userapp/%.c
-	# TODO: remove -I./kernel/include
-	$(CC) $(DEFINES) -I./libc/include -I./kernel/include -ffreestanding -nostdlib -e _start -o $@ $< -L./bin -lc -lgcc
+	$(CC) $(DEFINES) -I./libc/include -ffreestanding -nostdlib -e _start -o $@ $< -L./bin -lc -lgcc
 
 libc: $(BIN_DIR)libc.a
 

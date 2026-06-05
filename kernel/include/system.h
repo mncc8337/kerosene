@@ -112,3 +112,6 @@ void isr_init();
 // spinlock.c
 void spinlock_acquire(volatile atomic_flag* lock);
 void spinlock_release(volatile atomic_flag* lock);
+
+// syscall.c
+void syscall_init();
