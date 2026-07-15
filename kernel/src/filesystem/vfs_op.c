@@ -1,4 +1,3 @@
-#include "sys/filesystem.h"
 #include <filesystem.h>
 #include <process.h>
 
@@ -149,7 +148,7 @@ FS_ERR vfs_find_and_create_node(
 
             bool is_last_token = (token == NULL || *token == '\0');
 
-            FS_ERR find_err = fs_find(parent_node, current_name, new_node);
+            FS_ERR find_err = node_find(parent_node, current_name, new_node);
             if(find_err) {
                 if(find_err == ERR_FS_NOT_FOUND && is_last_token) {
                     if(do_create_node) {
@@ -195,9 +194,9 @@ FS_ERR vfs_find_and_create_node(
 
         FS_ERR op_err;
         if(is_file)
-            op_err = fs_touch(parent_node, current_name, new_node);
+            op_err = node_touch(parent_node, current_name, new_node);
         else
-            op_err = fs_mkdir(parent_node, current_name, new_node);
+            op_err = node_mkdir(parent_node, current_name, new_node);
                                 
         if(op_err) {
             kfree(new_node);

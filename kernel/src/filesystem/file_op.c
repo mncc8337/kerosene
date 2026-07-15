@@ -1,4 +1,3 @@
-#include "sys/filesystem.h"
 #include <filesystem.h>
 #include <timer.h>
 
@@ -45,7 +44,7 @@ FS_ERR file_setup_directory_iterator(file_description_t* dir) {
     FS_ERR err;
 
     directory_iterator_t diriter;
-    err = fs_setup_directory_iterator(&diriter, dir->node);
+    err = node_setup_directory_iterator(&diriter, dir->node);
     if(err) return err;
 
     err = save_diriter_adapter(dir, &diriter);
@@ -69,7 +68,7 @@ FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent) {
     if(err) return err;
 
     fs_node_t ret_node;
-    err = fs_iterate_directory(&diriter, &ret_node);
+    err = node_iterate_directory(&diriter, &ret_node);
     if(err) return err;
 
     err = save_diriter_adapter(dir, &diriter);

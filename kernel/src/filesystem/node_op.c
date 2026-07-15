@@ -6,7 +6,7 @@
 
 // copy file from any filesystem to another filesystem
 static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
-    FS_ERR touch_err = fs_touch(new_parent, new_name, copied);
+    FS_ERR touch_err = node_touch(new_parent, new_name, copied);
     if(touch_err) return touch_err;
 
     file_description_t src_file;
@@ -42,7 +42,7 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
+FS_ERR node_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
     switch(node->fs->type) {
         case FS_RAMFS:
             return ramfs_setup_directory_iterator(diriter, node);
@@ -53,7 +53,7 @@ FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* nod
     }
 }
 
-FS_ERR fs_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node) {
+FS_ERR node_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node) {
     switch(diriter->node->fs->type) {
         case FS_RAMFS:
             return ramfs_iterate_directory(diriter, ret_node);
@@ -64,20 +64,20 @@ FS_ERR fs_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node) 
     }
 }
 
-FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
+FS_ERR node_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
     if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
 
     FS_ERR last_err;
     ret_node->flags = 0;
 
     directory_iterator_t diriter;
-    FS_ERR diriter_err = fs_setup_directory_iterator(&diriter, parent);
+    FS_ERR diriter_err = node_setup_directory_iterator(&diriter, parent);
     if(diriter_err) return diriter_err;
 
     int (*cmpcmd)(const char*, const char*) = strcmp;
     if(parent->fs->type == FS_FAT32) cmpcmd = strcmp_case_insensitive;
 
-    while(!(last_err = fs_iterate_directory(&diriter, ret_node))) {
+    while(!(last_err = node_iterate_directory(&diriter, ret_node))) {
         if(!cmpcmd(nodename, ret_node->name))
             return ERR_FS_SUCCESS;
     }
@@ -89,7 +89,7 @@ FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
 }
 
 // make a directory in parent node
-FS_ERR fs_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
+FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
     if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
 
     new_node->flags = 0;
@@ -104,7 +104,7 @@ FS_ERR fs_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
     }
 }
 
-FS_ERR fs_touch(fs_node_t* parent, const char* name, fs_node_t* new_node) {
+FS_ERR node_touch(fs_node_t* parent, const char* name, fs_node_t* new_node) {
     if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
 
     new_node->flags = 0;
@@ -126,7 +126,7 @@ FS_ERR fs_touch(fs_node_t* parent, const char* name, fs_node_t* new_node) {
     }
 }
 
-FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node) {
+FS_ERR node_remove(fs_node_t* parent, fs_node_t* node) {
     if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
 
     switch(parent->fs->type) {
@@ -140,7 +140,7 @@ FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node) {
 }
 
 // set new_name to NULL to reuse the old name
-FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
+FS_ERR node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
     if(!FS_NODE_IS_DIR(new_parent)) return ERR_FS_NOT_DIR;
     if(FS_NODE_IS_DIR(node)) return ERR_FS_NOT_FILE;
 
@@ -165,7 +165,7 @@ FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const 
 // move a node to a new parent
 // only works when moving to the same disk
 // set new_name to NULL to reuse the old name
-FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
+FS_ERR node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
     if(!FS_NODE_IS_DIR(new_parent)) return ERR_FS_NOT_DIR;
     if(node->fs != new_parent->fs) return ERR_FS_NOT_SUPPORTED;
 

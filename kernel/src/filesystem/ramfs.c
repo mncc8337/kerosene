@@ -618,7 +618,7 @@ FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, con
 }
 
 FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
-    FS_ERR touch_err = fs_touch(new_parent, new_name, copied);
+    FS_ERR touch_err = node_touch(new_parent, new_name, copied);
     if(touch_err) return touch_err;
 
     file_description_t dst_file;

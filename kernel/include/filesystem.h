@@ -196,14 +196,14 @@ int64_t vfs_seek(int file_descriptor, int64_t offset, whence_t whence);
 void vfs_seek_syscall(int file_descriptor, uint32_t hoff, uint32_t loff, whence_t whence, int64_t* position);
 
 // fs_op.c
-FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
-FS_ERR fs_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
-FS_ERR fs_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node);
-FS_ERR fs_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node);
-FS_ERR fs_touch(fs_node_t* parent, const char* name, fs_node_t* new_node);
-FS_ERR fs_remove(fs_node_t* parent, fs_node_t* node);
-FS_ERR fs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
-FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
+FS_ERR node_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
+FS_ERR node_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
+FS_ERR node_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node);
+FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node);
+FS_ERR node_touch(fs_node_t* parent, const char* name, fs_node_t* new_node);
+FS_ERR node_remove(fs_node_t* parent, fs_node_t* node);
+FS_ERR node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
+FS_ERR node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
 
 // file_op.c
 FS_ERR file_setup_directory_iterator(file_description_t* dir);
