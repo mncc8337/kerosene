@@ -6,8 +6,8 @@
 
 // copy file from any filesystem to another filesystem
 static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
-    FS_ERR touch_err = node_touch(new_parent, new_name, copied);
-    if(touch_err) return touch_err;
+    FS_ERR create_err = node_create(new_parent, new_name, copied);
+    if(create_err) return create_err;
 
     file_description_t src_file;
     FS_ERR src_open_err = file_open(&src_file, node, FILE_OPEN_READ);
@@ -35,8 +35,7 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
         remain_size -= actual_write_size;
     }
 
-    file_sync(&src_file);
-    file_sync(&dst_file);
+    node_sync(copied);
     if(final_err) return final_err;
 
     return ERR_FS_SUCCESS;
@@ -104,7 +103,7 @@ FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
     }
 }
 
-FS_ERR node_touch(fs_node_t* parent, const char* name, fs_node_t* new_node) {
+FS_ERR node_create(fs_node_t* parent, const char* name, fs_node_t* new_node) {
     if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
 
     new_node->flags = 0;
@@ -178,5 +177,16 @@ FS_ERR node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
             return fat32_move(node, new_parent, new_name);
         default:
             return ERR_FS_NOT_SUPPORTED;
+    }
+}
+
+FS_ERR node_sync(fs_node_t* node) {
+    switch(node->fs->type) {
+        case FS_RAMFS:
+            return ramfs_update_entry(node);
+        case FS_FAT32:
+            return fat32_update_entry(node);
+        default:
+            return ERR_FS_SUCCESS;
     }
 }

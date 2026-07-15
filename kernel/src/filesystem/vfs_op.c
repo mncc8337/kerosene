@@ -194,7 +194,7 @@ FS_ERR vfs_find_and_create_node(
 
         FS_ERR op_err;
         if(is_file)
-            op_err = node_touch(parent_node, current_name, new_node);
+            op_err = node_create(parent_node, current_name, new_node);
         else
             op_err = node_mkdir(parent_node, current_name, new_node);
                                 
@@ -377,7 +377,7 @@ void vfs_close(int file_descriptor) {
     if(fde->node == NULL)
         return;
 
-    file_sync(fde);
+    node_sync(fde->node);
 
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));

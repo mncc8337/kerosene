@@ -278,14 +278,3 @@ FS_ERR file_write(
     file->node->modified_timestamp = timer_get_current_time();
     return ERR_FS_SUCCESS;
 }
-
-FS_ERR file_sync(file_description_t* file) {
-    switch(file->node->fs->type) {
-        case FS_RAMFS:
-            return ramfs_update_entry(file->node);
-        case FS_FAT32:
-            return fat32_update_entry(file->node);
-        default:
-            return ERR_FS_SUCCESS;
-    }
-}

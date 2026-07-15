@@ -249,7 +249,7 @@ void process_delete(process_t* proc) {
             // TODO:
             // wait for IO op to be done
             // before closing
-            file_sync(fde);
+            node_sync(fde->node);
 
             fde->node->refcount--;
             vfs_cleanup_node_tree(fde->node);

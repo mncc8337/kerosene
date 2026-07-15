@@ -200,10 +200,11 @@ FS_ERR node_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* n
 FS_ERR node_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR node_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node);
 FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node);
-FS_ERR node_touch(fs_node_t* parent, const char* name, fs_node_t* new_node);
+FS_ERR node_create(fs_node_t* parent, const char* name, fs_node_t* new_node);
 FS_ERR node_remove(fs_node_t* parent, fs_node_t* node);
 FS_ERR node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
 FS_ERR node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
+FS_ERR node_sync(fs_node_t* node);
 
 // file_op.c
 FS_ERR file_setup_directory_iterator(file_description_t* dir);
@@ -213,7 +214,6 @@ FS_ERR file_open(file_description_t* file, fs_node_t* node, const file_mode_t mo
 FS_ERR file_seek(file_description_t* file, int64_t offset, whence_t whence, int64_t* final_position);
 FS_ERR file_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
-FS_ERR file_sync(file_description_t* file);
 
 // ramfs.c
 ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear);

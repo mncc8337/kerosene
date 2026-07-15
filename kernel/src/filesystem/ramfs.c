@@ -617,9 +617,10 @@ FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, con
     return ERR_FS_SUCCESS;
 }
 
+// copy a node from ramfs to any fs
 FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
-    FS_ERR touch_err = node_touch(new_parent, new_name, copied);
-    if(touch_err) return touch_err;
+    FS_ERR create_err = node_create(new_parent, new_name, copied);
+    if(create_err) return create_err;
 
     file_description_t dst_file;
     FS_ERR dst_open_err = file_open(&dst_file, copied, FILE_OPEN_WRITE);
@@ -648,7 +649,7 @@ FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* c
         current_datanode = current_datanode->next;
     }
 
-    file_sync(&dst_file);
+    node_sync(copied);
 
     return ERR_FS_SUCCESS;
 }
