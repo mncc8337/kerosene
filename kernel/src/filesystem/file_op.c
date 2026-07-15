@@ -1,3 +1,4 @@
+#include "sys/filesystem.h"
 #include <filesystem.h>
 #include <timer.h>
 
@@ -6,30 +7,18 @@
 
 static FS_ERR make_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter) {
     diriter->current_index = dir->current_index;
-    switch(dir->node->fs->type) {
-        case FS_RAMFS:
-             diriter->ramfs.current_datanode = dir->ramfs.current_datanode;
-            break;
-        case FS_FAT32:
-             diriter->fat32.current_cluster = dir->fat32.current_cluster;
-            break;
-        default:
-            return ERR_FS_NOT_SUPPORTED;
+    if(dir->node->fs->make_diriter_adapter) {
+        dir->node->fs->make_diriter_adapter(dir, diriter);
+        return ERR_FS_SUCCESS;
     }
-    return ERR_FS_SUCCESS;
+    return ERR_FS_NOT_SUPPORTED;
 }
 
 static FS_ERR save_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter) {
     dir->current_index = diriter->current_index;
-    switch(dir->node->fs->type) {
-        case FS_RAMFS:
-            dir->ramfs.current_datanode = diriter->ramfs.current_datanode;
-            break;
-        case FS_FAT32:
-            dir->fat32.current_cluster = diriter->fat32.current_cluster;
-            break;
-        default:
-            return ERR_FS_NOT_SUPPORTED;
+    if(dir->node->fs->save_diriter_adapter) {
+        dir->node->fs->save_diriter_adapter(dir, diriter);
+        return ERR_FS_SUCCESS;
     }
     return ERR_FS_SUCCESS;
 }
@@ -88,57 +77,23 @@ FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR file_reset(file_description_t* file) {
-    switch(file->node->fs->type) {
-        case FS_RAMFS:
-            return ramfs_file_reset(file->node);
-        case FS_FAT32:
-            return fat32_file_reset(file->node);
-        default:
-            return ERR_FS_NOT_SUPPORTED;
-    }
-}
-
 FS_ERR file_open(file_description_t* file, fs_node_t* node, const file_mode_t mode) {
     if(mode & FILE_OPEN_ONLYDIR && !FS_NODE_IS_DIR(node)) {
         return ERR_FS_NOT_DIR;
     }
 
     if(mode & FILE_OPEN_WRITE && mode & FILE_OPEN_TRUNCATE) {
-        file_reset(file);
+        node_reset(file->node);
     }
 
     file->node = node;
     file->mode = mode;
     file->position = 0;
 
-    switch(node->fs->type) {
-        case FS_RAMFS:
-            if(node->flags & FS_FLAG_MEMORY) {
-                break;
-            }
-            if(mode & FILE_OPEN_WRITE || mode & FILE_OPEN_READ) {
-                file->ramfs.current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain;
-            }
-            if(mode & FILE_OPEN_APPEND) {
-                file->ramfs.last_datanode = (uint32_t)(ramfs_get_last_datanote_of_chain(
-                    ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain)
-                );
-            }
-            break;
-        case FS_FAT32:
-            if(mode & FILE_OPEN_WRITE || mode & FILE_OPEN_READ) {
-                file->fat32.current_cluster = node->fat32.start_cluster;
-            }
-            if(mode & FILE_OPEN_APPEND) {
-                file->fat32.last_cluster = fat32_get_last_cluster_of_chain(
-                    node->fs,
-                    node->fat32.start_cluster
-                );
-            }
-            break;
-        default:
-            return ERR_FS_NOT_SUPPORTED;
+    if(node->fs->file_open) {
+        node->fs->file_open(file, node, mode);
+    } else {
+        return ERR_FS_NOT_SUPPORTED;
     }
 
     node->accessed_timestamp = timer_get_current_time();
@@ -177,16 +132,10 @@ FS_ERR file_seek(
     }
 
     FS_ERR err;
-
-    switch(file->node->fs->type) {
-        case FS_RAMFS:
-            err = ramfs_seek_absolute(file, absolute_position);
-            break;
-        case FS_FAT32:
-            err = fat32_seek_absolute(file, absolute_position);
-            break;
-        default:
-            err = ERR_FS_NOT_SUPPORTED;
+    if(file->node->fs->file_seek_absolute) {
+        err = file->node->fs->file_seek_absolute(file, absolute_position);
+    } else {
+        err = ERR_FS_NOT_SUPPORTED;
     }
 
     if(!err && final_position)
@@ -219,15 +168,10 @@ FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t*
     }
 
     FS_ERR err;
-    switch(file->node->fs->type) {
-        case FS_RAMFS:
-            err = ramfs_read(file, buffer, size, actual_read_size);
-            break;
-        case FS_FAT32:
-            err = fat32_read(file, buffer, size, actual_read_size);
-            break;
-        default:
-            return ERR_FS_NOT_SUPPORTED;
+    if(file->node->fs->file_read) {
+        err = file->node->fs->file_read(file, buffer, size, actual_read_size);
+    } else {
+        err = ERR_FS_NOT_SUPPORTED;
     }
     if(err != ERR_FS_SUCCESS && err != ERR_FS_EOF) return err;
 
@@ -251,15 +195,10 @@ FS_ERR file_write(
         return ERR_FS_NOT_FILE;
 
     FS_ERR err;
-    switch(file->node->fs->type) {
-        case FS_RAMFS:
-            err = ramfs_write(file, buffer, size, actual_write_size);
-            break;
-        case FS_FAT32:
-            err = fat32_write(file, buffer, size, actual_write_size);
-            break;
-        default:
-            return ERR_FS_NOT_SUPPORTED;
+    if(file->node->fs->file_write) {
+        err = file->node->fs->file_write(file, buffer, size, actual_write_size);
+    } else {
+        err = ERR_FS_NOT_SUPPORTED;
     }
     if(err) return err;
 

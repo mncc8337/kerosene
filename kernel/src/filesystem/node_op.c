@@ -1,3 +1,4 @@
+#include "sys/filesystem.h"
 #include <filesystem.h>
 
 #include <string.h>
@@ -42,25 +43,15 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
 }
 
 FS_ERR node_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
-    switch(node->fs->type) {
-        case FS_RAMFS:
-            return ramfs_setup_directory_iterator(diriter, node);
-        case FS_FAT32:
-            return fat32_setup_directory_iterator(diriter, node);
-        default:
-            return ERR_FS_NOT_SUPPORTED;
-    }
+    if(node->fs->setup_directory_iterator)
+        return node->fs->setup_directory_iterator(diriter, node);
+    return ERR_FS_NOT_SUPPORTED;
 }
 
 FS_ERR node_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node) {
-    switch(diriter->node->fs->type) {
-        case FS_RAMFS:
-            return ramfs_iterate_directory(diriter, ret_node);
-        case FS_FAT32:
-            return fat32_iterate_directory(diriter, ret_node);
-        default:
-            return ERR_FS_NOT_SUPPORTED;
-    }
+    if(diriter->node->fs->iterate_directory)
+        return diriter->node->fs->iterate_directory(diriter, ret_node);
+    return ERR_FS_NOT_SUPPORTED;
 }
 
 FS_ERR node_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
@@ -93,14 +84,9 @@ FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
 
     new_node->flags = 0;
 
-    switch(parent->fs->type) {
-        case FS_RAMFS:
-            return ramfs_mkdir(parent, name, 0, new_node);
-        case FS_FAT32:
-            return fat32_mkdir(parent, name, 0, new_node);
-        default:
-            return ERR_FS_NOT_SUPPORTED;
-    }
+    if(parent->fs->mkdir)
+        return parent->fs->mkdir(parent, name, 0, new_node);
+    return ERR_FS_NOT_SUPPORTED;
 }
 
 FS_ERR node_create(fs_node_t* parent, const char* name, fs_node_t* new_node) {
@@ -108,34 +94,17 @@ FS_ERR node_create(fs_node_t* parent, const char* name, fs_node_t* new_node) {
 
     new_node->flags = 0;
 
-    uint32_t file_cluster;
-    ramfs_datanode_t* datanode_chain;
-
-    switch(parent->fs->type) {
-        case FS_RAMFS:
-            datanode_chain = ramfs_allocate_datanodes(1, false);
-            if(!datanode_chain) return ERR_FS_NOT_ENOUGH_SPACE;
-            return ramfs_add_entry(parent, name, datanode_chain, 0, 0, new_node);
-        case FS_FAT32:
-            file_cluster = fat32_allocate_clusters(parent->fs, 1, false);
-            if(!file_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
-            return fat32_add_entry(parent, name, file_cluster, 0, 0, new_node);
-        default:
-            return ERR_FS_NOT_SUPPORTED;
-    }
+    if(parent->fs->node_create)
+        return parent->fs->node_create(parent, name, new_node);
+    return ERR_FS_NOT_SUPPORTED;
 }
 
 FS_ERR node_remove(fs_node_t* parent, fs_node_t* node) {
     if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
 
-    switch(parent->fs->type) {
-        case FS_RAMFS:
-            return ramfs_remove_entry(parent, node, true);
-        case FS_FAT32:
-            return fat32_remove_entry(parent, node, true);
-        default:
-            return ERR_FS_NOT_SUPPORTED;
-    }
+    if(parent->fs->remove_entry)
+        return parent->fs->remove_entry(parent, node, true);
+    return ERR_FS_NOT_SUPPORTED;
 }
 
 // set new_name to NULL to reuse the old name
@@ -146,14 +115,9 @@ FS_ERR node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, cons
     if(!new_name) new_name = node->name;
 
     if(node->fs == new_parent->fs) {
-        switch(node->fs->type) {
-            case FS_RAMFS:
-                return ramfs_copy(node, new_parent, copied, new_name);
-            case FS_FAT32:
-                return fat32_copy(node, new_parent, copied, new_name);
-            default:
-                return ERR_FS_NOT_SUPPORTED;
-        }
+        if(node->fs->node_copy)
+            return node->fs->node_copy(node, new_parent, copied, new_name);
+        return ERR_FS_NOT_SUPPORTED;
     }
 
     if(node->fs->type == FS_RAMFS)
@@ -170,23 +134,19 @@ FS_ERR node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
 
     if(!new_name) new_name = node->name;
 
-    switch(node->fs->type) {
-        case FS_RAMFS:
-            return ramfs_move(node, new_parent, new_name);
-        case FS_FAT32:
-            return fat32_move(node, new_parent, new_name);
-        default:
-            return ERR_FS_NOT_SUPPORTED;
-    }
+    if(node->fs->node_move)
+        return node->fs->node_move(node, new_parent, new_name);
+    return ERR_FS_NOT_SUPPORTED;
 }
 
 FS_ERR node_sync(fs_node_t* node) {
-    switch(node->fs->type) {
-        case FS_RAMFS:
-            return ramfs_update_entry(node);
-        case FS_FAT32:
-            return fat32_update_entry(node);
-        default:
-            return ERR_FS_SUCCESS;
-    }
+    if(node->fs->node_sync)
+        return node->fs->node_sync(node);
+    return ERR_FS_NOT_SUPPORTED;
+}
+
+FS_ERR node_reset(fs_node_t* node) {
+    if(node->fs->node_reset)
+        return node->fs->node_reset(node);
+    return ERR_FS_NOT_SUPPORTED;
 }

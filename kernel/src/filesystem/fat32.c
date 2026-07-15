@@ -398,13 +398,31 @@ static void parse_timestamp(uint16_t* date, uint16_t* time, struct tm t) {
 }
 
 static uint8_t to_fat_attr(uint32_t flags) {
-    // TODO: expand
+    uint8_t ret = 0;
+    if(flags & FS_FLAG_DIRECTORY) ret |= FAT_ATTR_DIRECTORY;
+    if(flags & FS_FLAG_HIDDEN) ret |= FAT_ATTR_HIDDEN;
 
-    uint8_t attr = 0;
-    if(flags & FS_FLAG_DIRECTORY) attr |= FAT_ATTR_DIRECTORY;
-    if(flags & FS_FLAG_HIDDEN) attr |= FAT_ATTR_HIDDEN;
+    // TODO:
+    // FAT_ATTR_READ_ONLY
+    // FAT_ATTR_SYSTEM
+    // FAT_ATTR_VOLUME_ID
+    // FAT_ATTR_ARCHIVE
 
-    return attr;
+    return ret;
+}
+
+static uint32_t to_fs_node_flags(uint8_t attr) {
+    uint8_t ret = 0;
+    if(attr & FAT_ATTR_DIRECTORY) ret |= FS_FLAG_DIRECTORY;
+    if(attr & FAT_ATTR_HIDDEN) ret |= FS_FLAG_HIDDEN;
+
+    // TODO:
+    // FAT_ATTR_READ_ONLY
+    // FAT_ATTR_SYSTEM
+    // FAT_ATTR_VOLUME_ID
+    // FAT_ATTR_ARCHIVE
+
+    return ret;
 }
 
 static FS_ERR read_file(
@@ -731,6 +749,14 @@ uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster) {
     return current_cluster;
 }
 
+void fat32_make_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter) {
+     diriter->fat32.current_cluster = dir->fat32.current_cluster;
+}
+
+void fat32_save_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter) {
+    dir->fat32.current_cluster = diriter->fat32.current_cluster;
+}
+
 FS_ERR fat32_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
     diriter->node = node;
     diriter->current_index = -32;
@@ -823,11 +849,7 @@ FS_ERR fat32_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_nod
             parse_datetime(temp_dir->last_access_date, 0, &(ret_node->accessed_timestamp));
             parse_datetime(temp_dir->last_mod_date, temp_dir->last_mod_time, &(ret_node->modified_timestamp));
 
-            ret_node->flags = 0;
-            if(temp_dir->attr & FAT_ATTR_DIRECTORY)
-                ret_node->flags |= FS_FLAG_DIRECTORY;
-            if(temp_dir->attr & FAT_ATTR_HIDDEN)
-                ret_node->flags |= FS_FLAG_HIDDEN;
+            ret_node->flags = to_fs_node_flags(temp_dir->attr);
 
             ret_node->size = temp_dir->size;
             ret_node->refcount = 0;
@@ -1035,11 +1057,7 @@ FS_ERR fat32_add_entry(
     new_node->size = size;
     new_node->refcount = 0;
 
-    new_node->flags = 0;
-    if(attr & FAT_ATTR_DIRECTORY)
-        new_node->flags |= FS_FLAG_DIRECTORY;
-    if(attr & FAT_ATTR_HIDDEN)
-        new_node->flags |= FS_FLAG_HIDDEN;
+    new_node->flags = to_fs_node_flags(attr);
 
     new_node->creation_milisecond = (clock() % CLOCKS_PER_SEC) * 1000 / CLOCKS_PER_SEC;
     new_node->creation_timestamp = timer_get_current_time();
@@ -1330,11 +1348,7 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
     dir->last_mod_time = time_dump;
     dir->last_mod_date = date_dump;
 
-    dir->attr = 0;
-    if(node->flags & FS_FLAG_DIRECTORY)
-        dir->attr |= FAT_ATTR_DIRECTORY;
-    if(node->flags & FS_FLAG_HIDDEN)
-        dir->attr |= FAT_ATTR_HIDDEN;
+    dir->attr = to_fat_attr(node->flags);
     dir->size = node->size;
     // name updating is very problematic
     // so if you want to update the name
@@ -1355,7 +1369,8 @@ FS_ERR fat32_update_entry(fs_node_t* node) {
 // make a directory in parent node
 // return valid node when success
 // return invalid node when node with the same name has already exists / cannot find free cluster
-FS_ERR fat32_mkdir(fs_node_t* parent, const char* name, uint8_t attr, fs_node_t* new_node) {
+FS_ERR fat32_mkdir(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node) {
+    uint8_t attr = to_fat_attr(flags);
     new_node->flags = 0;
 
     uint32_t start_cluster = fat32_allocate_clusters(parent->fs, 1, true);
@@ -1388,7 +1403,13 @@ FS_ERR fat32_mkdir(fs_node_t* parent, const char* name, uint8_t attr, fs_node_t*
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
+FS_ERR fat32_node_create(fs_node_t* parent, const char* name, fs_node_t* new_node) {
+    uint32_t file_cluster = fat32_allocate_clusters(parent->fs, 1, false);
+    if(!file_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
+    return fat32_add_entry(parent, name, file_cluster, 0, 0, new_node);
+}
+
+FS_ERR fat32_node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
     fs_node_t copied;
     FS_ERR copy_err = fat32_add_entry(
         new_parent, new_name,
@@ -1408,7 +1429,7 @@ FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) 
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
+FS_ERR fat32_node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
     uint32_t start_cluster = copy_cluster_chain(new_parent->fs, node->fat32.start_cluster);
     if(!start_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
 
@@ -1425,7 +1446,7 @@ FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, con
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_file_reset(fs_node_t* node) {
+FS_ERR fat32_node_reset(fs_node_t* node) {
     FS_ERR err = cut_cluster_chain(node->fs, node->fat32.start_cluster);
     if(err) return err;
     node->size = 0;
@@ -1433,7 +1454,7 @@ FS_ERR fat32_file_reset(fs_node_t* node) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_seek_absolute(file_description_t* file, int64_t seek_position) {
+FS_ERR fat32_file_seek_absolute(file_description_t* file, int64_t seek_position) {
     if(seek_position < 0) {
         seek_position = 0;
     }
@@ -1481,7 +1502,7 @@ FS_ERR fat32_seek_absolute(file_description_t* file, int64_t seek_position) {
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_read(
+FS_ERR fat32_file_read(
     file_description_t* file,
     uint8_t* buffer,
     size_t size,
@@ -1505,7 +1526,7 @@ FS_ERR fat32_read(
     );
 }
 
-FS_ERR fat32_write(
+FS_ERR fat32_file_write(
     file_description_t* file,
     const uint8_t* data,
     size_t size,
@@ -1535,6 +1556,18 @@ FS_ERR fat32_write(
         file->node->size,
         position + size
     );
+}
+
+void fat32_file_open(file_description_t* file, fs_node_t* node, const file_mode_t mode) {
+    if(mode & FILE_OPEN_WRITE || mode & FILE_OPEN_READ) {
+        file->fat32.current_cluster = node->fat32.start_cluster;
+    }
+    if(mode & FILE_OPEN_APPEND) {
+        file->fat32.last_cluster = fat32_get_last_cluster_of_chain(
+            node->fs,
+            node->fat32.start_cluster
+        );
+    }
 }
 
 // initialize FAT 32
@@ -1576,6 +1609,22 @@ FS_ERR fat32_init(fs_t* fs, partition_entry_t part) {
     fs->root_node.name[0] = '/';
     fs->root_node.name[1] = '\0';
     fs->root_node.refcount = 69420;
+
+    fs->remove_entry = fat32_remove_entry;
+    fs->make_diriter_adapter = fat32_make_diriter_adapter;
+    fs->save_diriter_adapter = fat32_save_diriter_adapter;
+    fs->setup_directory_iterator = fat32_setup_directory_iterator;
+    fs->iterate_directory = fat32_iterate_directory;
+    fs->mkdir = fat32_mkdir;
+    fs->node_create = fat32_node_create;
+    fs->node_copy = fat32_node_copy;
+    fs->node_move = fat32_node_move;
+    fs->node_reset = fat32_node_reset;
+    fs->node_sync = fat32_update_entry;
+    fs->file_seek_absolute = fat32_file_seek_absolute;
+    fs->file_read = fat32_file_read;
+    fs->file_write = fat32_file_write;
+    fs->file_open = fat32_file_open;
 
     return ERR_FS_SUCCESS;
 }

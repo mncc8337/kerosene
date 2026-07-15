@@ -127,31 +127,13 @@ typedef struct {
     };
 } directory_iterator_t;
 
-typedef struct fs {
-    fs_type_t type;
-    partition_entry_t partition;
-    struct fs_node root_node;
-
-    // fs-depend field
-    union {
-        struct {
-            uint8_t infotable[1024];
-        } info;
-
-        struct {
-            fat32_bootrecord_t bootrec;
-            fat32_fsinfo_t fsinfo;
-        } fat32_info;
-    };
-} fs_t;
-
 typedef struct {
     fs_node_t* node;
     int mode;
 
     union {
         int64_t position; // files
-        int32_t current_index; // directories (for iteration)
+        int64_t current_index; // directories (for iteration)
     };
 
     // fs depended field
@@ -168,6 +150,40 @@ typedef struct {
 
     // TODO: add more thing here
 } file_description_t;
+
+typedef struct fs {
+    fs_type_t type;
+    partition_entry_t partition;
+    struct fs_node root_node;
+
+    FS_ERR (*remove_entry)(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
+    void (*make_diriter_adapter)(file_description_t* dir, directory_iterator_t* diriter);
+    void (*save_diriter_adapter)(file_description_t* dir, directory_iterator_t* diriter);
+    FS_ERR (*setup_directory_iterator)(directory_iterator_t* diriter, fs_node_t* node);
+    FS_ERR (*iterate_directory)(directory_iterator_t* diriter, fs_node_t* ret_node);
+    FS_ERR (*mkdir)(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node);
+    FS_ERR (*node_create)(fs_node_t* parent, const char* name, fs_node_t* new_node);
+    FS_ERR (*node_copy)(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
+    FS_ERR (*node_move)(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
+    FS_ERR (*node_reset)(fs_node_t* node);
+    FS_ERR (*node_sync)(fs_node_t* node);
+    FS_ERR (*file_seek_absolute)(file_description_t* file, int64_t seek_position);
+    FS_ERR (*file_read)(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
+    FS_ERR (*file_write)(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
+    void (*file_open)(file_description_t* file, fs_node_t* node, const file_mode_t mode);
+
+    // fs-depend field
+    union {
+        struct {
+            uint8_t infotable[1024];
+        } info;
+
+        struct {
+            fat32_bootrecord_t bootrec;
+            fat32_fsinfo_t fsinfo;
+        } fat32_info;
+    };
+} fs_t;
 
 // mbr.c
 bool mbr_load();
@@ -195,21 +211,21 @@ int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size);
 int64_t vfs_seek(int file_descriptor, int64_t offset, whence_t whence);
 void vfs_seek_syscall(int file_descriptor, uint32_t hoff, uint32_t loff, whence_t whence, int64_t* position);
 
-// fs_op.c
+// node_op.c
 FS_ERR node_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR node_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR node_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node);
 FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node);
 FS_ERR node_create(fs_node_t* parent, const char* name, fs_node_t* new_node);
-FS_ERR node_remove(fs_node_t* parent, fs_node_t* node);
 FS_ERR node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
 FS_ERR node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
+FS_ERR node_remove(fs_node_t* parent, fs_node_t* node);
 FS_ERR node_sync(fs_node_t* node);
+FS_ERR node_reset(fs_node_t* node);
 
 // file_op.c
 FS_ERR file_setup_directory_iterator(file_description_t* dir);
 FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent);
-FS_ERR file_reset(file_description_t* file);
 FS_ERR file_open(file_description_t* file, fs_node_t* node, const file_mode_t mode);
 FS_ERR file_seek(file_description_t* file, int64_t offset, whence_t whence, int64_t* final_position);
 FS_ERR file_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
@@ -218,6 +234,8 @@ FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t*
 // ramfs.c
 ramfs_datanode_t* ramfs_allocate_datanodes(size_t count, bool clear);
 ramfs_datanode_t* ramfs_get_last_datanote_of_chain(ramfs_datanode_t* datanode);
+void ramfs_make_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter);
+void ramfs_save_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter);
 FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR ramfs_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR ramfs_add_entry(fs_node_t* parent, const char* name, ramfs_datanode_t* datanode_chain, uint32_t flags, size_t size, fs_node_t* new_node);
@@ -225,15 +243,17 @@ FS_ERR ramfs_add_memory_entry(fs_node_t* parent, const char* name, void* mem_add
 FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
 FS_ERR ramfs_update_entry(fs_node_t* node);
 FS_ERR ramfs_mkdir(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node);
-FS_ERR ramfs_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
-FS_ERR ramfs_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
+FS_ERR ramfs_node_create(fs_node_t* parent, const char* name, fs_node_t* new_node);
+FS_ERR ramfs_node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
+FS_ERR ramfs_node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
 FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
 
-FS_ERR ramfs_file_reset(fs_node_t* node);
+FS_ERR ramfs_node_reset(fs_node_t* node);
 FS_ERR ramfs_pipe_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
-FS_ERR ramfs_seek_absolute(file_description_t* file, int64_t seek_position);
-FS_ERR ramfs_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
-FS_ERR ramfs_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
+FS_ERR ramfs_file_seek_absolute(file_description_t* file, int64_t seek_position);
+FS_ERR ramfs_file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
+FS_ERR ramfs_file_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
+void ramfs_file_open(file_description_t* file, fs_node_t* node, const file_mode_t mode);
 
 FS_ERR ramfs_init(fs_t* fs);
 
@@ -241,18 +261,22 @@ FS_ERR ramfs_init(fs_t* fs);
 uint32_t fat32_allocate_clusters(fs_t* fs, size_t cluster_count, bool clear);
 uint32_t fat32_get_last_cluster_of_chain(fs_t* fs, uint32_t start_cluster);
 
+void fat32_make_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter);
+void fat32_save_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter);
 FS_ERR fat32_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR fat32_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR fat32_add_entry(fs_node_t* parent, const char* name, uint32_t start_cluster, uint8_t attr, size_t size, fs_node_t* new_node);
 FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
 FS_ERR fat32_update_entry(fs_node_t* node);
-FS_ERR fat32_mkdir(fs_node_t* parent, const char* name, uint8_t attr, fs_node_t* new_node);
-FS_ERR fat32_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
-FS_ERR fat32_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
+FS_ERR fat32_mkdir(fs_node_t* parent, const char* name, uint32_t attr, fs_node_t* new_node);
+FS_ERR fat32_node_create(fs_node_t* parent, const char* name, fs_node_t* new_node);
+FS_ERR fat32_node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
+FS_ERR fat32_node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
 
-FS_ERR fat32_file_reset(fs_node_t* node);
-FS_ERR fat32_seek_absolute(file_description_t* file, int64_t seek_position);
-FS_ERR fat32_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
-FS_ERR fat32_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
+FS_ERR fat32_node_reset(fs_node_t* node);
+FS_ERR fat32_file_seek_absolute(file_description_t* file, int64_t seek_position);
+FS_ERR fat32_file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
+FS_ERR fat32_file_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
+void fat32_file_open(file_description_t* file, fs_node_t* node, const file_mode_t mode);
 
 FS_ERR fat32_init(fs_t* fs, partition_entry_t part);
