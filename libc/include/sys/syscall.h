@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <sys/filesystem.h>
 
 enum {
     SYSCALL_TIME,
@@ -36,7 +37,7 @@ asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), 
 uint64_t syscall_time();
 void syscall_kill_process(int exit_code);
 void syscall_sleep(unsigned ticks);
-int syscall_open(const char* path, const char* modestr);
+int syscall_open(const char* path, const file_mode_t mode);
 void syscall_close(int file_descriptor);
 int syscall_read(int file_descriptor, uint8_t* buffer, size_t size);
 int syscall_write(int file_descriptor, const uint8_t* buffer, size_t size);

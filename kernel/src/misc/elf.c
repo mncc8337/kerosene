@@ -39,7 +39,7 @@ int elf_get_err() {
 
 ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry) {
     file_description_t f;
-    errcode = file_open(&f, node, "r");
+    errcode = file_open(&f, node, FILE_OPEN_READ);
     if(errcode)
         return ERR_ELF_FILE_ERROR;
 
@@ -127,7 +127,7 @@ ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
     }
 
     fs_node_t* elf;
-    errcode = vfs_find_and_create_node(path, &fs->root_node, &elf, false, true);
+    errcode = vfs_find_and_create_node(path, &fs->root_node, &elf, 0, true);
     if(errcode)
         return ERR_ELF_FILE_ERROR;
 

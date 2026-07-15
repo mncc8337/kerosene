@@ -1516,7 +1516,7 @@ FS_ERR fat32_write(
 
     int position = file->position;
     uint32_t* cluster_ptr = &file->fat32.current_cluster;
-    if(file->mode & FILE_APPEND) {
+    if(file->mode & FILE_OPEN_APPEND) {
         position = file->node->size;
         cluster_ptr = &file->fat32.last_cluster;
     }

@@ -622,7 +622,7 @@ FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* c
     if(touch_err) return touch_err;
 
     file_description_t dst_file;
-    FS_ERR dst_open_err = file_open(&dst_file, copied, "w");
+    FS_ERR dst_open_err = file_open(&dst_file, copied, FILE_OPEN_WRITE);
     if(dst_open_err) return dst_open_err;
 
     ramfs_node_t* ramnode = (ramfs_node_t*)node->ramfs.node_addr;
@@ -825,7 +825,7 @@ FS_ERR ramfs_write(
 
     if(FS_NODE_IS_PIPE(file->node)) {
         datanode_ptr = (ramfs_datanode_t**)&file->ramfs.last_datanode;
-    } else if(file->mode & FILE_APPEND) {
+    } else if(file->mode & FILE_OPEN_APPEND) {
         position = file->node->size;
         datanode_ptr = (ramfs_datanode_t**)&file->ramfs.last_datanode;
     }

@@ -46,18 +46,18 @@ bool vfs_init() {
 
     if(ramfs_init(&FS[RAMFS_DISK])) return true;
 
-    if(vfs_find_and_create_node(SYSFILE_PATH_DEV, &FS[RAMFS_DISK].root_node, &kern_dev, true, false))
+    if(vfs_find_and_create_node(SYSFILE_PATH_DEV, &FS[RAMFS_DISK].root_node, &kern_dev, FILE_OPEN_CREATE, false))
         return true;
 
-    if(vfs_find_and_create_node(SYSFILE_PATH_STDIN, kern_dev, &kern_stdin, true, true))
+    if(vfs_find_and_create_node(SYSFILE_PATH_STDIN, kern_dev, &kern_stdin, FILE_OPEN_CREATE, true))
         return true;
     kern_stdin->flags |= FS_FLAG_PIPE;
 
-    if(vfs_find_and_create_node(SYSFILE_PATH_STDOUT, kern_dev, &kern_stdout, true, true))
+    if(vfs_find_and_create_node(SYSFILE_PATH_STDOUT, kern_dev, &kern_stdout, FILE_OPEN_CREATE, true))
         return true;
     kern_stdout->flags |= FS_FLAG_PIPE;
 
-    if(vfs_find_and_create_node(SYSFILE_PATH_PROC, &FS[RAMFS_DISK].root_node, &kern_proc, true, false))
+    if(vfs_find_and_create_node(SYSFILE_PATH_PROC, &FS[RAMFS_DISK].root_node, &kern_proc, FILE_OPEN_CREATE, false))
         return true;
 
     // prevent these from being delete from the tree
@@ -65,8 +65,8 @@ bool vfs_init() {
     kern_stdin->refcount = 69420;
     KERNEL_FILE_COUNT = 2;
 
-    file_open(KERNEL_FDT + SYSFILE_FD_STDIN,  kern_stdin,  "a");
-    file_open(KERNEL_FDT + SYSFILE_FD_STDOUT, kern_stdout, "r");
+    file_open(KERNEL_FDT + SYSFILE_FD_STDIN,  kern_stdin,  FILE_OPEN_WRITE | FILE_OPEN_APPEND);
+    file_open(KERNEL_FDT + SYSFILE_FD_STDOUT, kern_stdout, FILE_OPEN_READ);
 
     return false;
 }

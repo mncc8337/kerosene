@@ -1,4 +1,4 @@
-#include "sys/dirent.h"
+#include "sys/filesystem.h"
 #include <filesystem.h>
 #include <timer.h>
 
@@ -39,7 +39,7 @@ FS_ERR file_setup_directory_iterator(file_description_t* dir) {
     if(!FS_NODE_IS_DIR(dir->node))
         return ERR_FS_NOT_DIR;
 
-    if(dir->mode != FILE_READ)
+    if(!(dir->mode & FILE_OPEN_READ))
         return ERR_FS_NOT_DIR;
 
     FS_ERR err;
@@ -58,7 +58,7 @@ FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent) {
     if(!FS_NODE_IS_DIR(dir->node))
         return ERR_FS_NOT_DIR;
 
-    if(dir->mode != FILE_READ)
+    if(!(dir->mode & FILE_OPEN_READ))
         return ERR_FS_NOT_DIR;
 
     FS_ERR err;
@@ -100,59 +100,38 @@ FS_ERR file_reset(file_description_t* file) {
     }
 }
 
-FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr) {
-    int mode = 0;
-
-    if(modestr[0] == 'w') {
-        mode = FILE_WRITE;
-        file_reset(file);
-    } else if(modestr[0] == 'r') {
-        mode = FILE_READ;
-    } else if(modestr[0] == 'a') {
-        mode = FILE_APPEND;
-    } else return ERR_FS_FAILED;
-
-    if(FS_NODE_IS_DIR(node)) {
-        if(mode != FILE_READ) {
-            return ERR_FS_NOT_FILE;
-        }
+FS_ERR file_open(file_description_t* file, fs_node_t* node, const file_mode_t mode) {
+    if(mode & FILE_OPEN_ONLYDIR && !FS_NODE_IS_DIR(node)) {
+        return ERR_FS_NOT_DIR;
     }
 
-    if(modestr[1] != '\0') {
-        if(modestr[1] == '+') {
-            if(mode != FILE_READ)
-                mode |= FILE_READ;
-            else
-                mode |= FILE_WRITE;
-        } else return ERR_FS_FAILED;
+    if(mode & FILE_OPEN_WRITE && mode & FILE_OPEN_TRUNCATE) {
+        file_reset(file);
     }
 
     file->node = node;
     file->mode = mode;
     file->position = 0;
 
-    // TODO:
-    // clear file content if mode is w or w+
-
     switch(node->fs->type) {
         case FS_RAMFS:
             if(node->flags & FS_FLAG_MEMORY) {
                 break;
             }
-            if(mode & FILE_WRITE || mode & FILE_READ) {
+            if(mode & FILE_OPEN_WRITE || mode & FILE_OPEN_READ) {
                 file->ramfs.current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain;
             }
-            if(mode & FILE_APPEND) {
+            if(mode & FILE_OPEN_APPEND) {
                 file->ramfs.last_datanode = (uint32_t)(ramfs_get_last_datanote_of_chain(
                     ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain)
                 );
             }
             break;
         case FS_FAT32:
-            if(mode & FILE_WRITE || mode & FILE_READ) {
+            if(mode & FILE_OPEN_WRITE || mode & FILE_OPEN_READ) {
                 file->fat32.current_cluster = node->fat32.start_cluster;
             }
-            if(mode & FILE_APPEND) {
+            if(mode & FILE_OPEN_APPEND) {
                 file->fat32.last_cluster = fat32_get_last_cluster_of_chain(
                     node->fs,
                     node->fat32.start_cluster
@@ -172,13 +151,13 @@ FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr)
 FS_ERR file_seek(
     file_description_t* file,
     int64_t offset,
-    int whence,
+    whence_t whence,
     int64_t* final_position
 ) {
     // TODO:
     // support a+ mode
 
-    if(file->mode & FILE_APPEND)
+    if(file->mode & FILE_OPEN_APPEND)
         return ERR_FS_FAILED;
 
     int64_t absolute_position = 0;
@@ -193,7 +172,7 @@ FS_ERR file_seek(
                 absolute_position = 0;
             }
             break;
-        case SEEK_END:
+        case SEEK_BOTTOM:
             absolute_position = file->node->size;
             break;
     }
@@ -218,7 +197,7 @@ FS_ERR file_seek(
 }
 
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size) {
-    if(!(file->mode & FILE_READ)) return ERR_FS_FAILED;
+    if(!(file->mode & FILE_OPEN_READ)) return ERR_FS_FAILED;
 
     if(FS_NODE_IS_PIPE(file->node)) {
         // pipe mode: node->size = bytes available; empty pipe returns 0, not EOF
@@ -267,8 +246,10 @@ FS_ERR file_write(
     size_t size,
     size_t* actual_write_size
 ) {
-    if(!(file->mode & FILE_WRITE) && !(file->mode & FILE_APPEND))
+    if(!(file->mode & FILE_OPEN_WRITE))
         return ERR_FS_FAILED;
+    if(FS_NODE_IS_DIR(file->node))
+        return ERR_FS_NOT_FILE;
 
     FS_ERR err;
     switch(file->node->fs->type) {
@@ -286,7 +267,7 @@ FS_ERR file_write(
     if(FS_NODE_IS_PIPE(file->node)) {
         file->node->size += (*actual_write_size);
         file->position += (*actual_write_size);
-    } else if(file->mode & FILE_APPEND) {
+    } else if(file->mode & FILE_OPEN_APPEND) {
         file->node->size += (*actual_write_size);
         file->position = file->node->size;
     } else {

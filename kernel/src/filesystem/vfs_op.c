@@ -1,3 +1,4 @@
+#include "sys/filesystem.h"
 #include <filesystem.h>
 #include <process.h>
 
@@ -33,13 +34,20 @@ static bool validate_user_string(const process_t* current_process, const char* s
     return false;
 }
 
+// mode should be only:
+// - FILE_OPEN_CREATE to create file if not existed. to create a dir, set is_file to false
+// - FILE_OPEN_EXCLUSIVE: yield error when the file is existed
+// - FILE_OPEN_ONLYDIR: to force find directory only. also disable file creation
 FS_ERR vfs_find_and_create_node(
     const char* path,
     fs_node_t* cwd,
     fs_node_t** ret_node,
-    bool create_node,
-    bool is_file
+    const file_mode_t mode,
+    const bool is_file
 ) {
+    bool do_create_node = mode & FILE_OPEN_CREATE && !(mode & FILE_OPEN_ONLYDIR);
+    bool fail_if_existed = mode & FILE_OPEN_EXCLUSIVE;
+
     // disable interrupts because we are heavily
     // modifying the vfs tree
     uint32_t eflags;
@@ -106,7 +114,7 @@ FS_ERR vfs_find_and_create_node(
 
     char* token = pathcpy;
     char* current_name = strtok_r(pathcpy, "/", &token);
-    bool create_file_flag = false;
+    bool create_node_flag = false;
     
     while(current_name) {
         if(!strcmp(current_name, "."))
@@ -139,11 +147,13 @@ FS_ERR vfs_find_and_create_node(
             search_stack[search_stack_counter++] = new_node;
             new_node->parent = NULL;
 
+            bool is_last_token = (token == NULL || *token == '\0');
+
             FS_ERR find_err = fs_find(parent_node, current_name, new_node);
             if(find_err) {
-                if(find_err == ERR_FS_NOT_FOUND && strtok_r(NULL, "/", &token) == NULL) {
-                    if(create_node) {
-                        create_file_flag = true;
+                if(find_err == ERR_FS_NOT_FOUND && is_last_token) {
+                    if(do_create_node) {
+                        create_node_flag = true;
                         break;
                     }
                     ret_err = ERR_FS_TARGET_NOT_FOUND;
@@ -153,7 +163,14 @@ FS_ERR vfs_find_and_create_node(
                 goto nuke_search_stack_and_ret;
             }
 
-            // successfully found on disk, add to vfs tree
+            // successfully found on disk
+
+            if(fail_if_existed && is_last_token) {
+                ret_err = ERR_FS_ENTRY_EXISTED;
+                goto nuke_search_stack_and_ret;
+            }
+
+            // add to vfs tree
             if(!parent_node->children) {
                 parent_node->children = new_node;
             } else {
@@ -169,7 +186,7 @@ FS_ERR vfs_find_and_create_node(
         current_name = strtok_r(NULL, "/", &token);
     }
 
-    if(create_file_flag) {
+    if(create_node_flag) {
         fs_node_t* new_node = (fs_node_t*)kmalloc(sizeof(fs_node_t));
         if(!new_node) {
             ret_err = ERR_FS_NOT_ENOUGH_SPACE;
@@ -199,6 +216,11 @@ FS_ERR vfs_find_and_create_node(
         }
         new_node->next_sibling = NULL;
         current_node = new_node;
+    }
+
+    if((mode & FILE_OPEN_ONLYDIR) && !FS_NODE_IS_DIR(current_node)) {
+        ret_err = ERR_FS_NOT_DIR;
+        goto nuke_search_stack_and_ret;
     }
 
     *ret_node = current_node;
@@ -281,10 +303,10 @@ void vfs_cleanup_node_tree(fs_node_t* start_node) {
 // TODO:
 // specify the error when failed
 
-int vfs_open(const char* path, const char* modestr) {
+int vfs_open(const char* path, const file_mode_t mode) {
     process_t* proc = scheduler_get_current_process();
 
-    if(!validate_user_string(proc, path) || !validate_user_string(proc, modestr))
+    if(!validate_user_string(proc, path))
         return -1;
 
     // return early, prevent searching for the entire table and found nothing
@@ -298,8 +320,13 @@ int vfs_open(const char* path, const char* modestr) {
         return -1;
 
     fs_node_t* node;
-    bool do_touch_file = (modestr[0] == 'w') || (modestr[0] == 'a');
-    FS_ERR find_err = vfs_find_and_create_node(path, proc->cwd, &node, do_touch_file, true);
+    FS_ERR find_err = vfs_find_and_create_node(
+        path,
+        proc->cwd,
+        &node,
+        mode,
+        true
+    );
     if(find_err)
         return -1;
 
@@ -324,7 +351,7 @@ int vfs_open(const char* path, const char* modestr) {
         return -1;
     }
 
-    FS_ERR open_err = file_open(fde, node, modestr);
+    FS_ERR open_err = file_open(fde, node, mode);
     if(open_err) {
         fde->node = NULL;
         // NOTE: dont nuke the whole tree after just failing to open a node
@@ -380,7 +407,7 @@ int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
     if(fde->node == NULL)
         return -1;
 
-    if(!(fde->mode & FILE_READ))
+    if(!(fde->mode & FILE_OPEN_READ))
         return -1;
 
     size_t read_size;
@@ -408,7 +435,7 @@ int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size) {
     if(fde->node == NULL)
         return -1;
 
-    if(!(fde->mode & FILE_WRITE) && !(fde->mode & FILE_APPEND))
+    if(!(fde->mode & FILE_OPEN_WRITE))
         return -1;
 
     size_t write_size;
@@ -420,7 +447,7 @@ int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size) {
         return -1;
 }
 
-int64_t vfs_seek(int file_descriptor, int64_t offset, int whence) {
+int64_t vfs_seek(int file_descriptor, int64_t offset, whence_t whence) {
     process_t* proc = scheduler_get_current_process();
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
@@ -443,7 +470,7 @@ void vfs_seek_syscall(
     int file_descriptor,
     uint32_t hoff,
     uint32_t loff,
-    int whence,
+    whence_t whence,
     int64_t* position
 ) {
     int64_t pos = ((uint64_t)(hoff & 0xffffffff) << 32) | (loff & 0xffffffff);

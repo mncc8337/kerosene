@@ -1,3 +1,4 @@
+#include "sys/filesystem.h"
 #include <filesystem.h>
 
 #include <string.h>
@@ -10,11 +11,11 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
     if(touch_err) return touch_err;
 
     file_description_t src_file;
-    FS_ERR src_open_err = file_open(&src_file, node, "r");
+    FS_ERR src_open_err = file_open(&src_file, node, FILE_OPEN_READ);
     if(src_open_err) return src_open_err;
 
     file_description_t dst_file;
-    FS_ERR dst_open_err = file_open(&dst_file, copied, "w");
+    FS_ERR dst_open_err = file_open(&dst_file, copied, FILE_OPEN_WRITE | FILE_OPEN_CREATE);
     if(dst_open_err) return dst_open_err;
 
     FS_ERR final_err = ERR_FS_SUCCESS;

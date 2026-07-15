@@ -16,15 +16,20 @@
 
 #define MAX_FILE 128
 
-// this must be multiply of 4 and larger than 4
+// this must be a multiply of 4 and is larger than 5
 #define RAMFS_DATANODE_SIZE 512
 
 typedef enum {
-    FS_FLAG_DIRECTORY = (1 << 0),
-    FS_FLAG_HIDDEN    = (1 << 1),
-    FS_FLAG_PIPE      = (1 << 2),
-    FS_FLAG_MEMORY    = (1 << 3),
-} fs_node_flag_t;
+    FS_EMPTY,
+    FS_FAT32,
+    FS_EXT2,
+    FS_RAMFS
+} fs_type_t;
+
+#define FS_FLAG_DIRECTORY (1 << 0)
+#define FS_FLAG_HIDDEN (1 << 1)
+#define FS_FLAG_PIPE (1 << 2)
+#define FS_FLAG_MEMORY (1 << 3)
 
 #define FS_NODE_IS_VALID(node_ptr) ((node_ptr)->flags != 0)
 #define FS_NODE_IS_DIR(node_ptr) ((node_ptr)->flags & FS_FLAG_DIRECTORY)
@@ -34,36 +39,7 @@ typedef enum {
 #define FS_NODE_FLAG_SET(node_ptr, flag) ((node_ptr)->flags |= (flag))
 #define FS_NODE_FLAG_UNSET(node_ptr, flag) ((node_ptr)->flags &= ~(flag))
 
-typedef enum {
-    ERR_FS_SUCCESS,
-    ERR_FS_FAILED,
-    ERR_FS_ENTRY_EXISTED,
-    ERR_FS_BAD_CLUSTER,
-    ERR_FS_NOT_FOUND,
-    ERR_FS_TARGET_NOT_FOUND,
-    ERR_FS_DIR_NOT_EMPTY,
-    ERR_FS_INVALID_FSINFO,
-    ERR_FS_MAX_DEPTH_REACHED,
-    ERR_FS_NOT_ENOUGH_SPACE,
-    ERR_FS_OOM,
-    ERR_FS_NOT_FILE,
-    ERR_FS_NOT_DIR,
-    ERR_FS_NOT_SUPPORTED,
-    ERR_FS_EOF
-} FS_ERR;
-
-typedef enum {
-    FS_EMPTY,
-    FS_FAT32,
-    FS_EXT2,
-    FS_RAMFS
-} fs_type_t;
-
-typedef enum {
-    FILE_WRITE = 0b001,
-    FILE_APPEND = 0b010,
-    FILE_READ = 0b100,
-} FILE_OP;
+#include <sys/filesystem.h>
 
 typedef struct {
     uint8_t drive_attribute;
@@ -193,10 +169,6 @@ typedef struct {
     // TODO: add more thing here
 } file_description_t;
 
-#define SEEK_ABSOLUTE 0
-#define SEEK_RELATIVE 1
-#define SEEK_END 2
-
 // mbr.c
 bool mbr_load();
 partition_entry_t mbr_get_partition_entry(unsigned int id);
@@ -214,14 +186,14 @@ file_description_t* vfs_get_kernel_file_descriptor_table();
 unsigned vfs_get_kernel_file_count();
 
 // vfs_op.c
-FS_ERR vfs_find_and_create_node(const char* path, fs_node_t* cwd, fs_node_t** ret_node, bool create_node, bool is_file);
+FS_ERR vfs_find_and_create_node(const char* path, fs_node_t* cwd, fs_node_t** ret_node, const file_mode_t mode, const bool is_file);
 void vfs_cleanup_node_tree(fs_node_t* start_node);
-int vfs_open(const char* path, const char* modestr);
+int vfs_open(const char* path, const file_mode_t mode);
 void vfs_close(int file_descriptor);
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size);
 int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size);
-int64_t vfs_seek(int file_descriptor, int64_t offset, int whence);
-void vfs_seek_syscall(int file_descriptor, uint32_t hoff, uint32_t loff, int whence, int64_t* position);
+int64_t vfs_seek(int file_descriptor, int64_t offset, whence_t whence);
+void vfs_seek_syscall(int file_descriptor, uint32_t hoff, uint32_t loff, whence_t whence, int64_t* position);
 
 // fs_op.c
 FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
@@ -237,8 +209,8 @@ FS_ERR fs_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
 FS_ERR file_setup_directory_iterator(file_description_t* dir);
 FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent);
 FS_ERR file_reset(file_description_t* file);
-FS_ERR file_open(file_description_t* file, fs_node_t* node, const char* modestr);
-FS_ERR file_seek(file_description_t* file, int64_t offset, int whence, int64_t* final_position);
+FS_ERR file_open(file_description_t* file, fs_node_t* node, const file_mode_t mode);
+FS_ERR file_seek(file_description_t* file, int64_t offset, whence_t whence, int64_t* final_position);
 FS_ERR file_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
 FS_ERR file_sync(file_description_t* file);

@@ -1,3 +1,4 @@
+#include "sys/filesystem.h"
 #include <process.h>
 #include <filesystem.h>
 #include <system.h>
@@ -176,7 +177,13 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
 
 
         fs_node_t* proc_dir;
-        if(vfs_find_and_create_node(buff, sysproc_dir, &proc_dir, true, false)) {
+        if(vfs_find_and_create_node(
+            buff,
+            sysproc_dir,
+            &proc_dir,
+            FILE_OPEN_CREATE | FILE_OPEN_EXCLUSIVE,
+            false
+        )) {
             process_delete(proc);
             return NULL;
         }
@@ -184,8 +191,8 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
         file_description_t* fdt = proc->file_descriptor_table;
 
         // should always success
-        file_open(fdt + SYSFILE_FD_STDIN,  vfs_get_stdin(),  "r");
-        file_open(fdt + SYSFILE_FD_STDOUT, vfs_get_stdout(), "a");
+        file_open(fdt + SYSFILE_FD_STDIN,  vfs_get_stdin(),  FILE_OPEN_READ);
+        file_open(fdt + SYSFILE_FD_STDOUT, vfs_get_stdout(), FILE_OPEN_WRITE | FILE_OPEN_APPEND);
 
         fdt[SYSFILE_FD_STDIN].node->refcount++;
         fdt[SYSFILE_FD_STDOUT].node->refcount++;
