@@ -1,4 +1,3 @@
-#include "sys/filesystem.h"
 #include <filesystem.h>
 
 #include <string.h>
@@ -44,8 +43,6 @@ static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* 
 }
 
 FS_ERR fs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node) {
-    if(!FS_NODE_IS_DIR(node)) return ERR_FS_NOT_DIR;
-
     switch(node->fs->type) {
         case FS_RAMFS:
             return ramfs_setup_directory_iterator(diriter, node);
