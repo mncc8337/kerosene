@@ -1,4 +1,5 @@
 #include <video.h>
+#include <string.h>
 #include <misc/psf.h>
 
 static bool linear_graphics_mode = false;
@@ -35,7 +36,10 @@ void video_preinit_prints(const char* str, int offset, int fg, int bg, bool move
     if(offset < 0) offset = preinit_cursor;
     if((unsigned)offset >= preinit_buffer_len) preinit_buffer_len = offset + 1;
 
-    preinit_buffer[offset++] = str[0];
+    size_t len = strlen(str);
+    for(size_t i = 0; i < len; i++) {
+        preinit_buffer[offset++] = str[i];
+    }
     if(move) preinit_cursor = offset;
 }
 

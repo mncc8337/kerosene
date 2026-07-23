@@ -1,7 +1,6 @@
 #include <system.h>
 #include <process.h>
 #include <mem.h>
-#include <stdio.h>
 #include <video.h>
 #include <misc/elf.h>
 
@@ -17,15 +16,15 @@ void stack_trace(stackframe_t* stk) {
 
     for(unsigned frame = 0; stk && frame < MAX_FRAMES; frame++) {
         if(!vmmngr_to_physical_addr(NULL, (virtual_addr_t)stk)) {
-            printf("unmapped EBP address: 0x%x\n", stk);
+            kprintf("unmapped EBP address: 0x%x\n", stk);
             return;
         }
 
         uint32_t addr = stk->eip;
-        printf("[0x%x] ", addr);
+        kprintf("[0x%x] ", addr);
 
         if(!addr) {
-            puts("stack end");
+            kputs("stack end");
             return;
         }
 
@@ -39,11 +38,11 @@ void stack_trace(stackframe_t* stk) {
         if(function_addr > object_addr) name = function_name;
         else name = object_name;
 
-        printf("%s\n", name ? name : "unknown function");
+        kprintf("%s\n", name ? name : "unknown function");
 
         stk = stk->ebp;
     }
-    if(stk) puts("..."); // reached max frames limit
+    if(stk) kputs("..."); // reached max frames limit
 }
 
 void kernel_set_strtab_ptr(uint32_t ptr) {
@@ -81,16 +80,16 @@ char* kernel_find_symbol(unsigned addr, int type, unsigned* ret_addr) {
 void kernel_panic(stackframe_t* stk) {
     asm("cli");
     video_set_attr(video_rgb(VIDEO_LIGHT_RED), video_rgb(VIDEO_BLACK));
-    puts("kernel panicked!");
+    kputs("kernel panicked!");
     video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
 
     process_t* current_process = scheduler_get_current_process();
     if(current_process) {
-        printf("current process: 0x%x (id %d)\n", current_process, current_process->id);
+        kprintf("current process: 0x%x (id %d)\n", current_process, current_process->id);
     }
 
-    puts("stack trace:");
+    kputs("stack trace:");
     stack_trace(stk);
-    puts("system halted!");
+    kputs("system halted!");
     while(1) asm("hlt");
 }

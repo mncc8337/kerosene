@@ -48,11 +48,11 @@ static char* exception_message[] = {
 // default exception handler
 static uint32_t exception_handler(regs_t* r) {
     video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
-    printf("Exception: ");
+    kprintf("Exception: ");
     video_set_attr(video_rgb(VIDEO_LIGHT_RED), video_rgb(VIDEO_BLACK));
-    puts(exception_message[r->int_no]);
+    kputs(exception_message[r->int_no]);
     video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
-    printf("Error code: 0b%b\n", r->err_code);
+    kprintf("Error code: 0b%b\n", r->err_code);
 
     stackframe_t stk = {(stackframe_t*)r->ebp, r->eip};
     kernel_panic(&stk);
@@ -93,31 +93,31 @@ static uint32_t page_fault_handler(regs_t* r) {
     bool sgx  = r->err_code & 0x8000;
 
     video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
-    printf("page fault at address ");
+    kprintf("page fault at address ");
     video_set_attr(video_rgb(VIDEO_LIGHT_RED), video_rgb(VIDEO_BLACK));
-    printf("0x%x\n", faulting_address);
+    kprintf("0x%x\n", faulting_address);
     video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
-    printf("flags: ");
+    kprintf("flags: ");
 
-    if(p) printf("present, ");
-    else printf("not-present, ");
+    if(p) kprintf("present, ");
+    else kprintf("not-present, ");
 
-    if(rw) printf("read/write, ");
-    else printf("read-only, ");
+    if(rw) kprintf("read/write, ");
+    else kprintf("read-only, ");
 
-    if(us) printf("user, ");
-    else printf("supervisor, ");
+    if(us) kprintf("user, ");
+    else kprintf("supervisor, ");
 
-    if(rsvd) printf("reserved, ");
+    if(rsvd) kprintf("reserved, ");
 
-    if(id) printf("instruction fetch, ");
-    else printf("data access, ");
+    if(id) kprintf("instruction fetch, ");
+    else kprintf("data access, ");
 
-    if(pk) printf("protection-key violation, ");
-    if(ss) printf("shadow-stack access fault, ");
-    if(sgx) printf("SGX violation, ");
+    if(pk) kprintf("protection-key violation, ");
+    if(ss) kprintf("shadow-stack access fault, ");
+    if(sgx) kprintf("SGX violation, ");
 
-    putchar('\n');
+    kputchar('\n');
     return exception_handler(r);
 }
 

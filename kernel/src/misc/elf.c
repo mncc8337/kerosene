@@ -141,10 +141,10 @@ ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
     if(errcode)
         return errcode;
 
-    // printf("jumping to entry (0x%x)\n", entry);
+    // kprintf("jumping to entry (0x%x)\n", entry);
     // int (*prog)(void) = (void*)entry;
     // int exit_code = prog();
-    // printf("program exited with code %d\n", exit_code);
+    // kprintf("program exited with code %d\n", exit_code);
     
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));

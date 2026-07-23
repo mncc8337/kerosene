@@ -1,0 +1,109 @@
+#include <stdio.h>
+#include <limits.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+
+static bool print(int fd, const char* data, size_t length) {
+    const unsigned char* bytes = (const unsigned char*)data;
+    for(size_t i = 0; i < length; i++) {
+        if(syscall_write(fd, bytes + i, 1) == EOF)
+            return false;
+    }
+    return true;
+}
+
+static size_t intlen(int num, int radix) {
+    if(num == 0) return 1;
+    size_t len = 0;
+    unsigned n;
+    if(radix == 10 && num < 0) {
+        len++; // minus sign
+        n = -num;
+    } else n = (unsigned)num;
+    while(n > 0) {
+        n /= radix;
+        len++;
+    }
+    return len;
+}
+
+int vdprintf(int fd, const char* restrict format, va_list parameters) {
+    int written = 0;
+
+    while(*format != '\0') {
+        size_t maxrem = INT_MAX - written;
+
+        if(format[0] != '%' || format[1] == '%') {
+            if(format[0] == '%')
+                format++;
+            size_t amount = 1;
+            while(format[amount] && format[amount] != '%')
+                amount++;
+            if(maxrem < amount) {
+                return -1;
+            }
+            if(!print(fd, format, amount))
+                return -1;
+            format += amount;
+            written += amount;
+            continue;
+        }
+
+        const char* format_begun_at = format++;
+
+        if(*format == 'c') {
+            format++;
+            char c = (char)va_arg(parameters, int);
+            if(!maxrem) return -1;
+            if(!print(fd, &c, sizeof(c))) return -1;
+            written++;
+        } else if(*format == 's') {
+            format++;
+            const char* str = va_arg(parameters, const char*);
+            if(!str) str = "(null)";
+            size_t len = strlen(str);
+            if(maxrem < len) return -1;
+            if(!print(fd, str, len)) return -1;
+            written += len;
+        } else if(*format == 'b') {
+            format++;
+            int integer = va_arg(parameters, int);
+            size_t len = intlen(integer, 2);
+            char str[len + 1];
+            itoa(integer, str, 2);
+            if(maxrem < len) return -1;
+            if(!print(fd, str, len)) return -1;
+            written += len;
+        } else if(*format == 'd') {
+            format++;
+            int integer = va_arg(parameters, int);
+            size_t len = intlen(integer, 10);
+            char str[len + 1];
+            itoa(integer, str, 10);
+            if(maxrem < len) return -1;
+            if(!print(fd, str, len)) return -1;
+            written += len;
+        } else if(*format == 'x') {
+            format++;
+            int integer = va_arg(parameters, int);
+            size_t len = intlen(integer, 16);
+            char str[len + 1];
+            itoa(integer, str, 16);
+            if(maxrem < len) return -1;
+            if(!print(fd, str, len)) return -1;
+            written += len;
+        } else {
+            format = format_begun_at;
+            size_t len = strlen(format);
+            if(maxrem < len) return -1;
+            if(!print(fd, format, len)) return -1;
+            written += len;
+            format += len;
+        }
+    }
+
+    return written;
+}

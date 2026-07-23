@@ -16,7 +16,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/syscall.h>
-#include <debug.h>
 
 #include <misc/elf.h>
 
@@ -39,7 +38,7 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
         memsize += mmmt->len;
     }
     pmmngr_init(memsize);
-    print_debug(LT_OK, "pmmngr initialised, detected %d MiB of memory\n", memsize/1024/1024);
+    kprint_debug(LT_OK, "pmmngr initialised, detected %d MiB of memory\n", memsize/1024/1024);
 
     // init regions
     for(unsigned int i = 0; i < mmap_length; i += sizeof(multiboot_memory_map_t)) {
@@ -118,7 +117,7 @@ void video_init(multiboot_info_t* mbd) {
             video_width, video_height,
             video_pitch, video_bpp
         );
-        print_debug(
+        kprint_debug(
             LT_OK,
             "VESA video initialised with resolution %dx%d, %d bpp\n",
             video_width,
@@ -127,7 +126,7 @@ void video_init(multiboot_info_t* mbd) {
         );
     } else {
         video_vga_init(video_width, video_height);
-        print_debug(
+        kprint_debug(
             LT_OK,
             "VGA video initialised with resolution %dx%d, %d bpp\n",
             video_width,
@@ -140,25 +139,25 @@ void video_init(multiboot_info_t* mbd) {
 void disk_init() {
     uint16_t* dump = kmalloc(256 * sizeof(uint16_t));
     if(!dump) {
-        print_debug(LT_ER, "not enough memory to initialise disk\n");
+        kprint_debug(LT_ER, "not enough memory to initialise disk\n");
         return;
     }
 
     ATA_PIO_ERR ata_err = ata_pio_init(dump);
     kfree(dump);
     if(ata_err) {
-        print_debug(LT_WN, "failed to initialise ATA PIO mode. error code %d\n", ata_err);
+        kprint_debug(LT_WN, "failed to initialise ATA PIO mode. error code %d\n", ata_err);
         return;
     }
 
-    print_debug(LT_OK, "ATA PIO mode initialised\n");
+    kprint_debug(LT_OK, "ATA PIO mode initialised\n");
 
     bool mbr_err = mbr_load();
     if(mbr_err) {
-        print_debug(LT_ER, "cannot load MBR\n");
+        kprint_debug(LT_ER, "cannot load MBR\n");
         return;
     }
-    print_debug(LT_OK, "MBR loaded\n");
+    kprint_debug(LT_OK, "MBR loaded\n");
 
     for(int i = 0; i < 4; i++) {
         partition_entry_t part = mbr_get_partition_entry(i);
@@ -175,21 +174,24 @@ void disk_init() {
             case FS_FAT32:
                 err = fat32_init(vfs_getfs(fs_count), part);
                 if(err)
-                    print_debug(LT_ER, "failed to initialise FAT32 filesystem on partition %d. error code %d\n", i+1, err);
+                    kprint_debug(LT_ER, "failed to initialise FAT32 filesystem on partition %d. error code %d\n", i+1, err);
                 else {
-                    print_debug(LT_OK, "initialised FAT32 filesystem on partition %d", i+1);
-                    printf(" on fs (%d)\n", fs_count);
+                    kprint_debug(LT_OK, "initialised FAT32 filesystem on partition %d", i+1);
+                    kprintf(" on fs (%d)\n", fs_count);
                     fs_count++;
                 }
                 break;
             case FS_EXT2:
-                print_debug(LT_WN, "EXT2 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
+                kprint_debug(LT_WN, "EXT2 filesystem in partition %d is not implemented, the partition will be ignored\n", i+1);
                 break;
         }
     }
 }
 
 void kinit(multiboot_info_t* mbd) {
+    // disable interrupts to set up things
+    asm volatile("cli");
+
     // from kernel_entry.asm
     extern uint32_t kernel_start;
     extern uint32_t kernel_end;
@@ -198,10 +200,10 @@ void kinit(multiboot_info_t* mbd) {
     // greeting msg to let us know we are in the kernel
     // note that this will print into preinit video buffer
     // and will not drawn to screen until video is initialised
-    puts("hello");
-    printf("this is "); puts("kernosene!");
-    printf("build datetime: %s, %s\n", __TIME__, __DATE__);
-    printf("kernel size: %d bytes\n", kernel_size);
+    kputs("hello");
+    kprintf("this is kerosense!\n");
+    kprintf("build datetime: %s, %s\n", __TIME__, __DATE__);
+    kprintf("kernel size: %d bytes\n", kernel_size);
 
     // since we have mapped 4MiB from 0x0 to 0xc0000000
     // any physical address under 4MiB can be converted to virtual address
@@ -213,10 +215,7 @@ void kinit(multiboot_info_t* mbd) {
     mbd = (void*)mbd + KERNEL_START;
 
     if(mbd->flags & MULTIBOOT_INFO_BOOT_LOADER_NAME)
-        print_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + KERNEL_START);
-
-    // disable interrupts to set up things
-    asm volatile("cli");
+        kprint_debug(LT_IF, "using %s bootloader\n", mbd->boot_loader_name + KERNEL_START);
 
     if(!(mbd->flags & MULTIBOOT_INFO_MEM_MAP)) kernel_panic(NULL);
     mem_init((void*)mbd->mmap_addr + KERNEL_START, mbd->mmap_length);
@@ -243,16 +242,14 @@ void kinit(multiboot_info_t* mbd) {
     video_init(mbd);
 
     if(kheap_init()) {
-        print_debug(LT_CR, "failed to initialise kernel heap. not enough memory\n");
+        kprint_debug(LT_CR, "failed to initialise kernel heap. not enough memory\n");
         kernel_panic(NULL);
     }
-    print_debug(LT_OK, "kernel heap initialised\n");
+    kprint_debug(LT_OK, "kernel heap initialised\n");
 
     // if(mbd->flags & MULTIBOOT_INFO_AOUT_SYMS) {
     //     aout_sym = mbd->u.aout_sym;
     // }
-
-    // TODO: implement the a.out option, assumption is bad
 
     // we gave GRUB an ELF binary so GRUB will not give us the a.out symbol table option (commented above)
     // also only one of the two (a.out option or ELF option) must be existed
@@ -267,70 +264,70 @@ void kinit(multiboot_info_t* mbd) {
         char* sec_name = shstrtab + sh->name;
 
         if(!strcmp(sec_name, ".symtab")) {
-            print_debug(LT_IF, "found .symtab section\n");
+            kprint_debug(LT_IF, "found .symtab section\n");
             kernel_set_symtab_sh_ptr((uint32_t)sh);
         } else if(!strcmp(sec_name, ".strtab")) {
-            print_debug(LT_IF, "found .strtab section\n");
+            kprint_debug(LT_IF, "found .strtab section\n");
             kernel_set_strtab_ptr(sh->addr + KERNEL_START);
         }
     }
 
     gdt_init();
-    print_debug(LT_OK, "GDT initialised\n");
+    kprint_debug(LT_OK, "GDT initialised\n");
 
     idt_init();
-    print_debug(LT_OK, "IDT initialised\n");
+    kprint_debug(LT_OK, "IDT initialised\n");
 
     isr_init();
-    print_debug(LT_OK, "ISR initialised\n");
+    kprint_debug(LT_OK, "ISR initialised\n");
 
     syscall_init();
-    print_debug(LT_OK, "syscall initialised\n");
+    kprint_debug(LT_OK, "syscall initialised\n");
 
     if(!vfs_init()) {
-        print_debug(LT_OK, "initialised ramFS on fs (%d)\n", RAMFS_DISK);
+        kprint_debug(LT_OK, "initialised ramFS on fs (%d)\n", RAMFS_DISK);
         disk_init();
     } else {
-        print_debug(LT_CR, "failed to initialise FS. not enough memory\n");
+        kprint_debug(LT_CR, "failed to initialise FS. not enough memory\n");
         kernel_panic(NULL);
     }
 
-    print_debug(LT_IF, "all disk detected: ");
+    kprint_debug(LT_IF, "detected disks: ");
     for(int i = 0; i < MAX_FS; i++)
-        if(vfs_is_fs_available(i)) printf("%d ", i);
-    putchar('\n');
+        if(vfs_is_fs_available(i)) kprintf("%d ", i);
+    kputchar('\n');
 
     locale_set_keyboard_layout(KBD_LAYOUT_US);
-    print_debug(LT_IF, "set keyboard layout to US\n");
+    kprint_debug(LT_IF, "set keyboard layout to US\n");
 
     kbd_init();
-    print_debug(LT_OK, "keyboard initialised\n");
+    kprint_debug(LT_OK, "keyboard initialised\n");
 
     timer_init();
-    print_debug(LT_OK, "timer initialised\n");
+    kprint_debug(LT_OK, "timer initialised\n");
 
     // idle process takes its creator eip to continue
     // which is this function
     process_t* idle_proc = process_make_idle();
     if(!idle_proc) {
-        print_debug(LT_CR, "failed to create idle process. not enough memory\n");
+        kprint_debug(LT_CR, "failed to create idle process. not enough memory\n");
         kernel_panic(NULL);
     }
-    print_debug(LT_OK, "created idle process\n");
+    kprint_debug(LT_OK, "created idle process\n");
 
     scheduler_init(idle_proc);
-    print_debug(LT_OK, "scheduler initialised\n");
+    kprint_debug(LT_OK, "scheduler initialised\n");
 
     kernel_process = process_new((uint32_t)kmain, false, NULL);
     if(kernel_process) {
         scheduler_add_process(kernel_process);
-        print_debug(LT_OK, "created kernel main process\n");
+        kprint_debug(LT_OK, "created kernel main process\n");
     } else {
-        print_debug(LT_CR, "failed to create main process. not enough memory\n");
+        kprint_debug(LT_CR, "failed to create main process. not enough memory\n");
         kernel_panic(NULL);
     }
 
-    print_debug(LT_IF, "done initialising\n");
+    kprint_debug(LT_IF, "done initialising\n");
 
     // start interrupts again after setting up everything
     // this will also enable the timer callback (scheduler switch, see kernel/driver/timer.c)
@@ -354,34 +351,39 @@ void kernel_proc2() {
 }
 
 void kmain() {
-    print_debug(LT_OK, "jumped into main kernel process\n");
+    // should the kernel main process the init process?
+    // currently the purpose of the kernel main process is to start other processes
+    // that should be the job of the init process right?
+
+    kprint_debug(LT_OK, "jumped into main kernel process\n");
 
     process_t* proc_stdout = process_new((uint32_t)kproc_stdout, false, NULL);
     if(proc_stdout) scheduler_add_process(proc_stdout);
-    else print_debug(LT_CR, "cannot start standard out process\n");
+    else kprint_debug(LT_CR, "cannot start standard out process\n");
 
     process_t* proc_stdin = process_new((uint32_t)kproc_stdin, false, NULL);
     if(proc_stdin) scheduler_add_process(proc_stdin);
-    else print_debug(LT_CR, "cannot start standard in process\n");
+    else kprint_debug(LT_CR, "cannot start standard in process\n");
 
-    print_debug(LT_IF, "done initialising\n");
+    kprint_debug(LT_IF, "done initialising\n");
     // free now
 
     syscall_sleep(1000);
 
-    process_t* uproc = process_new(0, true, NULL);
-    if(uproc) {
-        ELF_ERR load_err = elf_load_to_proc("hi.elf", uproc);
+    // start the init process
+    process_t* init_proc = process_new(0, true, NULL);
+    if(init_proc) {
+        ELF_ERR load_err = elf_load_to_proc("(0)/bin/keroshell.elf", init_proc);
         if(load_err) {
             FS_ERR ferr = elf_get_err();
-            printf("file err while loading %s: %d\n", "hi.elf", ferr);
+            kprintf("file err while loading %s: %d\n", "keroshell.elf", ferr);
         } else {
             syscall_sleep(100);
-            scheduler_add_process(uproc);
-            puts("uproc started");
+            scheduler_add_process(init_proc);
+            kputs("shell started");
         }
     } else {
-        printf("failed to start uproc\n");
+        kprintf("failed to start the shell\n");
     }
 
     syscall_sleep(7000);

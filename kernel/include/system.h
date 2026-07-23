@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdatomic.h>
+#include <stdarg.h>
 
 #define GDT_MAX_DESCRIPTORS 6
 #define IDT_MAX_DESCRIPTORS 256
@@ -76,6 +77,14 @@ typedef struct stackframe {
   uint32_t eip;
 } stackframe_t;
 
+enum LOG_TAG{
+    LT_IF,
+    LT_OK,
+    LT_WN,
+    LT_ER,
+    LT_CR
+};
+
 // port_io.c
 uint8_t port_inb(uint16_t port);
 void port_outb(uint16_t port, uint8_t data);
@@ -115,3 +124,10 @@ void spinlock_release(volatile atomic_flag* lock);
 
 // syscall.c
 void syscall_init();
+
+// utils.c
+void kvprintf(const char* restrict format, va_list parameters);
+void kprintf(const char* restrict format, ...);
+void kputchar(const char chr);
+void kputs(const char* str);
+void kprint_debug(int log_tag, const char* restrict format, ...);

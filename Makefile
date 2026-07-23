@@ -4,7 +4,7 @@ export BIN_DIR
 export OBJ_DIR
 export DISK_IMAGE_SIZE
 
-$(shell mkdir $(BIN_DIR) $(OBJ_DIR))
+$(shell mkdir $(BIN_DIR) $(BIN_DIR)coreutils/ $(OBJ_DIR))
 
 # kernel defines
 
@@ -15,9 +15,14 @@ C_SRC := $(shell cd kernel/src && find -L * -type f -name '*.c' | sort)
 A_SRC := $(shell cd kernel/src && find -L * -type f -name '*.asm' | sort)
 
 LIBC_OBJ := $(addprefix $(OBJ_DIR)libc/, $(LIBC_SRC:.c=.o))
-LIBK_OBJ := $(addprefix $(OBJ_DIR)libk/, $(LIBC_SRC:.c=.o))
 OBJ := $(addprefix $(OBJ_DIR)kernel/, $(C_SRC:.c=.o))
 OBJ += $(addprefix $(OBJ_DIR)kernel/, $(addsuffix .o, $(A_SRC)))
+
+COREUTILS_SRC := $(shell cd coreutils && find -L * -type f -name '*.c')
+COREUTILS_ELF := $(addprefix $(BIN_DIR)coreutils/, $(COREUTILS_SRC:.c=.elf))
+
+SHELL_SRC := $(shell cd shell/src && find -L * -type f -name '*.c')
+SHELL_OBJ := $(addprefix $(OBJ_DIR)shell/, $(SHELL_SRC:.c=.o))
 
 USER_SRC := $(shell cd userapp && find -L * -type f -name '*.c')
 USER_ELF := $(addprefix fsfiles/, $(USER_SRC:.c=.elf))
@@ -55,17 +60,9 @@ ifdef NO_CROSS_COMPILER
 	LDFLAGS := -T linker.ld -nostdlib -m32 -fno-pie -lgcc
 endif
 
-.PHONY: all libk libc kernel disk copyfs run run-debug userapp clean clean-all
+.PHONY: all libc kernel disk copyfs run run-debug coreutils shell userapp clean clean-all
 
-all: libk libc userapp kernel disk copyfs
-
-# libk
-$(OBJ_DIR)libk/%.o: libc/src/%.c
-	mkdir -p $$(dirname $@)
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $< -D__is_libk
-$(BIN_DIR)libk.a: $(LIBK_OBJ)
-	$(AR) rcs $@ $^
-	@echo done building libk
+all: libc kernel coreutils shell userapp disk copyfs
 
 # libc
 $(OBJ_DIR)libc/%.o: libc/src/%.c
@@ -83,9 +80,20 @@ $(OBJ_DIR)kernel/%.o: kernel/src/%.c
 $(OBJ_DIR)kernel/%.asm.o: kernel/src/%.asm
 	mkdir -p $$(dirname $@)
 	$(AS) $(ASFLAGS) -o $@ $<
-$(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(OBJ) $(BIN_DIR)libk.a
+$(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(OBJ)
 	# use GCC to link instead of LD because LD cannot find the libgcc
-	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lk $(LDLIBS)
+	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lc $(LDLIBS)
+
+# coreutils
+$(BIN_DIR)coreutils/%.elf: coreutils/%.c $(BIN_DIR)libc.a
+	$(CC) $(DEFINES) -I./libc/include -ffreestanding -nostdlib -e _start -o $@ $< -L./bin -lc -lgcc
+
+# shell
+$(OBJ_DIR)shell/%.o: shell/src/%.c
+	mkdir -p $$(dirname $@)
+	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(BIN_DIR)keroshell.elf: $(SHELL_OBJ) $(BIN_DIR)libc.a
+	$(CC) $(DEFINES) -I./libc/include -I./kernel/include -ffreestanding -nostdlib -e _start -o $@ $(SHELL_OBJ) -L./bin -lc -lgcc
 
 # user app
 fsfiles/%.elf: userapp/%.c
@@ -93,9 +101,13 @@ fsfiles/%.elf: userapp/%.c
 
 libc: $(BIN_DIR)libc.a
 
-libk: $(BIN_DIR)libk.a
-
 kernel: $(BIN_DIR)kerosene.elf
+
+coreutils: $(COREUTILS_ELF)
+
+shell: $(BIN_DIR)keroshell.elf
+
+userapp: $(USER_ELF)
 
 disk:
 	./script/gendiskimage.sh $(DISK_IMAGE_SIZE)
@@ -103,7 +115,10 @@ disk:
 copyfs: disk
 	./script/mount-device.sh
 	sudo cp grub.cfg ./mnt/boot/grub/ # update grub config
-	sudo cp bin/kerosene.elf ./mnt/boot/ # update kernel
+	sudo cp $(BIN_DIR)kerosene.elf ./mnt/boot/ # update kernel
+	sudo mkdir -p ./mnt/bin/
+	sudo cp $(COREUTILS_ELF) ./mnt/bin/ # update coreutils
+	sudo cp $(BIN_DIR)keroshell.elf ./mnt/bin/ # update shell
 	for file in fsfiles/*; do sudo cp -r $$file ./mnt/; done
 	./script/umount-device.sh
 
@@ -113,15 +128,13 @@ run:
 run-debug:
 	./script/run.sh debug
 
-userapp: $(USER_ELF)
-
 clean:
-	rm -r $(OBJ_DIR) $(BIN_DIR)kerosene.elf $(BIN_DIR)libk.a $(BIN_DIR)libc.a
+	rm -r $(OBJ_DIR) $(BIN_DIR)kerosene.elf $(BIN_DIR)libc.a $(BIN_DIR)coreutils/ $(BIN_DIR)keroshell.elf
 
 clean-all:
 	rm -r $(BIN_DIR) $(OBJ_DIR)
 
 DEPS  = $(patsubst %.o,%.d,$(OBJ))
 DEPS += $(patsubst %.o,%.d,$(LIBC_OBJ))
-DEPS += $(patsubst %.o,%.d,$(LIBK_OBJ))
+DEPS += $(patsubst %.o,%.d,$(SHELL_OBJ))
 -include $(DEPS)

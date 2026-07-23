@@ -54,7 +54,7 @@ static ramfs_node_t* create_new_node(
     if(!node) return NULL;
 
     node->size = size;
-    node->creation_milisecond = (clock() % CLOCKS_PER_SEC) * 1000 / CLOCKS_PER_SEC;
+    node->creation_milisecond = timer_get_current_ticks() * 1000 / TIMER_FREQUENCY;
     node->creation_timestamp = timer_get_current_time();
     node->modified_timestamp = 0;
     node->accessed_timestamp = 0;
