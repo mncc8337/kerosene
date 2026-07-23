@@ -460,9 +460,6 @@ FS_ERR ramfs_add_memory_entry(
 }
 
 FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content) {
-    if(!strcmp(remove_node->name, ".") || !strcmp(remove_node->name, ".."))
-        return ERR_FS_FAILED;
-
     ramfs_node_t* parent_ramnode = (ramfs_node_t*)parent->ramfs.node_addr;
     ramfs_node_t* remove_ramnode = (ramfs_node_t*)remove_node->ramfs.node_addr;
 

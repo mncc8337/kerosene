@@ -1152,9 +1152,6 @@ FS_ERR fat32_add_entry(
 
 // remove an entry from parent
 FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content) {
-    if(!strcmp(remove_node->name, ".") || !strcmp(remove_node->name, ".."))
-        return ERR_FS_FAILED;
-
     fat32_bootrecord_t* bootrec = &(parent->fs->fat32_info.bootrec);
     uint32_t sectors_per_cluster = bootrec->bpb.sectors_per_cluster;
     uint32_t first_data_sector = get_first_data_sector(bootrec);
@@ -1199,7 +1196,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
     // the file name fits perfectly on the SFN entry
     // the implementation below follow windows/linux algo on how many lfn will be generated
     int lfn_entry_count = 0;
-    if(strcmp(remove_node->name, ".") && strcmp(remove_node->name, "..") && !is_valid_sfn(remove_node->name)) {
+    if(!is_valid_sfn(remove_node->name)) {
         lfn_entry_count = (strlen(remove_node->name) + 12) / 13;
     }
 

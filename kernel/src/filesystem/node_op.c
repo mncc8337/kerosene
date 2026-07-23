@@ -1,4 +1,3 @@
-#include "sys/filesystem.h"
 #include <filesystem.h>
 
 #include <string.h>
@@ -101,6 +100,9 @@ FS_ERR node_create(fs_node_t* parent, const char* name, fs_node_t* new_node) {
 
 FS_ERR node_remove(fs_node_t* parent, fs_node_t* node) {
     if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
+
+    if(!strcmp(node->name, ".") || !strcmp(node->name, ".."))
+        return ERR_FS_FAILED;
 
     if(parent->fs->remove_entry)
         return parent->fs->remove_entry(parent, node, true);
