@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sys/types.h>
+#include <sys/timer.h>
 
 #define CLOCKS_PER_SEC TIMER_FREQUENCY
 

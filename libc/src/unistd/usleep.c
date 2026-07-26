@@ -1,5 +1,6 @@
 #include <unistd.h>
 #include <sys/syscall.h>
+#include <sys/timer.h>
 
 unsigned sleep_ms(unsigned microseconds) {
     syscall_sleep(microseconds * TIMER_FREQUENCY / 1000000);

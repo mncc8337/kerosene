@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <sys/timer.h>
 
 uint64_t timer_get_start_time();
 uint64_t timer_get_current_time();

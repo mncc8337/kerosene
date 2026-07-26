@@ -28,39 +28,38 @@ USER_SRC := $(shell cd userapp && find -L * -type f -name '*.c')
 USER_ELF := $(addprefix fsfiles/, $(USER_SRC:.c=.elf))
 
 # see .env
-DEFINES := -DKERNEL_START=$(KERNEL_START) \
-		  -DVMMNGR_TEMP_TABLE=$(VMMNGR_TEMP_TABLE) \
-		  -DVMMNGR_TEMP_PD=$(VMMNGR_TEMP_PD) \
-		  -DVIDEO_START=$(VIDEO_START) \
-		  -DKHEAP_START=$(KHEAP_START) \
-		  -DKHEAP_INITIAL_SIZE=$(KHEAP_INITIAL_SIZE) \
-		  -DKHEAP_MAX_SIZE=$(KHEAP_MAX_SIZE) \
-		  -DRHEAP_START=$(RHEAP_START) \
-		  -DRHEAP_INITIAL_SIZE=$(RHEAP_INITIAL_SIZE) \
-		  -DRHEAP_MAX_SIZE=$(RHEAP_MAX_SIZE) \
-		  -DTIMER_FREQUENCY=$(TIMER_FREQUENCY) \
-		  -DUHEAP_START=$(UHEAP_START) \
-		  -DUHEAP_INITIAL_SIZE=$(UHEAP_INITIAL_SIZE) \
-		  -DUHEAP_MAX_SIZE=$(UHEAP_MAX_SIZE) \
+KERNEL_PARAMS := -DKERNEL_START=$(KERNEL_START) \
+				 -DVMMNGR_TEMP_TABLE=$(VMMNGR_TEMP_TABLE) \
+				 -DVMMNGR_TEMP_PD=$(VMMNGR_TEMP_PD) \
+				 -DVIDEO_START=$(VIDEO_START) \
+				 -DKHEAP_START=$(KHEAP_START) \
+				 -DKHEAP_INITIAL_SIZE=$(KHEAP_INITIAL_SIZE) \
+				 -DKHEAP_MAX_SIZE=$(KHEAP_MAX_SIZE) \
+				 -DRHEAP_START=$(RHEAP_START) \
+				 -DRHEAP_INITIAL_SIZE=$(RHEAP_INITIAL_SIZE) \
+				 -DRHEAP_MAX_SIZE=$(RHEAP_MAX_SIZE) \
+				 -DUHEAP_START=$(UHEAP_START) \
+				 -DUHEAP_INITIAL_SIZE=$(UHEAP_INITIAL_SIZE) \
+				 -DUHEAP_MAX_SIZE=$(UHEAP_MAX_SIZE) \
 
-CFLAGS = $(DEFINES) -ffreestanding -O0 -Wall -Wextra -g -MMD -MP
-LDFLAGS = -T linker.ld -nostdlib
-LDLIBS = -lgcc
-ASFLAGS = $(DEFINES) -f elf32 -F dwarf
+CFLAGS = -ffreestanding -O0 -Wall -Wextra -g -MMD -MP
+LDFLAGS = -nostdlib
+LDLIBS = -lc -lgcc
+ASFLAGS = $(KERNEL_PARAMS) -f elf32 -F dwarf
 
 ifdef NO_CROSS_COMPILER
 	CC := gcc
 	LD := ld
 	AR := ar
 
-	CFLAGS := $(DEFINES) -Wall -Wextra \
-			 -ffreestanding -m32 -mtune=i386 -fno-pie -nostdlib -nostartfiles \
-			 -fno-stack-protector \
-			 -g -MMD -MP
-	LDFLAGS := -T linker.ld -nostdlib -m32 -fno-pie -lgcc
+	CFLAGS += -fno-pie -fno-stack-protector \
+			  -nostdlib -nostartfiles \
+			  -m32 -mno-sse -mno-sse2 -mno-mmx \
+			  -mtune=i386 -march=i386 -mno-80387 -msoft-float
+	LDFLAGS += -m32 -fno-pie
 endif
 
-.PHONY: all libc kernel disk copyfs run run-debug coreutils shell userapp clean clean-all
+.PHONY: all libc kernel shell coreutils userapp disk copyfs run run-debug clean clean-all
 
 all: libc kernel coreutils shell userapp disk copyfs
 
@@ -76,28 +75,28 @@ $(BIN_DIR)libc.a: $(LIBC_OBJ)
 # kernel
 $(OBJ_DIR)kernel/%.o: kernel/src/%.c
 	mkdir -p $$(dirname $@)
-	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(KERNEL_PARAMS) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(OBJ_DIR)kernel/%.asm.o: kernel/src/%.asm
 	mkdir -p $$(dirname $@)
 	$(AS) $(ASFLAGS) -o $@ $<
 $(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(OBJ)
 	# use GCC to link instead of LD because LD cannot find the libgcc
-	$(CC) $(LDFLAGS) -o $@ $^ -L./bin -lc $(LDLIBS)
-
-# coreutils
-$(BIN_DIR)coreutils/%.elf: coreutils/%.c $(BIN_DIR)libc.a
-	$(CC) $(DEFINES) -I./libc/include -ffreestanding -nostdlib -e _start -o $@ $< -L./bin -lc -lgcc
+	$(CC) -T linker.ld $(LDFLAGS) -o $@ $^ -L./bin $(LDLIBS)
 
 # shell
 $(OBJ_DIR)shell/%.o: shell/src/%.c
 	mkdir -p $$(dirname $@)
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN_DIR)keroshell.elf: $(SHELL_OBJ) $(BIN_DIR)libc.a
-	$(CC) $(DEFINES) -I./libc/include -I./kernel/include -ffreestanding -nostdlib -e _start -o $@ $(SHELL_OBJ) -L./bin -lc -lgcc
+	$(CC) -I./libc/include $(LDFLAGS) -e _start -o $@ $(SHELL_OBJ) -L./bin $(LDLIBS)
+
+# coreutils
+$(BIN_DIR)coreutils/%.elf: coreutils/%.c $(BIN_DIR)libc.a
+	$(CC) -I./libc/include $(LDFLAGS) -e _start -o $@ $< -L./bin $(LDLIBS)
 
 # user app
 fsfiles/%.elf: userapp/%.c
-	$(CC) $(DEFINES) -I./libc/include -ffreestanding -nostdlib -e _start -o $@ $< -L./bin -lc -lgcc
+	$(CC) -I./libc/include $(LDFLAGS) -e _start -o $@ $< -L./bin $(LDLIBS)
 
 libc: $(BIN_DIR)libc.a
 
