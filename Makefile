@@ -100,13 +100,13 @@ fsfiles/%.elf: userapp/%.c
 
 libc: $(BIN_DIR)libc.a
 
-kernel: $(BIN_DIR)kerosene.elf
+kernel: libc $(BIN_DIR)kerosene.elf
 
-coreutils: $(COREUTILS_ELF)
+coreutils: libc $(COREUTILS_ELF)
 
-shell: $(BIN_DIR)keroshell.elf
+shell: libc $(BIN_DIR)keroshell.elf
 
-userapp: $(USER_ELF)
+userapp: libc $(USER_ELF)
 
 disk:
 	./script/gendiskimage.sh $(DISK_IMAGE_SIZE)

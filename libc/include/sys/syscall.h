@@ -6,6 +6,7 @@
 
 enum {
     SYSCALL_TIME,
+    SYSCALL_YIELD,
     SYSCALL_KILL_PROCESS,
     SYSCALL_SLEEP,
     SYSCALL_OPEN,
@@ -35,6 +36,7 @@ asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), 
 asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "S" (p4), "D" (p5))
 
 uint64_t syscall_time();
+void syscall_yield();
 void syscall_kill_process(int exit_code);
 void syscall_sleep(unsigned ticks);
 int syscall_open(const char* path, const file_mode_t mode);

@@ -74,6 +74,7 @@ process_t* scheduler_get_current_process();
 process_t* scheduler_get_ready_processes();
 process_t* scheduler_get_sleep_processes();
 void scheduler_add_process(process_t* proc);
+void scheduler_to_next_process(regs_t* regs, bool add_back);
 uint32_t scheduler_kill_process(regs_t* regs, int exit_code);
 uint32_t scheduler_set_sleep(regs_t* regs, unsigned ticks);
 uint32_t scheduler_switch(regs_t* regs);
