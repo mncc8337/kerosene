@@ -1,5 +1,5 @@
 #include <mem.h>
-#include <system.h>
+#include <spinlock.h>
 
 // heap implementation using first-fit algorithm
 // allocating complexity is O(n)

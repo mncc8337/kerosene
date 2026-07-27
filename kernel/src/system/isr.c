@@ -1,10 +1,10 @@
 #include <system.h>
 #include <pic.h>
-#include <stdio.h>
-#include <string.h>
 #include <video.h>
-
 #include <mem.h>
+
+#include <kutils.h>
+#include <string.h>
 
 static void* routines[IDT_MAX_DESCRIPTORS];
 // from isr.asm

@@ -12,6 +12,7 @@
 #include <kproc.h>
 #include <mem.h>
 
+#include <kutils.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

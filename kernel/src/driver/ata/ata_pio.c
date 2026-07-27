@@ -1,5 +1,6 @@
 #include <ata.h>
 #include <system.h>
+#include <spinlock.h>
 
 static bool LBA28_mode;
 static bool LBA48_mode;

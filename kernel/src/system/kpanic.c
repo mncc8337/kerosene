@@ -3,6 +3,7 @@
 #include <mem.h>
 #include <video.h>
 #include <misc/elf.h>
+#include <kutils.h>
 
 #define MAX_FRAMES 30
 
