@@ -15,8 +15,6 @@ static size_t global_list_size = 0;
 static uint64_t global_sleep_ticks = 0;
 
 static bool to_next_process(regs_t* regs, bool add_back) {
-    if(!ready_queue.size) return false;
-
     // save regs before switching
     current_process->saved_esp = (uint32_t)regs;
 
@@ -161,4 +159,39 @@ void scheduler_init(process_t* idle_proc) {
 
     // note that we do not switch page directory
     // because kernel page directory is preloaded
+}
+
+semaphore_t* semaphore_create(unsigned max_count) {
+    semaphore_t* ret = (semaphore_t*)kmalloc(sizeof(semaphore_t));
+
+    if(ret) {
+        ret->max_count = max_count;
+        ret->current_count = 0;
+        ret->waiting_queue.top = NULL;
+        ret->waiting_queue.bottom = NULL;
+        ret->waiting_queue.size = 0;
+    }
+
+    return ret;
+}
+
+uint32_t semaphore_acquire(regs_t* regs, semaphore_t* semaphore) {
+    if(semaphore->current_count < semaphore->max_count) {
+        semaphore->current_count++;
+    } else {
+        current_process->state = PROCESS_STATE_BLOCK;
+        process_queue_push(&semaphore->waiting_queue, current_process);
+
+        to_next_process(regs, false);
+    }
+
+    return current_process->saved_esp;
+}
+
+void semaphore_release(semaphore_t* semaphore) {
+    if(semaphore->waiting_queue.size) {
+        process_t* proc = process_queue_pop(&semaphore->waiting_queue);
+        proc->state = PROCESS_STATE_READY;
+        process_queue_push(&ready_queue, proc);
+    } else semaphore->current_count--;
 }

@@ -31,7 +31,7 @@ static uint32_t syscall_dispatcher(regs_t* regs) {
     }
 
     // handle context switchers diffently
-    // since they take regs ptr as an argument
+    // since they take regs ptr as the first argument
     return ((syscall_ctx_t)fn)(regs, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi);
 }
 

@@ -52,6 +52,12 @@ typedef struct {
 
 #define PROCESS_QUEUE_INIT {NULL, NULL, 0}
 
+typedef struct {
+    uint32_t max_count;
+    uint32_t current_count;
+    process_queue_t waiting_queue;
+} semaphore_t;
+
 // process.c
 process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd);
 process_t* process_make_idle();
@@ -72,3 +78,8 @@ uint32_t scheduler_kill_process(regs_t* regs, int exit_code);
 uint32_t scheduler_set_sleep(regs_t* regs, unsigned ticks);
 uint32_t scheduler_switch(regs_t* regs);
 void scheduler_init(process_t* proc);
+
+// semaphore.c
+semaphore_t* semaphore_create(unsigned max_count);
+uint32_t semaphore_acquire(regs_t* regs, semaphore_t* semaphore);
+void semaphore_release(semaphore_t* semaphore);
