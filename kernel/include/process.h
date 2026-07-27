@@ -39,7 +39,9 @@ typedef struct process {
     unsigned file_count;
     fs_node_t* cwd;
 
-    struct process* next;
+    struct process* queue_next; // next item in a local queue
+    struct process* global_next; // next item in the global process list
+    struct process* global_prev; // previous item in the global process list
 } process_t;
 
 typedef struct {

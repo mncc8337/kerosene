@@ -22,7 +22,6 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
     proc->state = PROCESS_STATE_READY;
     proc->alive_ticks = 0;
     proc->sleep_ticks = 0;
-    proc->next = NULL;
     proc->is_user = is_user;
     proc->cwd = cwd ? cwd : &vfs_getfs(RAMFS_DISK)->root_node;
 
@@ -211,7 +210,6 @@ process_t* process_make_idle() {
     proc->state = PROCESS_STATE_READY;
     proc->alive_ticks = 0;
     proc->sleep_ticks = 0;
-    proc->next = NULL;
 
     proc->page_directory = (page_directory_t*)KERNEL_PAGE_DIRECTORY;
     proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();

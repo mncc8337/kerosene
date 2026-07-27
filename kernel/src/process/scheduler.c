@@ -9,6 +9,9 @@ static process_queue_t delete_queue = PROCESS_QUEUE_INIT;
 
 static process_t* current_process = NULL;
 
+static process_t* global_list_bottom = NULL;
+static size_t global_list_size = 0;
+
 static uint64_t global_sleep_ticks = 0;
 
 static bool to_next_process(regs_t* regs, bool add_back) {
@@ -31,6 +34,28 @@ static bool to_next_process(regs_t* regs, bool add_back) {
     return true;
 }
 
+static void global_list_push(process_t* proc) {
+    global_list_bottom->global_next = proc;
+    proc->global_prev = global_list_bottom;
+    proc->global_next = NULL;
+    global_list_bottom = proc;
+    global_list_size++;
+}
+
+static void global_list_pop(process_t* proc) {
+    // assumption: since the idle process is the first process added to the list
+    // then proc->global_prev always exists
+    proc->global_prev->global_next = proc->global_next;
+    if(proc->global_next) {
+        proc->global_next->global_prev = proc->global_prev;
+    }
+
+    if(proc == global_list_bottom) {
+        global_list_bottom = proc->global_prev;
+    }
+    global_list_size--;
+}
+
 process_t* scheduler_get_current_process() {
     return current_process;
 }
@@ -45,6 +70,7 @@ process_t* scheduler_get_sleep_processes() {
 
 void scheduler_add_process(process_t* proc) {
     proc->state = PROCESS_STATE_READY;
+    global_list_push(proc);
     process_queue_push(&ready_queue, proc);
 }
 
@@ -86,8 +112,13 @@ uint32_t scheduler_switch(regs_t* regs) {
     // because upon deleting process it need to save opended files
     // accessing files on an interrupts requests blocks system progress
 
-    while(delete_queue.size)
-        process_delete(process_queue_pop(&delete_queue));
+    // TODO:
+    // only delete process with its exit_code read
+    while(delete_queue.size) {
+        process_t* proc = process_queue_pop(&delete_queue);
+        global_list_pop(proc);
+        process_delete(proc);
+    }
 
     if(sleep_queue.size) {
         global_sleep_ticks++;
@@ -120,6 +151,13 @@ void scheduler_init(process_t* idle_proc) {
 
     idle_proc->state = PROCESS_STATE_ACTIVE;
     current_process = idle_proc;
+
+    idle_proc->global_next = NULL;
+    idle_proc->global_prev = NULL;
+
+    // setting up the global process list
+    global_list_bottom = idle_proc;
+    global_list_size = 1;
 
     // note that we do not switch page directory
     // because kernel page directory is preloaded
