@@ -83,7 +83,7 @@ void kernel_panic(stackframe_t* stk) {
     kputs("kernel panicked!");
     video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
 
-    process_t* current_process = scheduler_get_current_process();
+    process_t* current_process = scheduler_get_current();
     if(current_process) {
         kprintf("current process: 0x%x (id %d)\n", current_process, current_process->id);
     }

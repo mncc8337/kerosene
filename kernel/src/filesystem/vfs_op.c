@@ -303,7 +303,7 @@ void vfs_cleanup_node_tree(fs_node_t* start_node) {
 // specify the error when failed
 
 int vfs_open(const char* path, const file_mode_t mode) {
-    process_t* proc = scheduler_get_current_process();
+    process_t* proc = scheduler_get_current();
 
     if(!validate_user_string(proc, path))
         return -1;
@@ -367,7 +367,7 @@ int vfs_open(const char* path, const file_mode_t mode) {
 }
 
 void vfs_close(int file_descriptor) {
-    process_t* proc = scheduler_get_current_process();
+    process_t* proc = scheduler_get_current();
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return;
@@ -393,7 +393,7 @@ void vfs_close(int file_descriptor) {
 }
 
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
-    process_t* proc = scheduler_get_current_process();
+    process_t* proc = scheduler_get_current();
 
     if(!validate_user_buffer(proc, buffer, size))
         return -1;
@@ -421,7 +421,7 @@ int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
 }
 
 int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size) {
-    process_t* proc = scheduler_get_current_process();
+    process_t* proc = scheduler_get_current();
 
     if(!validate_user_buffer(proc, buffer, size))
         return -1;
@@ -447,7 +447,7 @@ int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size) {
 }
 
 int64_t vfs_seek(int file_descriptor, int64_t offset, whence_t whence) {
-    process_t* proc = scheduler_get_current_process();
+    process_t* proc = scheduler_get_current();
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
         return -1;

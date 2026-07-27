@@ -40,7 +40,7 @@ uint64_t timer_get_current_time() {
 void timer_get_current_time_syscall(uint64_t* time) {
     if(!time) return;
 
-    process_t* proc = scheduler_get_current_process();
+    process_t* proc = scheduler_get_current();
     if(proc->is_user && (uint32_t)time >= KERNEL_START) return;
 
     *time = timer_get_current_time();
