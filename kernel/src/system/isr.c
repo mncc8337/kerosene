@@ -54,6 +54,37 @@ static uint32_t exception_handler(regs_t* r) {
     video_set_attr(video_rgb(VIDEO_WHITE), video_rgb(VIDEO_BLACK));
     kprintf("Error code: 0b%b\n", r->err_code);
 
+    kputs("regs:");
+    kprintf(
+        "GS %x FS %x ES %x DS %x CS %x SS %x\n",
+        r->gs,
+        r->fs,
+        r->es,
+        r->ds,
+        r->cs,
+        r->ss
+    );
+    kprintf(
+        "EBP %x ESP %x EIP %x\n",
+        r->ebp,
+        r->esp,
+        r->eip
+    );
+    kprintf(
+        "EAX %x EBX %x ECX %x EDX %x EDI %x ESI %x\n",
+        r->eax,
+        r->ebx,
+        r->ecx,
+        r->edx,
+        r->edi,
+        r->esi
+    );
+    kprintf(
+        "USERESP %x EFLAGS %b\n",
+        r->useresp,
+        r->eflags
+    );
+
     stackframe_t stk = {(stackframe_t*)r->ebp, r->eip};
     kernel_panic(&stk);
 

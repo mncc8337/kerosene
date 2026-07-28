@@ -386,6 +386,21 @@ void kmain() {
         kprintf("failed to start the shell\n");
     }
 
+    process_t* user_proc = process_new(0, true, NULL);
+    if(user_proc) {
+        ELF_ERR load_err = elf_load_to_proc("(0)/hi.elf", user_proc);
+        if(load_err) {
+            FS_ERR ferr = elf_get_err();
+            kprintf("file err while loading %s: %d\n", "hi.elf", ferr);
+        } else {
+            syscall_sleep(100);
+            scheduler_add_process(user_proc);
+            kprintf("hi.elf started with id %d\n", user_proc->id);
+        }
+    } else {
+        kprintf("failed to start hi.elf\n");
+    }
+
     process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL);
     if(proc1) scheduler_add_process(proc1);
 

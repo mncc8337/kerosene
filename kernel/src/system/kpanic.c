@@ -39,7 +39,11 @@ void stack_trace(stackframe_t* stk) {
         if(function_addr > object_addr) name = function_name;
         else name = object_name;
 
-        kprintf("%s\n", name ? name : "unknown function");
+        if(addr < KERNEL_START) {
+            kputs("unknown userapp function");
+        } else {
+            kprintf("%s\n", name ? name : "unknown function");
+        }
 
         stk = stk->ebp;
     }
@@ -86,7 +90,10 @@ void kernel_panic(stackframe_t* stk) {
 
     process_t* current_process = scheduler_get_current();
     if(current_process) {
-        kprintf("current process: 0x%x (id %d)\n", current_process, current_process->id);
+        kprintf("current process: 0x%x\n", current_process);
+        kprintf("    id:       %d\n", current_process->id);
+        kprintf("    is user:  %d\n", current_process->is_user);
+        kprintf("    page dir: 0x%x\n", current_process->page_directory);
     }
 
     kputs("stack trace:");
