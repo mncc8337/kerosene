@@ -8,7 +8,7 @@ isr_stub_%1:
 
 %macro isr_no_err_stub 1
 isr_stub_%1:
-    push byte 0
+    push byte 0 ; this is a dummy error code
     push %1
     jmp isr_common_stub
 %endmacro
@@ -72,6 +72,9 @@ isr_no_err_stub 47
 
 extern isr_handler ; from isr.c
 isr_common_stub:
+    ; once interrupted, the cpu has already pushed most of the registers to the kernel stack
+    ; we only need to push ds, es, fs, gs and esp to support the kernel's context switching
+    ; mechanism (see the commented block below)
     pusha
     push ds
     push es
@@ -93,11 +96,13 @@ isr_common_stub:
     ; return value (next context's esp) now stored on eax
 
     mov esp, eax ; switch context by switching esp
-    ; the idea is that processes store their register states by pushing them to their stack
-    ; and then switch to other process's stack
-    ; when it is time to switch in, it then switch to its stack and restore the state
-    ; by all the popping below
-    ; the final thing to do is faking storing registers for new processes (see process.c)
+    ; because processes has already save their registers to their kernel stack
+    ; context switching is simply choosing the kernel stack to use
+    ; that is why the isr_handler must return the esp of the next context
+    ; (or just return the old esp if no context switching is taken place)
+    ; the only thing left to do is faking storing registers for new processes
+    ; (see process/process.c process_new())
+
     pop gs
     pop fs
     pop es

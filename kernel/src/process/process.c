@@ -117,7 +117,8 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
     uint32_t stack_top = proc->stack_addr + stack_size - sizeof(virtual_addr_t);
     *(uint32_t*)stack_top = 0;
 
-    // `push` default register states
+    // fake pushing default register states
+    // for the context switching mechanism (see also system/isr.asm isr_common_stub())
     regs_t* regs;
     if(is_user) {
         regs = (regs_t*)(proc->tss_esp0 - sizeof(regs_t));
@@ -129,12 +130,10 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
         regs->ss = regs->ds;
         regs->useresp = stack_top;
     } else {
-        // upon `iret` from ring 0 (kernel)
-        // it only pops eip, cs and eflags
-        // while in ring 3 (user)
-        // it pops eip, cs, eflags, useresp and ss
-        // so the regs pointer is different
-        // and we dont set useresp and ss here
+        // upon `iret` from ring 0 (kernel) it only pops eip, cs and eflags
+        // while in ring 3 (user) it also pops useresp and ss
+        // we need to shift the regs pointer by 8 bytes to maintain the
+        // correct structure
         regs = (regs_t*)(stack_top - sizeof(regs_t) + 8);
         regs->cs = 0x08; // kernel code selector
         regs->ds = 0x10; // kernel data selector

@@ -1,11 +1,13 @@
 #pragma once
 
 #include <process.h>
+#include <spinlock.h>
 
 typedef struct {
     uint32_t max_count;
     uint32_t current_count;
     process_queue_t waiting_queue;
+    volatile atomic_flag lock;
 } semaphore_t;
 
 semaphore_t* semaphore_create(unsigned max_count);

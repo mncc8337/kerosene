@@ -75,28 +75,28 @@ $(BIN_DIR)libc.a: $(LIBC_OBJ)
 # kernel
 $(OBJ_DIR)kernel/%.o: kernel/src/%.c
 	mkdir -p $$(dirname $@)
-	$(CC) $(KERNEL_PARAMS) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(CFLAGS) $(KERNEL_PARAMS) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(OBJ_DIR)kernel/%.asm.o: kernel/src/%.asm
 	mkdir -p $$(dirname $@)
 	$(AS) $(ASFLAGS) -o $@ $<
 $(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(OBJ)
 	# use GCC to link instead of LD because LD cannot find the libgcc
-	$(CC) -T linker.ld $(LDFLAGS) -o $@ $^ -L./bin $(LDLIBS)
+	$(CC) $(CFLAGS) -T linker.ld $(LDFLAGS) -o $@ $^ -L./bin $(LDLIBS)
 
 # shell
 $(OBJ_DIR)shell/%.o: shell/src/%.c
 	mkdir -p $$(dirname $@)
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
 $(BIN_DIR)keroshell.elf: $(SHELL_OBJ) $(BIN_DIR)libc.a
-	$(CC) -I./libc/include $(LDFLAGS) -e _start -o $@ $(SHELL_OBJ) -L./bin $(LDLIBS)
+	$(CC) $(CFLAGS) -I./libc/include $(LDFLAGS) -e _start -o $@ $(SHELL_OBJ) -L./bin $(LDLIBS)
 
 # coreutils
 $(BIN_DIR)coreutils/%.elf: coreutils/%.c $(BIN_DIR)libc.a
-	$(CC) -I./libc/include $(LDFLAGS) -e _start -o $@ $< -L./bin $(LDLIBS)
+	$(CC) $(CFLAGS) -I./libc/include $(LDFLAGS) -e _start -o $@ $< -L./bin $(LDLIBS)
 
 # user app
 fsfiles/%.elf: userapp/%.c
-	$(CC) -I./libc/include $(LDFLAGS) -e _start -o $@ $< -L./bin $(LDLIBS)
+	$(CC) $(CFLAGS) -I./libc/include $(LDFLAGS) -e _start -o $@ $< -L./bin $(LDLIBS)
 
 libc: $(BIN_DIR)libc.a
 

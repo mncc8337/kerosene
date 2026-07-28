@@ -6,14 +6,20 @@
 
 enum {
     SYSCALL_TIME,
+
+    SYSCALL_SEMAPHORE_ACQUIRE,
+    SYSCALL_SEMAPHORE_RELEASE,
+
     SYSCALL_YIELD,
     SYSCALL_KILL_PROCESS,
     SYSCALL_SLEEP,
+
     SYSCALL_OPEN,
     SYSCALL_CLOSE,
     SYSCALL_READ,
     SYSCALL_WRITE,
     SYSCALL_SEEK,
+
     MAX_SYSCALL
 };
 
@@ -36,11 +42,18 @@ asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), 
 asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "S" (p4), "D" (p5))
 
 uint64_t syscall_time();
+
+void syscall_semaphore_acquire(void* addr);
+void syscall_semaphore_release(void* addr);
+
 void syscall_yield();
 void syscall_kill_process(int exit_code);
 void syscall_sleep(unsigned ticks);
+
 int syscall_open(const char* path, const file_mode_t mode);
 void syscall_close(int file_descriptor);
 int syscall_read(int file_descriptor, uint8_t* buffer, size_t size);
 int syscall_write(int file_descriptor, const uint8_t* buffer, size_t size);
 void syscall_seek(int file_descriptor, int64_t seek_position, int whence, int64_t* final_position);
+
+void syscall_test();

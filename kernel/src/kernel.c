@@ -9,6 +9,7 @@
 
 #include <system.h>
 #include <process.h>
+#include <semaphore.h>
 #include <kproc.h>
 #include <mem.h>
 
@@ -369,8 +370,6 @@ void kmain() {
     kprint_debug(LT_IF, "done initialising\n");
     // free now
 
-    syscall_sleep(1000);
-
     // start the init process
     process_t* init_proc = process_new(0, true, NULL);
     if(init_proc) {
@@ -381,13 +380,11 @@ void kmain() {
         } else {
             syscall_sleep(100);
             scheduler_add_process(init_proc);
-            kputs("shell started");
+            kprintf("shell started with id %d\n", init_proc->id);
         }
     } else {
         kprintf("failed to start the shell\n");
     }
-
-    syscall_sleep(7000);
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL);
     if(proc1) scheduler_add_process(proc1);
