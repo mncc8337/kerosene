@@ -119,7 +119,7 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
     return ERR_ELF_SUCCESS;
 }
 
-ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
+ELF_ERR elf_load_to_proc(const char* path, process_t* proc) {
     fs_t* fs = vfs_getfs(0);
     if(!fs) {
         errcode = ERR_FS_FAILED;
@@ -127,7 +127,7 @@ ELF_ERR elf_load_to_proc(char* path, process_t* proc) {
     }
 
     fs_node_t* elf;
-    errcode = vfs_find_and_create_node(path, &fs->root_node, &elf, 0, true);
+    errcode = vfs_find_and_create_node(path, &fs->root_node, &elf, 0, 0, RAMFS_TYPE_NONE);
     if(errcode)
         return ERR_ELF_FILE_ERROR;
 

@@ -6,7 +6,7 @@
 
 // copy file from any filesystem to another filesystem
 static FS_ERR universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
-    FS_ERR create_err = node_create(new_parent, new_name, copied);
+    FS_ERR create_err = node_create(new_parent, new_name, 0, copied);
     if(create_err) return create_err;
 
     file_description_t src_file;
@@ -88,26 +88,18 @@ FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
     return ERR_FS_NOT_SUPPORTED;
 }
 
-FS_ERR node_create(fs_node_t* parent, const char* name, fs_node_t* new_node) {
+// create strictly a file node
+FS_ERR node_create(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node) {
     if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
+    if(flags & FS_FLAG_DIRECTORY) return ERR_FS_NOT_SUPPORTED; // should use node_mkdir
 
     new_node->flags = 0;
 
     if(parent->fs->node_create)
-        return parent->fs->node_create(parent, name, new_node);
+        return parent->fs->node_create(parent, name, flags, new_node);
     return ERR_FS_NOT_SUPPORTED;
 }
 
-FS_ERR node_remove(fs_node_t* parent, fs_node_t* node) {
-    if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
-
-    if(!strcmp(node->name, ".") || !strcmp(node->name, ".."))
-        return ERR_FS_FAILED;
-
-    if(parent->fs->remove_entry)
-        return parent->fs->remove_entry(parent, node, true);
-    return ERR_FS_NOT_SUPPORTED;
-}
 
 // set new_name to NULL to reuse the old name
 FS_ERR node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {

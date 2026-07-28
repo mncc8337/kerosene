@@ -10,10 +10,11 @@ typedef int (*syscall_t)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 typedef uint32_t (*syscall_ctx_t)(regs_t*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 
 static void* syscalls[MAX_SYSCALL] = {
-    [SYSCALL_TIME] = &timer_get_current_time_syscall,
+    [SYSCALL_TIME] = &timer_syscall_get_current_time,
 
-    [SYSCALL_SEMAPHORE_ACQUIRE] = &semaphore_acquire,
-    [SYSCALL_SEMAPHORE_RELEASE] = &semaphore_release,
+    [SYSCALL_SEMAPHORE_CREATE] = &semaphore_syscall_create,
+    [SYSCALL_SEMAPHORE_ACQUIRE] = &semaphore_syscall_acquire,
+    [SYSCALL_SEMAPHORE_RELEASE] = &semaphore_syscall_release,
 
     [SYSCALL_YIELD] = &scheduler_to_next_process,
     [SYSCALL_KILL_PROCESS] = &scheduler_kill_process,

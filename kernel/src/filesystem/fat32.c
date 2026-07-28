@@ -1400,10 +1400,10 @@ FS_ERR fat32_mkdir(fs_node_t* parent, const char* name, uint32_t flags, fs_node_
     return ERR_FS_SUCCESS;
 }
 
-FS_ERR fat32_node_create(fs_node_t* parent, const char* name, fs_node_t* new_node) {
+FS_ERR fat32_node_create(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node) {
     uint32_t file_cluster = fat32_allocate_clusters(parent->fs, 1, false);
     if(!file_cluster) return ERR_FS_NOT_ENOUGH_SPACE;
-    return fat32_add_entry(parent, name, file_cluster, 0, 0, new_node);
+    return fat32_add_entry(parent, name, file_cluster, to_fat_attr(flags), 0, new_node);
 }
 
 FS_ERR fat32_node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {

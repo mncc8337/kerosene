@@ -37,7 +37,7 @@ uint64_t timer_get_current_time() {
     return value;
 }
 
-void timer_get_current_time_syscall(uint64_t* time) {
+void timer_syscall_get_current_time(uint64_t* time) {
     if(!time) return;
 
     process_t* proc = scheduler_get_current();

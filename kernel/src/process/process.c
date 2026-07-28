@@ -180,7 +180,8 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
             sysproc_dir,
             &proc_dir,
             FILE_OPEN_CREATE | FILE_OPEN_EXCLUSIVE,
-            false
+            FS_FLAG_DIRECTORY,
+            RAMFS_TYPE_NONE
         )) {
             process_delete(proc);
             return NULL;

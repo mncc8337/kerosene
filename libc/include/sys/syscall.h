@@ -7,6 +7,7 @@
 enum {
     SYSCALL_TIME,
 
+    SYSCALL_SEMAPHORE_CREATE,
     SYSCALL_SEMAPHORE_ACQUIRE,
     SYSCALL_SEMAPHORE_RELEASE,
 
@@ -24,27 +25,28 @@ enum {
 };
 
 #define SYSCALL_0P(id, ret) \
-asm volatile("int $0x80" : "=a" (ret) : "0" (id))
+asm volatile("int $0x80" : "=a" (ret) : "0" (id) : "memory")
 
 #define SYSCALL_1P(id, ret, p1) \
-asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1))
+asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1) : "memory")
 
 #define SYSCALL_2P(id, ret, p1, p2) \
-asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2))
+asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2) : "memory")
 
 #define SYSCALL_3P(id, ret, p1, p2, p3) \
-asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3))
+asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3) : "memory")
 
 #define SYSCALL_4P(id, ret, p1, p2, p3, p4) \
-asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "S" (p4))
+asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "S" (p4) : "memory")
 
 #define SYSCALL_5P(id, ret, p1, p2, p3, p4, p5) \
-asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "S" (p4), "D" (p5))
+asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "S" (p4), "D" (p5) : "memory")
 
 uint64_t syscall_time();
 
-void syscall_semaphore_acquire(void* addr);
-void syscall_semaphore_release(void* addr);
+int syscall_semaphore_create(const char* name, uint32_t max_count);
+void syscall_semaphore_acquire(int fd);
+void syscall_semaphore_release(int fd);
 
 void syscall_yield();
 void syscall_kill_process(int exit_code);

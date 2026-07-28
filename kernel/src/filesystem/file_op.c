@@ -66,7 +66,7 @@ FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent) {
 
     if(FS_NODE_IS_DIR(&ret_node))
         dirent->d_type = DT_DIR;
-    else if(FS_NODE_IS_PIPE(&ret_node))
+    else if(ret_node.fs->type == FS_RAMFS && ret_node.ramfs.type == RAMFS_TYPE_PIPE)
         dirent->d_type = DT_FIFO;
     else
         dirent->d_type = DT_REG;
@@ -146,7 +146,7 @@ FS_ERR file_seek(
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size) {
     if(!(file->mode & FILE_OPEN_READ)) return ERR_FS_FAILED;
 
-    if(FS_NODE_IS_PIPE(file->node)) {
+    if(file->node->fs->type == FS_RAMFS && file->node->ramfs.type == RAMFS_TYPE_PIPE) {
         // pipe mode: node->size = bytes available; empty pipe returns 0, not EOF
         if(file->node->size == 0) {
             *actual_read_size = 0;
@@ -201,7 +201,7 @@ FS_ERR file_write(
     }
     if(err) return err;
 
-    if(FS_NODE_IS_PIPE(file->node)) {
+    if(file->node->fs->type == FS_RAMFS && file->node->ramfs.type == RAMFS_TYPE_PIPE) {
         file->node->size += (*actual_write_size);
         file->position += (*actual_write_size);
     } else if(file->mode & FILE_OPEN_APPEND) {

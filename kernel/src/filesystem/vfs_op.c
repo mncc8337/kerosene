@@ -1,36 +1,33 @@
 #include <filesystem.h>
 #include <process.h>
 
+#include <kutils.h>
 #include <stdlib.h>
 #include <string.h>
 
 // from vfs.c
 extern fs_t* FS;
 
-static bool validate_user_buffer(const process_t* current_process, const void* buf, size_t size) {
-    if(!current_process->is_user) return true;
-
-    const char* start = (const char*)buf;
-    const char* end = start + size;
-
-    if(end < start) return false;
-    if((uint32_t)end > KERNEL_START) return false;
-
-    return true;
-}
-
-static bool validate_user_string(const process_t* current_process, const char* str) {
-    if(!current_process->is_user) return true;
-
-    if((uint32_t)str >= KERNEL_START) return false;
-
-    const char* p = str;
-    while((uint32_t)p < KERNEL_START) {
-        if (*p == '\0') return true;
-        p++;
+static void unlink_and_free_node(fs_node_t* node) {
+    fs_node_t* parent = node->parent;
+    if(parent != NULL) {
+        if(parent->children == node) {
+            parent->children = node->next_sibling;
+        } else {
+            fs_node_t* current = parent->children;
+            while(current != NULL && current->next_sibling != node) {
+                current = current->next_sibling;
+            }
+            if(current != NULL) {
+                current->next_sibling = node->next_sibling;
+            }
+        }
     }
 
-    return false;
+    if(node->fs->type == FS_RAMFS && node->ramfs.type == RAMFS_TYPE_SEMAPHORE && node->ramfs.semaphore != NULL) {
+        kfree(node->ramfs.semaphore);
+    }
+    kfree(node);
 }
 
 // mode should be only:
@@ -42,7 +39,8 @@ FS_ERR vfs_find_and_create_node(
     fs_node_t* cwd,
     fs_node_t** ret_node,
     const file_mode_t mode,
-    const bool is_file
+    const uint32_t create_flags,
+    const ramfs_type_t ramfs_type
 ) {
     bool do_create_node = mode & FILE_OPEN_CREATE && !(mode & FILE_OPEN_ONLYDIR);
     bool fail_if_existed = mode & FILE_OPEN_EXCLUSIVE;
@@ -192,11 +190,19 @@ FS_ERR vfs_find_and_create_node(
             goto nuke_search_stack_and_ret;
         }
 
-        FS_ERR op_err;
-        if(is_file)
-            op_err = node_create(parent_node, current_name, new_node);
-        else
+        FS_ERR op_err = ERR_FS_SUCCESS;
+
+        if(ramfs_type != RAMFS_TYPE_NONE) {
+            if(parent_node->fs->type != FS_RAMFS) {
+                kfree(new_node);
+                ret_err = ERR_FS_NOT_SUPPORTED;
+                goto nuke_search_stack_and_ret;
+            }
+            op_err = ramfs_create_special_node(parent_node, current_name, ramfs_type, new_node);
+        } else if(create_flags & FS_FLAG_DIRECTORY)
             op_err = node_mkdir(parent_node, current_name, new_node);
+        else
+            op_err = node_create(parent_node, current_name, create_flags, new_node);
                                 
         if(op_err) {
             kfree(new_node);
@@ -269,27 +275,11 @@ void vfs_cleanup_node_tree(fs_node_t* start_node) {
         fs_node_t* parent = target->parent;
         bool parent_became_empty = false;
 
-        if(parent != NULL) {
-            if(parent->children == target) {
-                parent->children = target->next_sibling;
-
-                if(parent->children == NULL) {
-                    parent_became_empty = true;
-                }
-            } else {
-                fs_node_t* current = parent->children;
-
-                while(current != NULL && current->next_sibling != target) {
-                    current = current->next_sibling;
-                }
-
-                if(current != NULL) {
-                    current->next_sibling = target->next_sibling;
-                }
-            }
+        if(parent != NULL && parent->children == target && target->next_sibling == NULL) {
+            parent_became_empty = true;
         }
 
-        kfree(target);
+        unlink_and_free_node(target);
 
         if(parent_became_empty) {
             target = parent;
@@ -297,6 +287,22 @@ void vfs_cleanup_node_tree(fs_node_t* start_node) {
             break;
         }
     }
+}
+
+FS_ERR vfs_remove_node(fs_node_t* parent, fs_node_t* node) {
+    if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
+
+    if(!strcmp(node->name, ".") || !strcmp(node->name, ".."))
+        return ERR_FS_FAILED;
+
+    if(parent->fs->remove_entry) {
+        FS_ERR err = parent->fs->remove_entry(parent, node, true);
+        if(err) return err;
+
+        unlink_and_free_node(node);
+        return ERR_FS_SUCCESS;
+    }
+    return ERR_FS_NOT_SUPPORTED;
 }
 
 // TODO:
@@ -324,7 +330,8 @@ int vfs_open(const char* path, const file_mode_t mode) {
         proc->cwd,
         &node,
         mode,
-        true
+        0,
+        RAMFS_TYPE_NONE
     );
     if(find_err)
         return -1;

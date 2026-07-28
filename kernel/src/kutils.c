@@ -1,8 +1,8 @@
 #include <kutils.h>
 #include <video.h>
 #include <stdio.h>
+
 #include <limits.h>
-#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -169,4 +169,31 @@ void kprint_debug(int log_tag, const char* restrict format, ...) {
     va_start(arg, format);
     kvprintf(format, arg);
     va_end(arg);
+}
+
+
+bool validate_user_buffer(const process_t* current_process, const void* buf, size_t size) {
+    if(!current_process->is_user) return true;
+
+    const char* start = (const char*)buf;
+    const char* end = start + size;
+
+    if(end < start) return false;
+    if((uint32_t)end > KERNEL_START) return false;
+
+    return true;
+}
+
+bool validate_user_string(const process_t* current_process, const char* str) {
+    if(!current_process->is_user) return true;
+
+    if((uint32_t)str >= KERNEL_START) return false;
+
+    const char* p = str;
+    while((uint32_t)p < KERNEL_START) {
+        if(*p == '\0') return true;
+        p++;
+    }
+
+    return false;
 }

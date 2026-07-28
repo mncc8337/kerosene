@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdatomic.h>
+#include <spinlock.h>
 
 typedef enum {
     ERR_MEM_SUCCESS,
@@ -79,8 +80,8 @@ typedef struct {
     uint32_t end;
     uint32_t max_addr;
     uint32_t min_size;
-    volatile atomic_flag lock;
     uint8_t flags;
+    spinlock_t lock;
 } __attribute__((packed)) heap_t;
 
 typedef struct heap_header {

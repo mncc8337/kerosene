@@ -10,7 +10,7 @@ static bool cable80;
 static uint32_t total_addressable_sec_LBA28;
 static uint64_t total_addressable_sec_LBA48;
 
-static volatile atomic_flag ata_lock = ATOMIC_FLAG_INIT;
+static spinlock_t ata_lock = SPINLOCK_INIT;
 
 static char* error_msg[] = {
     "AMNF - Address mark not found",

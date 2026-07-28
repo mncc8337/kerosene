@@ -160,4 +160,4 @@ char* elf_get_shstrtab(elf_header_t* eh);
 ELF_ERR elf_validate(elf_header_t* elf_header);
 int elf_get_err();
 ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry);
-ELF_ERR elf_load_to_proc(char* path, process_t* proc);
+ELF_ERR elf_load_to_proc(const char* path, process_t* proc);

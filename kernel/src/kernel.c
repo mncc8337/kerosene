@@ -14,8 +14,6 @@
 #include <mem.h>
 
 #include <kutils.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/syscall.h>
 
@@ -352,6 +350,24 @@ void kernel_proc2() {
     }
 }
 
+process_t* start_user_process(const char* path) {
+    process_t* proc = process_new(0, true, NULL);
+    if(proc) {
+        ELF_ERR load_err = elf_load_to_proc((char*)path, proc);
+        if(load_err) {
+            FS_ERR ferr = elf_get_err();
+            kprintf("file err while loading %s: %d\n", path, ferr);
+        } else {
+            scheduler_add_process(proc);
+            kprintf("%s started with id %d\n", path, proc->id);
+        }
+    } else {
+        kprintf("failed to start %s\n", path);
+    }
+
+    return proc;
+}
+
 void kmain() {
     // should the kernel main process the init process?
     // currently the purpose of the kernel main process is to start other processes
@@ -371,35 +387,7 @@ void kmain() {
     // free now
 
     // start the init process
-    process_t* init_proc = process_new(0, true, NULL);
-    if(init_proc) {
-        ELF_ERR load_err = elf_load_to_proc("(0)/bin/keroshell.elf", init_proc);
-        if(load_err) {
-            FS_ERR ferr = elf_get_err();
-            kprintf("file err while loading %s: %d\n", "keroshell.elf", ferr);
-        } else {
-            syscall_sleep(100);
-            scheduler_add_process(init_proc);
-            kprintf("shell started with id %d\n", init_proc->id);
-        }
-    } else {
-        kprintf("failed to start the shell\n");
-    }
-
-    process_t* user_proc = process_new(0, true, NULL);
-    if(user_proc) {
-        ELF_ERR load_err = elf_load_to_proc("(0)/hi.elf", user_proc);
-        if(load_err) {
-            FS_ERR ferr = elf_get_err();
-            kprintf("file err while loading %s: %d\n", "hi.elf", ferr);
-        } else {
-            syscall_sleep(100);
-            scheduler_add_process(user_proc);
-            kprintf("hi.elf started with id %d\n", user_proc->id);
-        }
-    } else {
-        kprintf("failed to start hi.elf\n");
-    }
+    start_user_process("(0)/bin/keroshell.elf");
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL);
     if(proc1) scheduler_add_process(proc1);

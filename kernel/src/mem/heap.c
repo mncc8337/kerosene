@@ -23,6 +23,7 @@ heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags) 
     heap->max_addr = start + max_size;
     heap->min_size = size;
     heap->flags = flags;
+    spinlock_init(&heap->lock);
 
     heap_header_t* header = HEAP_FIRST_HEADER(heap);
     header->magic = HEAP_FREE;
