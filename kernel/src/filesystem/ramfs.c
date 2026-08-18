@@ -41,6 +41,10 @@ static void* rmalloc(size_t size) {
     return heap_alloc(rheap, size, false);
 }
 
+static void rfree(void* addr) {
+    return heap_free(rheap, addr);
+}
+
 static ramfs_node_t* create_new_node(
     const char* name,
     uint32_t flags,
@@ -108,7 +112,7 @@ static void remove_datanode_chain(ramfs_datanode_t* node) {
     while(current_datanode) {
         ramfs_datanode_t* saved = current_datanode;
         current_datanode = current_datanode->next;
-        kfree((void*)saved);
+        rfree((void*)saved);
     }
 }
 
@@ -441,7 +445,7 @@ FS_ERR ramfs_add_entry(
             // create a new datanode and clear it
             ramfs_datanode_t* new_datanode = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
             if(!new_datanode) {
-                kfree((void*)ramnode);
+                rfree((void*)ramnode);
                 return ERR_FS_NOT_ENOUGH_SPACE;
             }
             new_datanode->next = NULL;
@@ -552,7 +556,7 @@ FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
         remove_datanode_chain(remove_ramnode->datanode_chain);
     }
 
-    kfree((void*)remove_ramnode);
+    rfree((void*)remove_ramnode);
 
     // remove entry
     if(entry_id < DIRECTORY_ENTRY_COUNT - 1) {
@@ -750,7 +754,7 @@ FS_ERR ramfs_pipe_read(
             if(head->next) {
                 // fully consumed — free this datanode and advance chain
                 ramnode->datanode_chain = head->next;
-                kfree(head);
+                rfree(head);
             }
             // whether freed or last node, reset offset for next iteration
             head_offset = 0;
