@@ -3,18 +3,19 @@
 #include <process.h>
 #include <kutils.h>
 
+void semaphore_init(semaphore_t* sem, uint32_t max_count) {
+    sem->max_count = max_count;
+    sem->current_count = 0;
+    sem->waiting_queue.top = NULL;
+    sem->waiting_queue.bottom = NULL;
+    sem->waiting_queue.size = 0;
+    spinlock_init(&sem->lock);
+}
+
 semaphore_t* semaphore_create(uint32_t max_count) {
     semaphore_t* ret = (semaphore_t*)kmalloc(sizeof(semaphore_t));
 
-    if(ret) {
-        ret->max_count = max_count;
-        ret->current_count = 0;
-        ret->waiting_queue.top = NULL;
-        ret->waiting_queue.bottom = NULL;
-        ret->waiting_queue.size = 0;
-        spinlock_init(&ret->lock);
-    }
-
+    if(ret) semaphore_init(ret, max_count);
     return ret;
 }
 

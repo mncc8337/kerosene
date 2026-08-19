@@ -10,6 +10,9 @@
 
 #include <time.h>
 
+#include <sys/filesystem.h>
+#include <semaphore.h>
+
 #define MAX_FS 32
 #define MAX_DISK_ID_STRLEN 2
 #define RAMFS_DISK (MAX_FS - 1)
@@ -43,8 +46,6 @@ typedef enum {
 
 #define FS_NODE_FLAG_SET(node_ptr, flag) ((node_ptr)->flags |= (flag))
 #define FS_NODE_FLAG_UNSET(node_ptr, flag) ((node_ptr)->flags &= ~(flag))
-
-#include <sys/filesystem.h>
 
 typedef struct {
     uint8_t drive_attribute;
@@ -104,6 +105,14 @@ typedef struct fs_node {
     time_t accessed_timestamp;
     uint32_t size;
 
+    semaphore_t lock;
+    // NOTE:
+    // because upon file read/write via syscall, interrupts will be disabled
+    // that means there is no way 2 processes can write to the same file at the same time
+    // (as long as i still use syscall to write to files in the kernel code)
+    // so we dont actually need this lock until i have off-load the interrupt tasks
+    // to a backgroud process.
+
     int32_t refcount;
 
     // fs depended field
@@ -140,7 +149,7 @@ typedef struct {
     };
 } directory_iterator_t;
 
-typedef struct {
+typedef struct file_description {
     fs_node_t* node;
     int mode;
 

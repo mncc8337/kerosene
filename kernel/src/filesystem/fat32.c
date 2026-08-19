@@ -1055,14 +1055,13 @@ FS_ERR fat32_add_entry(
     new_node->next_sibling = NULL;
     new_node->fat32.start_cluster = start_cluster;
     new_node->size = size;
-    new_node->refcount = 0;
-
     new_node->flags = to_fs_node_flags(attr);
-
     new_node->creation_milisecond = timer_get_current_ticks() * 1000 / TIMER_FREQUENCY;
     new_node->creation_timestamp = timer_get_current_time();
     new_node->modified_timestamp = 0;
     new_node->accessed_timestamp = 0;
+    semaphore_init(&new_node->lock, 1);
+    new_node->refcount = 0;
 
     // add entries
     for(int i = lfn_entry_count; i >= 0; i--) {

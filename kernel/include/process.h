@@ -2,7 +2,6 @@
 
 #include <mem.h>
 #include <system.h>
-#include <filesystem.h>
 
 #include <stdint.h>
 
@@ -35,9 +34,9 @@ typedef struct process {
     uint32_t saved_esp; // saved stack state of current process
     uint32_t tss_esp0; // the stack to use when handling interrupts (usr proc only)
     
-    file_description_t* file_descriptor_table;
+    struct file_description* file_descriptor_table;
     unsigned file_count;
-    fs_node_t* cwd;
+    struct fs_node* cwd;
 
     struct process* queue_next; // next item in a local queue
     struct process* global_next; // next item in the global process list
@@ -53,7 +52,7 @@ typedef struct {
 #define PROCESS_QUEUE_INIT {NULL, NULL, 0}
 
 // process.c
-process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd);
+process_t* process_new(uint32_t eip, bool is_user, struct fs_node* cwd);
 process_t* process_make_idle();
 void process_delete(process_t* proc);
 

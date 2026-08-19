@@ -98,6 +98,7 @@ static void to_fs_node(ramfs_node_t* ramnode, fs_node_t* parent, fs_node_t* node
     node->modified_timestamp = ramnode->modified_timestamp;
     node->accessed_timestamp = ramnode->accessed_timestamp;
     node->size = ramnode->size;
+    semaphore_init(&node->lock, 1);
     node->refcount = 0;
     node->ramfs.node_addr = (uint32_t)ramnode;
     node->ramfs.type = ramnode->type;
