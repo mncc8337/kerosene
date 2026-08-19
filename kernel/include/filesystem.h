@@ -82,9 +82,10 @@ typedef struct {
     uint32_t flags;
     uint8_t type;
     union {
-        ramfs_datanode_t* datanode_chain; // standard files/directories
-        void* mem_addr; // RAMFS_TYPE_MEMORY nodes
-        struct semaphore* semaphore; // RAMFS_TYPE_SEMAPHORE nodes
+        ramfs_datanode_t* datanode_chain; // RAMFS_TYPE_FILE (directories count too)
+        ramfs_datanode_t* pipe_data_chain; // RAMFS_TYPE_PIPE
+        void* mem_addr; // RAMFS_TYPE_MEMORY
+        struct semaphore* semaphore; // RAMFS_TYPE_SEMAPHORE
     };
 } ramfs_node_t;
 

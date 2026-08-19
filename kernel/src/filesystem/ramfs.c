@@ -1,4 +1,3 @@
-#include "sys/filesystem.h"
 #include <filesystem.h>
 #include <mem.h>
 #include <timer.h>
@@ -42,7 +41,7 @@ static void* rmalloc(size_t size) {
 }
 
 static void rfree(void* addr) {
-    return heap_free(rheap, addr);
+    heap_free(rheap, addr);
 }
 
 static ramfs_node_t* create_new_node(
@@ -73,8 +72,10 @@ static ramfs_node_t* create_new_node(
     ((char*)node + sizeof(ramfs_node_t))[namelen] = '\0';
 
     node->type = type;
-    if(type == RAMFS_TYPE_FILE || type == RAMFS_TYPE_PIPE) {
+    if(type == RAMFS_TYPE_FILE) {
         node->datanode_chain = (ramfs_datanode_t*)data;
+    } else if(type == RAMFS_TYPE_PIPE) {
+        node->pipe_data_chain = (ramfs_datanode_t*)data;
     } else if(type == RAMFS_TYPE_MEMORY) {
         node->mem_addr = data;
     } else if(type == RAMFS_TYPE_SEMAPHORE) {
@@ -737,7 +738,7 @@ FS_ERR ramfs_pipe_read(
     unsigned head_offset = file->position;
 
     while(size > 0) {
-        ramfs_datanode_t* head = ramnode->datanode_chain;
+        ramfs_datanode_t* head = ramnode->pipe_data_chain;
         if(!head) break;
 
         unsigned available = RAMFS_DATANODE_SIZE - head_offset;
@@ -752,8 +753,8 @@ FS_ERR ramfs_pipe_read(
 
         if(head_offset == RAMFS_DATANODE_SIZE) {
             if(head->next) {
-                // fully consumed — free this datanode and advance chain
-                ramnode->datanode_chain = head->next;
+                // fully consumed: free this datanode and advance chain
+                ramnode->pipe_data_chain = head->next;
                 rfree(head);
             }
             // whether freed or last node, reset offset for next iteration
@@ -762,7 +763,7 @@ FS_ERR ramfs_pipe_read(
     }
 
     file->position = head_offset;
-    file->ramfs.current_datanode = (uint32_t)ramnode->datanode_chain;
+    file->ramfs.current_datanode = (uint32_t)ramnode->pipe_data_chain;
     file->node->size -= *actual_read_size;
     // sync size back to the backing ramfs node
     ramnode->size = file->node->size;
@@ -903,13 +904,16 @@ void ramfs_file_open(file_description_t* file, fs_node_t* node, const file_mode_
     if(node->ramfs.type == RAMFS_TYPE_MEMORY || node->ramfs.type == RAMFS_TYPE_SEMAPHORE) {
         return;
     }
+
+    ramfs_datanode_t* chain = (node->ramfs.type == RAMFS_TYPE_PIPE)
+        ? ((ramfs_node_t*)node->ramfs.node_addr)->pipe_data_chain
+        : ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain;
+
     if(mode & FILE_OPEN_WRITE || mode & FILE_OPEN_READ) {
-        file->ramfs.current_datanode = (uint32_t)((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain;
+        file->ramfs.current_datanode = (uint32_t)chain;
     }
     if(mode & FILE_OPEN_APPEND || node->ramfs.type == RAMFS_TYPE_PIPE) {
-        file->ramfs.last_datanode = (uint32_t)(ramfs_get_last_datanode_of_chain(
-            ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain)
-        );
+        file->ramfs.last_datanode = (uint32_t)(ramfs_get_last_datanode_of_chain(chain));
     }
 }
 
