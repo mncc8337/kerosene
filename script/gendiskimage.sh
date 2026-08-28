@@ -7,7 +7,6 @@ if [ -f "${BIN_DIR}disk-backup.img" ]; then
     exit
 fi
 
-# unmount mnt
 sudo umount ./mnt
 
 rm ${BIN_DIR}disk.img
@@ -41,7 +40,8 @@ echo ------------------------------------------------------
 
 # find the first free loop device (/dev/loop0)
 # and create /dev/loop0p1 for the first partition
-LOOP_DEV=$(sudo losetup --find --partscan ${BIN_DIR}disk.img --show)
+OUTPUT=$(udisksctl loop-setup --no-user-interaction -f ${BIN_DIR}disk.img)
+LOOP_DEV=$(echo "$OUTPUT" | grep -oP '/dev/loop[0-9]+')
 if [ -z "$LOOP_DEV" ]; then
     echo "failed to set up loop device"
     exit 1
@@ -49,20 +49,21 @@ fi
 echo "using loop device $LOOP_DEV"
 
 sudo mkdosfs -F32 -f 2 ${LOOP_DEV}p1
-sudo mount --onlyonce ${LOOP_DEV}p1 ./mnt
+MOUNT_OUT=$(udisksctl mount --no-user-interaction -b ${LOOP_DEV}p1)
+MOUNT_POINT=$(echo "$MOUNT_OUT" | awk '{print $4}' | sed 's/\.$//')
 
 sudo grub-install --target=i386-pc \
-                  --root-directory=./mnt \
-                  --boot-directory=./mnt/boot \
+                  --root-directory="$MOUNT_POINT" \
+                  --boot-directory="$MOUNT_POINT"/boot \
                   --no-floppy \
                   --modules="normal part_msdos fat multiboot" \
                   ${LOOP_DEV}
 
-sudo mkdir -p ./mnt/boot/grub
-sudo cp grub.cfg ./mnt/boot/grub
+mkdir -p "$MOUNT_POINT"/boot/grub
+cp grub.cfg "$MOUNT_POINT"/boot/grub
 
-sudo umount ./mnt
-sudo losetup -d ${LOOP_DEV}
+udisksctl unmount --no-user-interaction -b ${LOOP_DEV}p1
+udisksctl loop-delete --no-user-interaction -b ${LOOP_DEV}
 
 cp ${BIN_DIR}disk.img ${BIN_DIR}disk-backup.img
 

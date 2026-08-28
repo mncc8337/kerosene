@@ -113,12 +113,12 @@ disk:
 
 copyfs: disk
 	./script/mount-device.sh
-	sudo cp grub.cfg ./mnt/boot/grub/ # update grub config
-	sudo cp $(BIN_DIR)kerosene.elf ./mnt/boot/ # update kernel
-	sudo mkdir -p ./mnt/bin/
-	sudo cp $(COREUTILS_ELF) ./mnt/bin/ # update coreutils
-	sudo cp $(BIN_DIR)keroshell.elf ./mnt/bin/ # update shell
-	for file in fsfiles/*; do sudo cp -r $$file ./mnt/; done
+	cp grub.cfg ./mnt/boot/grub/ # update grub config
+	cp $(BIN_DIR)kerosene.elf ./mnt/boot/ # update kernel
+	mkdir -p ./mnt/bin/
+	cp $(COREUTILS_ELF) ./mnt/bin/ # update coreutils
+	cp $(BIN_DIR)keroshell.elf ./mnt/bin/ # update shell
+	for file in fsfiles/*; do cp -r $$file ./mnt/; done
 	./script/umount-device.sh
 
 run:
