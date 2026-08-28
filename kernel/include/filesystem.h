@@ -106,12 +106,6 @@ typedef struct fs_node {
     uint32_t size;
 
     semaphore_t lock;
-    // NOTE:
-    // because upon file read/write via syscall, interrupts will be disabled
-    // that means there is no way 2 processes can write to the same file at the same time
-    // (as long as i still use syscall to write to files in the kernel code)
-    // so we dont actually need this lock until i have off-load the interrupt tasks
-    // to a backgroud process.
 
     int32_t refcount;
 
