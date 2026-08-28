@@ -33,7 +33,7 @@ typedef struct {
     uint32_t base;
 } __attribute__((packed)) idtr_t;
 
-typedef struct {
+typedef struct regs {
     uint32_t gs, fs, es, ds;
     uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax;
     uint32_t int_no, err_code;

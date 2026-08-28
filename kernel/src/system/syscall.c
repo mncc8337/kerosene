@@ -7,7 +7,7 @@
 #include <kutils.h>
 
 typedef int (*syscall_t)(uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
-typedef uint32_t (*syscall_ctx_t)(regs_t*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+typedef uint32_t (*syscall_ctx_t)(const regs_t*, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
 
 static void* syscalls[MAX_SYSCALL] = {
     [SYSCALL_TIME] = &timer_syscall_get_current_time,
@@ -24,14 +24,21 @@ static void* syscalls[MAX_SYSCALL] = {
     [SYSCALL_CLOSE] = &vfs_close,
     [SYSCALL_READ] = &vfs_read,
     [SYSCALL_WRITE] = &vfs_write,
-    [SYSCALL_SEEK] = &vfs_seek_syscall,
+    [SYSCALL_SEEK] = &vfs_seek,
 };
 
 static bool context_switchers[MAX_SYSCALL] = {
     [SYSCALL_SEMAPHORE_ACQUIRE] = 1,
+
     [SYSCALL_YIELD] = 1,
     [SYSCALL_KILL_PROCESS] = 1,
     [SYSCALL_SLEEP] = 1,
+
+    [SYSCALL_OPEN] = 1,
+    [SYSCALL_CLOSE] = 1,
+    [SYSCALL_READ] = 1,
+    [SYSCALL_WRITE] = 1,
+    [SYSCALL_SEEK] = 1,
 };
 
 static uint32_t syscall_dispatcher(regs_t* regs) {

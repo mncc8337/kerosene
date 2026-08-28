@@ -19,7 +19,7 @@ semaphore_t* semaphore_create(uint32_t max_count) {
     return ret;
 }
 
-uint32_t semaphore_acquire(regs_t* regs, semaphore_t* semaphore) {
+uint32_t semaphore_acquire(const regs_t* regs, semaphore_t* semaphore) {
     spinlock_acquire(&semaphore->lock);
     if(semaphore->current_count < semaphore->max_count) {
         semaphore->current_count++;
@@ -31,8 +31,7 @@ uint32_t semaphore_acquire(regs_t* regs, semaphore_t* semaphore) {
         process_queue_push(&semaphore->waiting_queue, current_process);
 
         spinlock_release(&semaphore->lock);
-        scheduler_to_next_process(regs, false);
-        return scheduler_get_current()->saved_esp;
+        return scheduler_to_next_process(regs, false);
     }
 }
 
@@ -106,15 +105,21 @@ int semaphore_syscall_create(const char* name, uint32_t max_count) {
     return -1;
 }
 
-uint32_t semaphore_syscall_acquire(regs_t* regs, int fd) {
-    if(fd < 0 || fd >= MAX_FILE) return (uint32_t)regs;
+uint32_t semaphore_syscall_acquire(const regs_t* regs, int fd) {
+    if(fd < 0 || fd >= MAX_FILE) {
+        ((regs_t*)regs)->eax = -1;
+        return (uint32_t)regs;
+    }
 
     process_t* proc = scheduler_get_current();
     file_description_t* fde = &proc->file_descriptor_table[fd];
 
-    if(!fde->node || !(fde->node->fs->type == FS_RAMFS && fde->node->ramfs.type == RAMFS_TYPE_SEMAPHORE) || !fde->node->ramfs.semaphore)
+    if(!fde->node || !(fde->node->fs->type == FS_RAMFS && fde->node->ramfs.type == RAMFS_TYPE_SEMAPHORE) || !fde->node->ramfs.semaphore) {
+        ((regs_t*)regs)->eax = -1;
         return (uint32_t)regs;
+    }
 
+    ((regs_t*)regs)->eax = 0;
     return semaphore_acquire(regs, fde->node->ramfs.semaphore);
 }
 

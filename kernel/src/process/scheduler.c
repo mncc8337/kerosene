@@ -50,7 +50,7 @@ void scheduler_add_process(process_t* proc) {
     process_queue_push(&ready_queue, proc);
 }
 
-void scheduler_to_next_process(regs_t* regs, bool add_back) {
+uint32_t scheduler_to_next_process(const regs_t* regs, bool add_back) {
     // save regs before switching
     current_process->saved_esp = (uint32_t)regs;
 
@@ -64,10 +64,11 @@ void scheduler_to_next_process(regs_t* regs, bool add_back) {
 
     vmmngr_switch_page_directory(current_process->page_directory);
     tss_set_stack(current_process->tss_esp0);
+    return current_process->saved_esp;
 }
 
 // put current process to delete queue, delete it later
-uint32_t scheduler_kill_process(regs_t* regs, int exit_code) {
+uint32_t scheduler_kill_process(const regs_t* regs, int exit_code) {
     if(current_process->id == 1) return (uint32_t)regs; // avoid deleting idle process
 
     current_process->exit_code = exit_code;
@@ -79,24 +80,20 @@ uint32_t scheduler_kill_process(regs_t* regs, int exit_code) {
     process_queue_push(&delete_queue, current_process);
 
     // dont add process back to ready queue
-    scheduler_to_next_process(regs, false);
-
-    return current_process->saved_esp;
+    return scheduler_to_next_process(regs, false);
 }
 
-uint32_t scheduler_set_sleep(regs_t* regs, unsigned ticks) {
+uint32_t scheduler_set_sleep(const regs_t* regs, unsigned ticks) {
     // set sleep target
     current_process->sleep_ticks = ticks + global_sleep_ticks;
 
     current_process->state = PROCESS_STATE_SLEEP;
     process_queue_sorted_push(&sleep_queue, current_process, process_sort_by_sleep_ticks);
 
-    scheduler_to_next_process(regs, false);
-
-    return current_process->saved_esp;
+    return scheduler_to_next_process(regs, false);
 }
 
-uint32_t scheduler_switch(regs_t* regs) {
+uint32_t scheduler_switch(const regs_t* regs) {
     
     // FIXME:
     // dont delete process on the spot
@@ -133,7 +130,7 @@ uint32_t scheduler_switch(regs_t* regs) {
 
     // switch to other thread if exceeded max runtime
     if(current_process->alive_ticks % PROCESS_ALIVE_TICKS == 0)
-        scheduler_to_next_process(regs, true);
+        return scheduler_to_next_process(regs, true);
 
     return current_process->saved_esp;
 }
