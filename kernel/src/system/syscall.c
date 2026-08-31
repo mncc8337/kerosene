@@ -33,12 +33,6 @@ static bool context_switchers[MAX_SYSCALL] = {
     [SYSCALL_YIELD] = 1,
     [SYSCALL_KILL_PROCESS] = 1,
     [SYSCALL_SLEEP] = 1,
-
-    [SYSCALL_OPEN] = 1,
-    [SYSCALL_CLOSE] = 1,
-    [SYSCALL_READ] = 1,
-    [SYSCALL_WRITE] = 1,
-    [SYSCALL_SEEK] = 1,
 };
 
 static uint32_t syscall_dispatcher(regs_t* regs) {

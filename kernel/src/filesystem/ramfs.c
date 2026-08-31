@@ -118,28 +118,28 @@ static void remove_datanode_chain(ramfs_datanode_t* node) {
     }
 }
 
-// static ramfs_datanode_t* copy_datanode_chain(ramfs_datanode_t* datanode) {
-//     ramfs_datanode_t* current_datanode = datanode;
-//     ramfs_datanode_t* ret = NULL;
-//
-//     ramfs_datanode_t* copied = NULL;
-//     while(current_datanode) {
-//         if(copied) {
-//             copied->next = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
-//             copied = copied->next;
-//         } else {
-//             copied = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
-//             ret = copied;
-//         }
-//         if(!copied) return NULL; // OOM
-//         copied->next = NULL;
-//
-//         memcpy(copied->data, current_datanode->data, RAMFS_DATANODE_SIZE);
-//         current_datanode = current_datanode->next;
-//     }
-//
-//     return ret;
-// }
+static ramfs_datanode_t* copy_datanode_chain(ramfs_datanode_t* datanode) {
+    ramfs_datanode_t* current_datanode = datanode;
+    ramfs_datanode_t* ret = NULL;
+
+    ramfs_datanode_t* copied = NULL;
+    while(current_datanode) {
+        if(copied) {
+            copied->next = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
+            copied = copied->next;
+        } else {
+            copied = (ramfs_datanode_t*)rmalloc(sizeof(ramfs_datanode_t));
+            ret = copied;
+        }
+        if(!copied) return NULL; // OOM
+        copied->next = NULL;
+
+        memcpy(copied->data, current_datanode->data, RAMFS_DATANODE_SIZE);
+        current_datanode = current_datanode->next;
+    }
+
+    return ret;
+}
 
 static void fix_empty_entries(ramfs_node_t* node) {
     ramfs_datanode_t* current_datanode = node->datanode_chain;
@@ -634,82 +634,82 @@ FS_ERR ramfs_node_create(fs_node_t* parent, const char* name, uint32_t flags, fs
     return ramfs_add_entry(parent, name, datanode_chain, flags, RAMFS_TYPE_FILE, 0, new_node);
 }
 
-// FS_ERR ramfs_node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
-//     ramfs_node_t* ramnode = (ramfs_node_t*)(node->ramfs.node_addr);
-//     ramfs_datanode_t* copied_datanode = copy_datanode_chain(ramnode->datanode_chain);
-//     if(!copied_datanode) return ERR_FS_NOT_ENOUGH_SPACE;
-//
-//     FS_ERR err = ramfs_add_entry(
-//         new_parent, new_name,
-//         copied_datanode,
-//         node->flags,
-//         ramnode->type,
-//         node->size, copied
-//     );
-//     if(err) return err;
-//
-//     return ERR_FS_SUCCESS;
-// }
+FS_ERR ramfs_node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
+    ramfs_node_t* ramnode = (ramfs_node_t*)(node->ramfs.node_addr);
+    ramfs_datanode_t* copied_datanode = copy_datanode_chain(ramnode->datanode_chain);
+    if(!copied_datanode) return ERR_FS_NOT_ENOUGH_SPACE;
 
-// FS_ERR ramfs_node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
-//     fs_node_t copied;
-//     FS_ERR copy_err = ramfs_add_entry(
-//         new_parent, new_name,
-//         ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain,
-//         node->flags,
-//         ((ramfs_node_t*)node->ramfs.node_addr)->type,
-//         node->size,
-//         &copied
-//     );
-//     if(copy_err) return copy_err;
-//
-//     // remove the entry but not the content
-//     FS_ERR remove_err = ramfs_remove_entry(node->parent, node, false);
-//     if(remove_err) {
-//         // FIXME: revert adding entry
-//         return remove_err;
-//     }
-//
-//     *node = copied;
-//     return ERR_FS_SUCCESS;
-// }
+    FS_ERR err = ramfs_add_entry(
+        new_parent, new_name,
+        copied_datanode,
+        node->flags,
+        ramnode->type,
+        node->size, copied
+    );
+    if(err) return err;
+
+    return ERR_FS_SUCCESS;
+}
+
+FS_ERR ramfs_node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
+    fs_node_t copied;
+    FS_ERR copy_err = ramfs_add_entry(
+        new_parent, new_name,
+        ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain,
+        node->flags,
+        ((ramfs_node_t*)node->ramfs.node_addr)->type,
+        node->size,
+        &copied
+    );
+    if(copy_err) return copy_err;
+
+    // remove the entry but not the content
+    FS_ERR remove_err = ramfs_remove_entry(node->parent, node, false);
+    if(remove_err) {
+        // FIXME: revert adding entry
+        return remove_err;
+    }
+
+    *node = copied;
+    return ERR_FS_SUCCESS;
+}
 
 // copy a node from ramfs to any fs
-// FS_ERR ramfs_universal_copy(struct regs* regs, fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
-//     FS_ERR create_err = node_create(new_parent, new_name, 0, copied);
-//     if(create_err) return create_err;
-//
-//     file_description_t dst_file;
-//     FS_ERR dst_open_err = file_open(regs, &dst_file, copied, FILE_OPEN_WRITE);
-//     if(dst_open_err) return dst_open_err;
-//
-//     ramfs_node_t* ramnode = (ramfs_node_t*)node->ramfs.node_addr;
-//     ramfs_datanode_t* current_datanode = ramnode->datanode_chain;
-//
-//     while(current_datanode) {
-//         unsigned size = RAMFS_DATANODE_SIZE;
-//         if(!current_datanode->next) size = ramnode->size % RAMFS_DATANODE_SIZE;
-//
-//         size_t write_size;
-//         size_t written_size = 0;
-//         while(written_size < size) {
-//             FS_ERR write_err = file_write(
-//                 &dst_file,
-//                 current_datanode->data + written_size,
-//                 size - written_size,
-//                 &write_size
-//             );
-//             if(write_err && write_err != ERR_FS_EOF) return write_err;
-//             written_size += write_size;
-//         }
-//
-//         current_datanode = current_datanode->next;
-//     }
-//
-//     node_sync(copied);
-//
-//     return ERR_FS_SUCCESS;
-// }
+FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
+    FS_ERR create_err = node_create(new_parent, new_name, 0, copied);
+    if(create_err) return create_err;
+
+    file_description_t dst_file;
+    FS_ERR dst_open_err = file_open(&dst_file, copied, FILE_OPEN_WRITE);
+    if(dst_open_err) return dst_open_err;
+
+    ramfs_node_t* ramnode = (ramfs_node_t*)node->ramfs.node_addr;
+    ramfs_datanode_t* current_datanode = ramnode->datanode_chain;
+
+    while(current_datanode) {
+        unsigned size = RAMFS_DATANODE_SIZE;
+        if(!current_datanode->next) size = ramnode->size % RAMFS_DATANODE_SIZE;
+
+        size_t write_size;
+        size_t written_size = 0;
+        while(written_size < size) {
+            FS_ERR write_err = file_write(
+                &dst_file,
+                current_datanode->data + written_size,
+                size - written_size,
+                &write_size
+            );
+            if(write_err && write_err != ERR_FS_EOF) return write_err;
+            written_size += write_size;
+        }
+
+        current_datanode = current_datanode->next;
+    }
+
+    node_sync(copied);
+
+    return ERR_FS_SUCCESS;
+}
 
 FS_ERR ramfs_node_reset(fs_node_t* node) {
     if(node->ramfs.type == RAMFS_TYPE_MEMORY)
@@ -953,8 +953,8 @@ FS_ERR ramfs_init(fs_t* fs) {
     fs->iterate_directory = ramfs_iterate_directory;
     fs->mkdir = ramfs_mkdir;
     fs->node_create = ramfs_node_create;
-    // fs->node_copy = ramfs_node_copy;
-    // fs->node_move = ramfs_node_move;
+    fs->node_copy = ramfs_node_copy;
+    fs->node_move = ramfs_node_move;
     fs->node_reset = ramfs_node_reset;
     fs->node_sync = ramfs_update_entry;
     fs->file_seek_absolute = ramfs_file_seek_absolute;

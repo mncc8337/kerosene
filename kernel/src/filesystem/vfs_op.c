@@ -8,13 +8,6 @@
 // from vfs.c
 extern fs_t* FS;
 
-#define RETURN_REGS(regs, ret_val) \
-    do { \
-        ((struct regs*)(regs))->eax = (uint32_t)(ret_val); \
-        return (uint32_t)(regs); \
-    } while(0)
-
-
 static void unlink_and_free_node(fs_node_t* node) {
     fs_node_t* parent = node->parent;
     if(parent != NULL) {
@@ -315,21 +308,21 @@ FS_ERR vfs_remove_node(fs_node_t* parent, fs_node_t* node) {
 // TODO:
 // specify the error when failed
 
-uint32_t vfs_open(const struct regs* regs, const char* path, const file_mode_t mode) {
+int vfs_open(const char* path, const file_mode_t mode) {
     process_t* proc = scheduler_get_current();
 
     if(!validate_user_string(proc, path))
-        RETURN_REGS(regs, -1);
+        return -1;
 
     // return early, prevent searching for the entire table and found nothing
     // NOTE:
     // this does not guarantee us to find a slot, it only shows that there is
     // some slots available but other processes may take it if we dont fast enough
     if(proc->file_count >= MAX_FILE)
-        RETURN_REGS(regs, -1);
+        return -1;
 
     if(!proc->cwd)
-        RETURN_REGS(regs, -1);
+        return -1;
 
     fs_node_t* node;
     FS_ERR find_err = vfs_find_and_create_node(
@@ -341,13 +334,13 @@ uint32_t vfs_open(const struct regs* regs, const char* path, const file_mode_t m
         RAMFS_TYPE_NONE
     );
     if(find_err)
-        RETURN_REGS(regs, -1);
+        return -1;
 
     int file_descriptor = -1;
     file_description_t* fde = NULL;
 
     int ret;
-    semaphore_acquire(regs, &fde->node->lock);
+    // semaphore_acquire(regs, &fde->node->lock);
     // prevent other process to hijack our free slot if there is one
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
@@ -380,22 +373,22 @@ uint32_t vfs_open(const struct regs* regs, const char* path, const file_mode_t m
 
 job_done:
     asm volatile("push %0; popf" : : "r"(eflags));
-    semaphore_release(&fde->node->lock);
-    RETURN_REGS(regs, ret);
+    // semaphore_release(&fde->node->lock);
+    return ret;
 }
 
-uint32_t vfs_close(const struct regs* regs, int file_descriptor) {
+void vfs_close(int file_descriptor) {
     process_t* proc = scheduler_get_current();
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
-        RETURN_REGS(regs, 0);
+        return;
 
     file_description_t* fde = proc->file_descriptor_table + file_descriptor;
 
     if(fde->node == NULL)
-        RETURN_REGS(regs, 0);
+        return;
 
-    semaphore_acquire(regs, &fde->node->lock);
+    // semaphore_acquire(regs, &fde->node->lock);
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
 
@@ -409,29 +402,28 @@ uint32_t vfs_close(const struct regs* regs, int file_descriptor) {
     proc->file_count--;
 
     asm volatile("push %0; popf" : : "r"(eflags));
-    semaphore_release(&fde->node->lock);
-    RETURN_REGS(regs, 0);
+    // semaphore_release(&fde->node->lock);
 }
 
-uint32_t vfs_read(const struct regs* regs, int file_descriptor, uint8_t* buffer, size_t size) {
+int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current();
 
     if(!validate_user_buffer(proc, buffer, size))
-        RETURN_REGS(regs, -1);
+        return -1;
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
-        RETURN_REGS(regs, -1);
+        return -1;
 
     file_description_t* fde = proc->file_descriptor_table + file_descriptor;
 
     if(fde->node == NULL)
-        RETURN_REGS(regs, -1);
+        return -1;
 
     if(!(fde->mode & FILE_OPEN_READ))
-        RETURN_REGS(regs, -1);
+        return -1;
 
     int ret;
-    semaphore_acquire(regs, &fde->node->lock);
+    // semaphore_acquire(regs, &fde->node->lock);
 
     size_t read_size;
     FS_ERR read_err = file_read(fde, buffer, size, &read_size);
@@ -443,29 +435,29 @@ uint32_t vfs_read(const struct regs* regs, int file_descriptor, uint8_t* buffer,
     else
         ret = -1;
 
-    semaphore_release(&fde->node->lock);
-    RETURN_REGS(regs, ret);
+    // semaphore_release(&fde->node->lock);
+    return ret;
 }
 
-uint32_t vfs_write(const struct regs* regs, int file_descriptor, const uint8_t* buffer, size_t size) {
+int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size) {
     process_t* proc = scheduler_get_current();
 
     if(!validate_user_buffer(proc, buffer, size))
-        RETURN_REGS(regs, -1);
+        return -1;
 
     if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
-        RETURN_REGS(regs, -1);
+        return -1;
 
     file_description_t* fde = proc->file_descriptor_table + file_descriptor;
 
     if(fde->node == NULL)
-        RETURN_REGS(regs, -1);
+        return -1;
 
     if(!(fde->mode & FILE_OPEN_WRITE))
-        RETURN_REGS(regs, -1);
+        return -1;
 
     int ret;
-    semaphore_acquire(regs, &fde->node->lock);
+    // semaphore_acquire(regs, &fde->node->lock);
 
     size_t write_size;
     FS_ERR write_err = file_write(fde, buffer, size, &write_size);
@@ -475,36 +467,35 @@ uint32_t vfs_write(const struct regs* regs, int file_descriptor, const uint8_t* 
     else
         ret = -1;
 
-    semaphore_release(&fde->node->lock);
-    RETURN_REGS(regs, ret);
+    // semaphore_release(&fde->node->lock);
+    return ret;
 }
 
-uint32_t vfs_seek(
-    const struct regs* regs,
+void vfs_seek(
     int file_descriptor,
     uint32_t hoff,
     uint32_t loff,
     whence_t whence,
     int64_t* position
 ) {
-    if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
-        RETURN_REGS(regs, -1);
+    if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE) {
+        *position = -1;
+        return;
+    }
 
     process_t* proc = scheduler_get_current();
     file_description_t* fde = proc->file_descriptor_table + file_descriptor;
 
-    if(fde->node == NULL)
-        RETURN_REGS(regs, -1);
+    if(fde->node == NULL) {
+        *position = -1;
+        return;
+    }
 
     int64_t offset = ((uint64_t)(hoff & 0xffffffff) << 32) | (loff & 0xffffffff);
-    semaphore_acquire(regs, &fde->node->lock);
+    // semaphore_acquire(regs, &fde->node->lock);
     FS_ERR seek_err = file_seek(fde, offset, whence, position);
-    semaphore_release(&fde->node->lock);
+    // semaphore_release(&fde->node->lock);
 
-    if(seek_err != ERR_FS_SUCCESS) {
+    if(seek_err != ERR_FS_SUCCESS)
         *position = -1;
-        RETURN_REGS(regs, -1);
-    } else {
-        RETURN_REGS(regs, 0);
-    }
 }
