@@ -221,9 +221,10 @@ unsigned vfs_get_kernel_file_count();
 FS_ERR vfs_find_and_create_node(const char* path, fs_node_t* cwd, fs_node_t** ret_node, const file_mode_t mode, const uint32_t create_flags, const ramfs_type_t ramfs_type);
 void vfs_cleanup_node_tree(fs_node_t* start_node);
 FS_ERR vfs_remove_node(fs_node_t* parent, fs_node_t* node);
-
 int vfs_open(const char* path, const file_mode_t mode);
 void vfs_close(int file_descriptor);
+uint32_t vfs_lock(struct regs* regs, int file_descriptor);
+void vfs_unlock(int file_descriptor);
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size);
 int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size);
 void vfs_seek(int file_descriptor, uint32_t hoff, uint32_t loff, whence_t whence, int64_t* position);

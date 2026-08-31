@@ -22,6 +22,8 @@ static void* syscalls[MAX_SYSCALL] = {
 
     [SYSCALL_OPEN] = &vfs_open,
     [SYSCALL_CLOSE] = &vfs_close,
+    [SYSCALL_LOCK] = &vfs_lock,
+    [SYSCALL_UNLOCK] = &vfs_unlock,
     [SYSCALL_READ] = &vfs_read,
     [SYSCALL_WRITE] = &vfs_write,
     [SYSCALL_SEEK] = &vfs_seek,
@@ -33,6 +35,8 @@ static bool context_switchers[MAX_SYSCALL] = {
     [SYSCALL_YIELD] = 1,
     [SYSCALL_KILL_PROCESS] = 1,
     [SYSCALL_SLEEP] = 1,
+
+    [SYSCALL_LOCK] = 1,
 };
 
 static uint32_t syscall_dispatcher(regs_t* regs) {
@@ -51,6 +55,7 @@ static uint32_t syscall_dispatcher(regs_t* regs) {
 
     // handle context switchers diffently
     // since they take regs ptr as the first argument
+    // NOTE: context switchers set their return value by setting regs->eax
     return ((syscall_ctx_t)fn)(regs, regs->ebx, regs->ecx, regs->edx, regs->esi, regs->edi);
 }
 

@@ -17,6 +17,8 @@ enum {
 
     SYSCALL_OPEN,
     SYSCALL_CLOSE,
+    SYSCALL_LOCK,
+    SYSCALL_UNLOCK,
     SYSCALL_READ,
     SYSCALL_WRITE,
     SYSCALL_SEEK,
@@ -54,6 +56,8 @@ void syscall_sleep(unsigned ticks);
 
 int syscall_open(const char* path, const file_mode_t mode);
 void syscall_close(int file_descriptor);
+int syscall_lock(int file_descriptor);
+void syscall_unlock(int file_descriptor);
 int syscall_read(int file_descriptor, uint8_t* buffer, size_t size);
 int syscall_write(int file_descriptor, const uint8_t* buffer, size_t size);
 void syscall_seek(int file_descriptor, int64_t seek_position, int whence, int64_t* final_position);

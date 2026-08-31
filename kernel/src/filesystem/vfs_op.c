@@ -1,5 +1,6 @@
 #include <filesystem.h>
 #include <process.h>
+#include <sys/syscall.h>
 
 #include <kutils.h>
 #include <stdlib.h>
@@ -340,7 +341,6 @@ int vfs_open(const char* path, const file_mode_t mode) {
     file_description_t* fde = NULL;
 
     int ret;
-    // semaphore_acquire(regs, &fde->node->lock);
     // prevent other process to hijack our free slot if there is one
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
@@ -373,7 +373,6 @@ int vfs_open(const char* path, const file_mode_t mode) {
 
 job_done:
     asm volatile("push %0; popf" : : "r"(eflags));
-    // semaphore_release(&fde->node->lock);
     return ret;
 }
 
@@ -388,7 +387,7 @@ void vfs_close(int file_descriptor) {
     if(fde->node == NULL)
         return;
 
-    // semaphore_acquire(regs, &fde->node->lock);
+    syscall_lock(file_descriptor);
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
 
@@ -402,7 +401,41 @@ void vfs_close(int file_descriptor) {
     proc->file_count--;
 
     asm volatile("push %0; popf" : : "r"(eflags));
-    // semaphore_release(&fde->node->lock);
+    syscall_unlock(file_descriptor);
+}
+
+// use semaphore to lock a file
+// return (in eax) 0 if file exists and locked, -1 for else
+uint32_t vfs_lock(struct regs* regs, int file_descriptor) {
+    if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE) {
+        regs->eax = -1;
+        return (uint32_t)regs;
+    }
+
+    process_t* proc = scheduler_get_current();
+    file_description_t* fde = proc->file_descriptor_table + file_descriptor;
+
+    if(fde->node == NULL) {
+        regs->eax = -1;
+        return (uint32_t)regs;
+    }
+
+    regs->eax = 0;
+    return semaphore_acquire(regs, &fde->node->lock);
+}
+
+void vfs_unlock(int file_descriptor) {
+    process_t* proc = scheduler_get_current();
+
+    if(file_descriptor < 0 || (unsigned)file_descriptor >= MAX_FILE)
+        return;
+
+    file_description_t* fde = proc->file_descriptor_table + file_descriptor;
+
+    if(fde->node == NULL)
+        return;
+
+    semaphore_release(&fde->node->lock);
 }
 
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
@@ -423,7 +456,7 @@ int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
         return -1;
 
     int ret;
-    // semaphore_acquire(regs, &fde->node->lock);
+    syscall_lock(file_descriptor);
 
     size_t read_size;
     FS_ERR read_err = file_read(fde, buffer, size, &read_size);
@@ -435,7 +468,7 @@ int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {
     else
         ret = -1;
 
-    // semaphore_release(&fde->node->lock);
+    syscall_unlock(file_descriptor);
     return ret;
 }
 
@@ -457,7 +490,7 @@ int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size) {
         return -1;
 
     int ret;
-    // semaphore_acquire(regs, &fde->node->lock);
+    syscall_lock(file_descriptor);
 
     size_t write_size;
     FS_ERR write_err = file_write(fde, buffer, size, &write_size);
@@ -467,7 +500,7 @@ int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size) {
     else
         ret = -1;
 
-    // semaphore_release(&fde->node->lock);
+    syscall_unlock(file_descriptor);
     return ret;
 }
 
@@ -492,9 +525,9 @@ void vfs_seek(
     }
 
     int64_t offset = ((uint64_t)(hoff & 0xffffffff) << 32) | (loff & 0xffffffff);
-    // semaphore_acquire(regs, &fde->node->lock);
+    syscall_lock(file_descriptor);
     FS_ERR seek_err = file_seek(fde, offset, whence, position);
-    // semaphore_release(&fde->node->lock);
+    syscall_unlock(file_descriptor);
 
     if(seek_err != ERR_FS_SUCCESS)
         *position = -1;
