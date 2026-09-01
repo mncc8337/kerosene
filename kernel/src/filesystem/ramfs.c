@@ -1,4 +1,5 @@
 #include <filesystem.h>
+#include <semaphore.h>
 #include <mem.h>
 #include <timer.h>
 #include <sys/syscall.h>
