@@ -82,14 +82,15 @@ typedef struct {
     uint32_t name_length;
     uint32_t flags;
     uint8_t type;
+    semaphore_t* lock;
     union {
         ramfs_datanode_t* datanode_chain; // RAMFS_TYPE_FILE (directories count too)
         void* mem_addr; // RAMFS_TYPE_MEMORY
-        struct semaphore* semaphore; // RAMFS_TYPE_SEMAPHORE
+        semaphore_t* semaphore; // RAMFS_TYPE_SEMAPHORE
         struct {
             ramfs_datanode_t* datanode_chain;
-            struct semaphore* bytes_available;
-            struct semaphore* space_available;
+            semaphore_t* bytes_available;
+            semaphore_t* space_available;
         } pipe; // RAMFS_TYPE_PIPE
     };
 } ramfs_node_t;
@@ -109,9 +110,9 @@ typedef struct fs_node {
     time_t accessed_timestamp;
     uint32_t size;
 
-    semaphore_t lock;
-
     int32_t refcount;
+
+    semaphore_t lock;
 
     // fs depended field
     union {
@@ -127,11 +128,11 @@ typedef struct fs_node {
             union {
                 // ramfs based objects
 
-                struct semaphore* semaphore;
+                semaphore_t* semaphore;
 
                 struct {
-                    struct semaphore* bytes_available;
-                    struct semaphore* space_available;
+                    semaphore_t* bytes_available;
+                    semaphore_t* space_available;
                 } pipe;
             };
         } ramfs;
@@ -233,7 +234,7 @@ void vfs_cleanup_node_tree(fs_node_t* start_node);
 FS_ERR vfs_remove_node(fs_node_t* parent, fs_node_t* node);
 int vfs_open(const char* path, const file_mode_t mode);
 void vfs_close(int file_descriptor);
-uint32_t vfs_lock(struct regs* regs, int file_descriptor);
+uint32_t vfs_lock(regs_t* regs, int file_descriptor);
 void vfs_unlock(int file_descriptor);
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size);
 int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size);

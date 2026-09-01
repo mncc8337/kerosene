@@ -59,6 +59,12 @@ static ramfs_node_t* create_new_node(
     ramfs_node_t* node = (ramfs_node_t*)rmalloc(sizeof(ramfs_node_t) + namelen + 1);
     if(!node) return NULL;
 
+    node->lock = semaphore_create(1);
+    if(!node->lock) {
+        rfree((void*)node);
+        return NULL;
+    }
+
     node->size = size;
     node->creation_milisecond = timer_get_current_ticks() * 1000 / TIMER_FREQUENCY;
     node->creation_timestamp = timer_get_current_time();
@@ -93,7 +99,7 @@ static ramfs_node_t* create_new_node(
             node->mem_addr = data;
             break;
         case RAMFS_TYPE_SEMAPHORE:
-            node->semaphore = (struct semaphore*)data;
+            node->semaphore = (semaphore_t*)data;
             break;
         default:
             break;
