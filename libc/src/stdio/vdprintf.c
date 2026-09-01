@@ -8,9 +8,8 @@
 
 static bool print(int fd, const char* data, size_t length) {
     const unsigned char* bytes = (const unsigned char*)data;
-    if(syscall_write(fd, bytes, length) == EOF)
-        return false;
-    return true;
+    size_t written = syscall_write(fd, bytes, length);
+    return written == length;
 }
 
 static size_t intlen(int num, int radix) {
