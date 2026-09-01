@@ -13,7 +13,6 @@ void kproc_stdin() {
         kbd_wait_key(&key);
 
         if(!key.released) {
-            video_printc(key.mapped, -1, -1, -1, true);
             syscall_write(SYSFILE_FD_STDIN, &key.mapped, 1);
         }
     }

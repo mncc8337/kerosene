@@ -84,9 +84,13 @@ typedef struct {
     uint8_t type;
     union {
         ramfs_datanode_t* datanode_chain; // RAMFS_TYPE_FILE (directories count too)
-        ramfs_datanode_t* pipe_data_chain; // RAMFS_TYPE_PIPE
         void* mem_addr; // RAMFS_TYPE_MEMORY
         struct semaphore* semaphore; // RAMFS_TYPE_SEMAPHORE
+        struct {
+            ramfs_datanode_t* datanode_chain;
+            struct semaphore* bytes_available;
+            struct semaphore* space_available;
+        } pipe; // RAMFS_TYPE_PIPE
     };
 } ramfs_node_t;
 
@@ -274,7 +278,6 @@ FS_ERR ramfs_node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_n
 FS_ERR ramfs_universal_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
 
 FS_ERR ramfs_node_reset(fs_node_t* node);
-FS_ERR ramfs_pipe_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
 FS_ERR ramfs_file_seek_absolute(file_description_t* file, int64_t seek_position);
 FS_ERR ramfs_file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size);
 FS_ERR ramfs_file_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
