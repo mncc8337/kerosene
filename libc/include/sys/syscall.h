@@ -10,6 +10,7 @@ enum {
     SYSCALL_SEMAPHORE_CREATE,
     SYSCALL_SEMAPHORE_ACQUIRE,
     SYSCALL_SEMAPHORE_RELEASE,
+    SYSCALL_SEMAPHORE_KACQUIRE,
 
     SYSCALL_YIELD,
     SYSCALL_KILL_PROCESS,
@@ -49,6 +50,7 @@ uint64_t syscall_time();
 int syscall_semaphore_create(const char* name, uint32_t initial_count);
 void syscall_semaphore_acquire(int fd, uint32_t count);
 void syscall_semaphore_release(int fd, uint32_t count);
+void syscall_semaphore_kacquire(void* semaphore_ptr, uint32_t count);
 
 void syscall_yield();
 void syscall_kill_process(int exit_code);

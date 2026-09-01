@@ -15,6 +15,7 @@ static void* syscalls[MAX_SYSCALL] = {
     [SYSCALL_SEMAPHORE_CREATE] = &semaphore_syscall_create,
     [SYSCALL_SEMAPHORE_ACQUIRE] = &semaphore_syscall_acquire,
     [SYSCALL_SEMAPHORE_RELEASE] = &semaphore_syscall_release,
+    [SYSCALL_SEMAPHORE_KACQUIRE] = &semaphore_syscall_kacquire,
 
     [SYSCALL_YIELD] = &scheduler_to_next_process,
     [SYSCALL_KILL_PROCESS] = &scheduler_kill_process,
@@ -31,6 +32,7 @@ static void* syscalls[MAX_SYSCALL] = {
 
 static bool context_switchers[MAX_SYSCALL] = {
     [SYSCALL_SEMAPHORE_ACQUIRE] = 1,
+    [SYSCALL_SEMAPHORE_KACQUIRE] = 1,
 
     [SYSCALL_YIELD] = 1,
     [SYSCALL_KILL_PROCESS] = 1,

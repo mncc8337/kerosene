@@ -122,7 +122,13 @@ typedef struct fs_node {
             uint8_t type;
             union {
                 // ramfs based objects
+
                 struct semaphore* semaphore;
+
+                struct {
+                    struct semaphore* bytes_available;
+                    struct semaphore* space_available;
+                } pipe;
             };
         } ramfs;
     };

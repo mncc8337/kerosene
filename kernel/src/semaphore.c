@@ -113,9 +113,9 @@ int semaphore_syscall_create(const char* name, uint32_t initial_count) {
     return -1;
 }
 
-uint32_t semaphore_syscall_acquire(const regs_t* regs, int fd, uint32_t count) {
+uint32_t semaphore_syscall_acquire(regs_t* regs, int fd, uint32_t count) {
     if(fd < 0 || fd >= MAX_FILE) {
-        ((regs_t*)regs)->eax = -1;
+        regs->eax = -1;
         return (uint32_t)regs;
     }
 
@@ -123,11 +123,11 @@ uint32_t semaphore_syscall_acquire(const regs_t* regs, int fd, uint32_t count) {
     file_description_t* fde = &proc->file_descriptor_table[fd];
 
     if(!fde->node || !(fde->node->fs->type == FS_RAMFS && fde->node->ramfs.type == RAMFS_TYPE_SEMAPHORE) || !fde->node->ramfs.semaphore) {
-        ((regs_t*)regs)->eax = -1;
+        regs->eax = -1;
         return (uint32_t)regs;
     }
 
-    ((regs_t*)regs)->eax = 0;
+    regs->eax = 0;
     return semaphore_acquire(regs, fde->node->ramfs.semaphore, count);
 }
 
@@ -142,4 +142,14 @@ int semaphore_syscall_release(int fd, uint32_t count) {
 
     semaphore_release(fde->node->ramfs.semaphore, count);
     return 0;
+}
+
+uint32_t semaphore_syscall_kacquire(const regs_t* regs, semaphore_t* semaphore, uint32_t count) {
+    // only allowed kernel to call this
+    if((regs->cs & 0x03) != 0) {
+        return scheduler_kill_process(regs, 13);
+        return (uint32_t)regs;
+    }
+
+    return semaphore_acquire(regs, semaphore, count);
 }
