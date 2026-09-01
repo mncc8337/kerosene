@@ -46,9 +46,9 @@ asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), 
 
 uint64_t syscall_time();
 
-int syscall_semaphore_create(const char* name, uint32_t max_count);
-void syscall_semaphore_acquire(int fd);
-void syscall_semaphore_release(int fd);
+int syscall_semaphore_create(const char* name, uint32_t initial_count);
+void syscall_semaphore_acquire(int fd, uint32_t count);
+void syscall_semaphore_release(int fd, uint32_t count);
 
 void syscall_yield();
 void syscall_kill_process(int exit_code);

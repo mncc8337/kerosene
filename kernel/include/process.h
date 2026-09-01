@@ -34,6 +34,8 @@ typedef struct process {
     uint32_t saved_esp; // saved stack state of current process
     uint32_t tss_esp0; // the stack to use when handling interrupts (usr proc only)
     
+    uint32_t waiting_for_resource_count; // how many resources the process is currently blocked waiting for
+
     struct file_description* file_descriptor_table;
     unsigned file_count;
     struct fs_node* cwd;

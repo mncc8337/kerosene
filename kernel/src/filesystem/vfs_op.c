@@ -421,7 +421,7 @@ uint32_t vfs_lock(struct regs* regs, int file_descriptor) {
     }
 
     regs->eax = 0;
-    return semaphore_acquire(regs, &fde->node->lock);
+    return semaphore_acquire(regs, &fde->node->lock, 1);
 }
 
 void vfs_unlock(int file_descriptor) {
@@ -435,7 +435,7 @@ void vfs_unlock(int file_descriptor) {
     if(fde->node == NULL)
         return;
 
-    semaphore_release(&fde->node->lock);
+    semaphore_release(&fde->node->lock, 1);
 }
 
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size) {

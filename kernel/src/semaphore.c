@@ -3,31 +3,31 @@
 #include <process.h>
 #include <kutils.h>
 
-void semaphore_init(semaphore_t* sem, uint32_t max_count) {
-    sem->max_count = max_count;
-    sem->current_count = 0;
+void semaphore_init(semaphore_t* sem, uint32_t initial_count) {
+    sem->count = initial_count;
     sem->waiting_queue.top = NULL;
     sem->waiting_queue.bottom = NULL;
     sem->waiting_queue.size = 0;
     spinlock_init(&sem->lock);
 }
 
-semaphore_t* semaphore_create(uint32_t max_count) {
+semaphore_t* semaphore_create(uint32_t initial_count) {
     semaphore_t* ret = (semaphore_t*)kmalloc(sizeof(semaphore_t));
 
-    if(ret) semaphore_init(ret, max_count);
+    if(ret) semaphore_init(ret, initial_count);
     return ret;
 }
 
-uint32_t semaphore_acquire(const regs_t* regs, semaphore_t* semaphore) {
+uint32_t semaphore_acquire(const regs_t* regs, semaphore_t* semaphore, uint32_t count) {
     spinlock_acquire(&semaphore->lock);
-    if(semaphore->current_count < semaphore->max_count) {
-        semaphore->current_count++;
+    if(semaphore->count >= count) {
+        semaphore->count -= count;
         spinlock_release(&semaphore->lock);
         return (uint32_t)regs;
     } else {
         process_t* current_process = scheduler_get_current();
         current_process->state = PROCESS_STATE_BLOCK;
+        current_process->waiting_for_resource_count = count;
         process_queue_push(&semaphore->waiting_queue, current_process);
 
         spinlock_release(&semaphore->lock);
@@ -35,20 +35,28 @@ uint32_t semaphore_acquire(const regs_t* regs, semaphore_t* semaphore) {
     }
 }
 
-void semaphore_release(semaphore_t* semaphore) {
+void semaphore_release(semaphore_t* semaphore, uint32_t count) {
     spinlock_acquire(&semaphore->lock);
-    if(semaphore->waiting_queue.size) {
-        process_t* proc = process_queue_pop(&semaphore->waiting_queue);
-        proc->state = PROCESS_STATE_READY;
-        scheduler_push_ready(proc);
-    } else semaphore->current_count--;
+    semaphore->count += count;
+
+    while(semaphore->waiting_queue.size > 0) {
+        process_t* proc = semaphore->waiting_queue.top;
+        if(semaphore->count >= proc->waiting_for_resource_count) {
+            semaphore->count -= proc->waiting_for_resource_count;
+            process_queue_pop(&semaphore->waiting_queue);
+            proc->state = PROCESS_STATE_READY;
+            scheduler_push_ready(proc);
+        } else {
+            break;
+        }
+    }
     spinlock_release(&semaphore->lock);
 }
 
-int semaphore_syscall_create(const char* name, uint32_t max_count) {
+int semaphore_syscall_create(const char* name, uint32_t initial_count) {
     if(!name) return -1;
 
-    semaphore_t* sem = semaphore_create(max_count);
+    semaphore_t* sem = semaphore_create(initial_count);
     if(!sem) return -1;
     
     process_t* current_process = scheduler_get_current();
@@ -105,7 +113,7 @@ int semaphore_syscall_create(const char* name, uint32_t max_count) {
     return -1;
 }
 
-uint32_t semaphore_syscall_acquire(const regs_t* regs, int fd) {
+uint32_t semaphore_syscall_acquire(const regs_t* regs, int fd, uint32_t count) {
     if(fd < 0 || fd >= MAX_FILE) {
         ((regs_t*)regs)->eax = -1;
         return (uint32_t)regs;
@@ -120,10 +128,10 @@ uint32_t semaphore_syscall_acquire(const regs_t* regs, int fd) {
     }
 
     ((regs_t*)regs)->eax = 0;
-    return semaphore_acquire(regs, fde->node->ramfs.semaphore);
+    return semaphore_acquire(regs, fde->node->ramfs.semaphore, count);
 }
 
-int semaphore_syscall_release(int fd) {
+int semaphore_syscall_release(int fd, uint32_t count) {
     if(fd < 0 || fd >= MAX_FILE) return -1;
 
     process_t* proc = scheduler_get_current();
@@ -132,6 +140,6 @@ int semaphore_syscall_release(int fd) {
     if(!fde->node || !(fde->node->fs->type == FS_RAMFS && fde->node->ramfs.type == RAMFS_TYPE_SEMAPHORE) || !fde->node->ramfs.semaphore)
         return -1;
 
-    semaphore_release(fde->node->ramfs.semaphore);
+    semaphore_release(fde->node->ramfs.semaphore, count);
     return 0;
 }
