@@ -71,8 +71,7 @@ int semaphore_syscall_create(const char* name, uint32_t initial_count) {
         current_process->cwd,
         &node,
         FILE_OPEN_CREATE | FILE_OPEN_EXCLUSIVE,
-        0,
-        RAMFS_TYPE_SEMAPHORE
+        FS_NODE_TYPE_SEMAPHORE
     );
 
     if(find_err) {
@@ -122,7 +121,7 @@ uint32_t semaphore_syscall_acquire(regs_t* regs, int fd, uint32_t count) {
     process_t* proc = scheduler_get_current();
     file_description_t* fde = &proc->file_descriptor_table[fd];
 
-    if(!fde->node || !(fde->node->fs->type == FS_RAMFS && fde->node->ramfs.type == RAMFS_TYPE_SEMAPHORE) || !fde->node->ramfs.semaphore) {
+    if(!fde->node || !(FS_NODE_IS_SEMAPHORE(fde->node)) || !fde->node->ramfs.semaphore) {
         regs->eax = -1;
         return (uint32_t)regs;
     }
@@ -137,7 +136,7 @@ int semaphore_syscall_release(int fd, uint32_t count) {
     process_t* proc = scheduler_get_current();
     file_description_t* fde = &proc->file_descriptor_table[fd];
 
-    if(!fde->node || !(fde->node->fs->type == FS_RAMFS && fde->node->ramfs.type == RAMFS_TYPE_SEMAPHORE) || !fde->node->ramfs.semaphore)
+    if(!fde->node || !(FS_NODE_IS_SEMAPHORE(fde->node)) || !fde->node->ramfs.semaphore)
         return -1;
 
     semaphore_release(fde->node->ramfs.semaphore, count);

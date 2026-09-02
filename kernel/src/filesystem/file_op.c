@@ -1,3 +1,4 @@
+#include "sys/filesystem.h"
 #include <filesystem.h>
 #include <timer.h>
 
@@ -23,11 +24,11 @@ static FS_ERR save_diriter_adapter(file_description_t* dir, directory_iterator_t
 }
 
 FS_ERR file_setup_directory_iterator(file_description_t* dir) {
-    if(!FS_NODE_IS_DIR(dir->node))
+    if(!FS_NODE_IS_DIRECTORY(dir->node))
         return ERR_FS_NOT_DIR;
 
     if(!(dir->mode & FILE_OPEN_READ))
-        return ERR_FS_NOT_DIR;
+        return ERR_FS_FAILED;
 
     FS_ERR err;
 
@@ -42,7 +43,7 @@ FS_ERR file_setup_directory_iterator(file_description_t* dir) {
 }
 
 FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent) {
-    if(!FS_NODE_IS_DIR(dir->node))
+    if(!FS_NODE_IS_DIRECTORY(dir->node))
         return ERR_FS_NOT_DIR;
 
     if(!(dir->mode & FILE_OPEN_READ))
@@ -64,9 +65,9 @@ FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent) {
 
     dirent->d_ino = 0; // TODO: figure out what should i put here
 
-    if(FS_NODE_IS_DIR(&ret_node))
+    if(FS_NODE_IS_DIRECTORY(&ret_node))
         dirent->d_type = DT_DIR;
-    else if(ret_node.fs->type == FS_RAMFS && ret_node.ramfs.type == RAMFS_TYPE_PIPE)
+    else if(FS_NODE_IS_PIPE(&ret_node))
         dirent->d_type = DT_FIFO;
     else
         dirent->d_type = DT_REG;
@@ -77,7 +78,7 @@ FS_ERR file_iterate_directory(file_description_t* dir, dirent_t* dirent) {
 }
 
 FS_ERR file_open(file_description_t* file, fs_node_t* node, const file_mode_t mode) {
-    if(mode & FILE_OPEN_ONLYDIR && !FS_NODE_IS_DIR(node)) {
+    if(mode & FILE_OPEN_ONLYDIR && !FS_NODE_IS_DIRECTORY(node)) {
         return ERR_FS_NOT_DIR;
     }
 
@@ -146,7 +147,7 @@ FS_ERR file_seek(
 FS_ERR file_read(file_description_t* file, uint8_t* buffer, size_t size, size_t* actual_read_size) {
     if(!(file->mode & FILE_OPEN_READ)) return ERR_FS_FAILED;
 
-    if(file->node->fs->type == FS_RAMFS && file->node->ramfs.type == RAMFS_TYPE_PIPE) {
+    if(FS_NODE_IS_PIPE(file->node)) {
         if(file->node->fs->file_read) {
             return file->node->fs->file_read(file, buffer, size, actual_read_size);
         }
@@ -180,7 +181,8 @@ FS_ERR file_write(
 ) {
     if(!(file->mode & FILE_OPEN_WRITE))
         return ERR_FS_FAILED;
-    if(FS_NODE_IS_DIR(file->node))
+
+    if(!FS_NODE_IS_FILE(file->node) && !FS_NODE_IS_PIPE(file->node) && !FS_NODE_IS_MEMORY(file->node))
         return ERR_FS_NOT_FILE;
 
     FS_ERR err;
@@ -191,7 +193,7 @@ FS_ERR file_write(
     }
     if(err) return err;
 
-    if(file->node->fs->type == FS_RAMFS && file->node->ramfs.type == RAMFS_TYPE_PIPE) {
+    if(FS_NODE_IS_PIPE(file->node)) {
         file->node->modified_timestamp = timer_get_current_time();
         return ERR_FS_SUCCESS;
     }

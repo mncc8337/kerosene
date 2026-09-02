@@ -127,7 +127,7 @@ ELF_ERR elf_load_to_proc(const char* path, process_t* proc) {
     }
 
     fs_node_t* elf;
-    errcode = vfs_find_and_create_node(path, &fs->root_node, &elf, 0, 0, RAMFS_TYPE_NONE);
+    errcode = vfs_find_and_create_node(path, &fs->root_node, &elf, 0, 0);
     if(errcode)
         return ERR_ELF_FILE_ERROR;
 

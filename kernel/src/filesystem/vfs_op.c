@@ -25,7 +25,7 @@ static void unlink_and_free_node(fs_node_t* node) {
         }
     }
 
-    if(node->fs->type == FS_RAMFS && node->ramfs.type == RAMFS_TYPE_SEMAPHORE && node->ramfs.semaphore != NULL) {
+    if(FS_NODE_IS_SEMAPHORE(node) && node->ramfs.semaphore != NULL) {
         kfree(node->ramfs.semaphore);
     }
     kfree(node);
@@ -40,8 +40,7 @@ FS_ERR vfs_find_and_create_node(
     fs_node_t* cwd,
     fs_node_t** ret_node,
     const file_mode_t mode,
-    const uint32_t create_flags,
-    const ramfs_type_t ramfs_type
+    const uint32_t create_flags
 ) {
     bool do_create_node = mode & FILE_OPEN_CREATE && !(mode & FILE_OPEN_ONLYDIR);
     bool fail_if_existed = mode & FILE_OPEN_EXCLUSIVE;
@@ -193,14 +192,14 @@ FS_ERR vfs_find_and_create_node(
 
         FS_ERR op_err = ERR_FS_SUCCESS;
 
-        if(ramfs_type != RAMFS_TYPE_NONE) {
+        if((create_flags & FS_NODE_TYPE_MASK) != FS_NODE_TYPE_FILE && (create_flags & FS_NODE_TYPE_MASK) != FS_NODE_TYPE_DIRECTORY) {
             if(parent_node->fs->type != FS_RAMFS) {
                 kfree(new_node);
                 ret_err = ERR_FS_NOT_SUPPORTED;
                 goto nuke_search_stack_and_ret;
             }
-            op_err = ramfs_create_special_node(parent_node, current_name, ramfs_type, new_node);
-        } else if(create_flags & FS_FLAG_DIRECTORY)
+            op_err = ramfs_create_special_node(parent_node, current_name, (create_flags & FS_NODE_TYPE_MASK), new_node);
+        } else if((create_flags & FS_NODE_TYPE_MASK) == FS_NODE_TYPE_DIRECTORY)
             op_err = node_mkdir(parent_node, current_name, new_node);
         else
             op_err = node_create(parent_node, current_name, create_flags, new_node);
@@ -224,7 +223,7 @@ FS_ERR vfs_find_and_create_node(
         current_node = new_node;
     }
 
-    if((mode & FILE_OPEN_ONLYDIR) && !FS_NODE_IS_DIR(current_node)) {
+    if((mode & FILE_OPEN_ONLYDIR) && !FS_NODE_IS_DIRECTORY(current_node)) {
         ret_err = ERR_FS_NOT_DIR;
         goto nuke_search_stack_and_ret;
     }
@@ -291,7 +290,7 @@ void vfs_cleanup_node_tree(fs_node_t* start_node) {
 }
 
 FS_ERR vfs_remove_node(fs_node_t* parent, fs_node_t* node) {
-    if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIRECTORY(parent)) return ERR_FS_NOT_DIR;
 
     if(!strcmp(node->name, ".") || !strcmp(node->name, ".."))
         return ERR_FS_FAILED;
@@ -331,8 +330,7 @@ int vfs_open(const char* path, const file_mode_t mode) {
         proc->cwd,
         &node,
         mode,
-        0,
-        RAMFS_TYPE_NONE
+        0
     );
     if(find_err)
         return -1;

@@ -29,20 +29,30 @@ typedef enum {
     FS_RAMFS
 } fs_type_t;
 
-#define FS_FLAG_DIRECTORY (1 << 0)
-#define FS_FLAG_HIDDEN (1 << 1)
+// lower 4 bits: node type
+#define FS_NODE_TYPE_MASK 0b1111
+#define FS_NODE_TYPE_FILE 0b0000
+#define FS_NODE_TYPE_DIRECTORY 0b0001
+#define FS_NODE_TYPE_SYMLINK 0b0010
+#define FS_NODE_TYPE_MEMORY 0b0011
+#define FS_NODE_TYPE_PIPE 0b0100
+#define FS_NODE_TYPE_SEMAPHORE 0b0101
+// higher 28 bits: node flags
+#define FS_NODE_FLAG_HIDDEN (1 << 4)
+#define FS_NODE_FLAG_MOUNTPOINT (1 << 5)
 
-#define FS_NODE_IS_VALID(node_ptr) ((node_ptr)->flags != 0)
-#define FS_NODE_IS_DIR(node_ptr) ((node_ptr)->flags & FS_FLAG_DIRECTORY)
-#define FS_NODE_IS_HIDDEN(node_ptr) ((node_ptr)->flags & FS_FLAG_HIDDEN)
+#define FS_NODE_GET_TYPE(node_ptr) ((node_ptr)->flags & FS_NODE_TYPE_MASK)
+#define FS_NODE_GET_FLAGS(node_ptr) ((node_ptr)->flags & (~FS_NODE_TYPE_MASK))
 
-typedef enum {
-    RAMFS_TYPE_NONE = 0,
-    RAMFS_TYPE_FILE = 1,
-    RAMFS_TYPE_MEMORY = 2,
-    RAMFS_TYPE_PIPE = 3,
-    RAMFS_TYPE_SEMAPHORE = 4
-} ramfs_type_t;
+#define FS_NODE_IS_FILE(node_ptr) (FS_NODE_GET_TYPE(node_ptr) == FS_NODE_TYPE_FILE)
+#define FS_NODE_IS_DIRECTORY(node_ptr) (FS_NODE_GET_TYPE(node_ptr) == FS_NODE_TYPE_DIRECTORY)
+#define FS_NODE_IS_SYMLINK(node_ptr) (FS_NODE_GET_TYPE(node_ptr) == FS_NODE_TYPE_SYMLINK)
+#define FS_NODE_IS_PIPE(node_ptr) (FS_NODE_GET_TYPE(node_ptr) == FS_NODE_TYPE_PIPE)
+#define FS_NODE_IS_SEMAPHORE(node_ptr) (FS_NODE_GET_TYPE(node_ptr) == FS_NODE_TYPE_SEMAPHORE)
+#define FS_NODE_IS_MEMORY(node_ptr) (FS_NODE_GET_TYPE(node_ptr) == FS_NODE_TYPE_MEMORY)
+
+#define FS_NODE_IS_HIDDEN(node_ptr) ((node_ptr)->flags & FS_NODE_FLAG_HIDDEN)
+#define FS_NODE_IS_MOUNTPOINT(node_ptr) ((node_ptr)->flags & FS_NODE_FLAG_MOUNTPOINT)
 
 #define FS_NODE_FLAG_SET(node_ptr, flag) ((node_ptr)->flags |= (flag))
 #define FS_NODE_FLAG_UNSET(node_ptr, flag) ((node_ptr)->flags &= ~(flag))
@@ -81,17 +91,16 @@ typedef struct {
     time_t accessed_timestamp;
     uint32_t name_length;
     uint32_t flags;
-    uint8_t type;
     semaphore_t* lock;
     union {
-        ramfs_datanode_t* datanode_chain; // RAMFS_TYPE_FILE (directories count too)
-        void* mem_addr; // RAMFS_TYPE_MEMORY
-        semaphore_t* semaphore; // RAMFS_TYPE_SEMAPHORE
+        ramfs_datanode_t* datanode_chain; // FS_NODE_TYPE_FILE (directories count too)
+        void* mem_addr; // FS_NODE_TYPE_MEMORY
+        semaphore_t* semaphore; // FS_NODE_TYPE_SEMAPHORE
         struct {
             ramfs_datanode_t* datanode_chain;
             semaphore_t* bytes_available;
             semaphore_t* space_available;
-        } pipe; // RAMFS_TYPE_PIPE
+        } pipe; // FS_NODE_TYPE_PIPE
     };
 } ramfs_node_t;
 
@@ -103,7 +112,9 @@ typedef struct fs_node {
     struct fs_node* parent;
     struct fs_node* children;
     struct fs_node* next_sibling;
+
     uint32_t flags;
+
     uint16_t creation_milisecond;
     time_t creation_timestamp;
     time_t modified_timestamp;
@@ -124,7 +135,6 @@ typedef struct fs_node {
 
         struct {
             uint32_t node_addr;
-            uint8_t type;
             union {
                 // ramfs based objects
 
@@ -229,7 +239,7 @@ file_description_t* vfs_get_kernel_file_descriptor_table();
 unsigned vfs_get_kernel_file_count();
 
 // vfs_op.c
-FS_ERR vfs_find_and_create_node(const char* path, fs_node_t* cwd, fs_node_t** ret_node, const file_mode_t mode, const uint32_t create_flags, const ramfs_type_t ramfs_type);
+FS_ERR vfs_find_and_create_node(const char* path, fs_node_t* cwd, fs_node_t** ret_node, const file_mode_t mode, const uint32_t create_flags);
 void vfs_cleanup_node_tree(fs_node_t* start_node);
 FS_ERR vfs_remove_node(fs_node_t* parent, fs_node_t* node);
 int vfs_open(const char* path, const file_mode_t mode);
@@ -267,9 +277,9 @@ void ramfs_make_diriter_adapter(file_description_t* dir, directory_iterator_t* d
 void ramfs_save_diriter_adapter(file_description_t* dir, directory_iterator_t* diriter);
 FS_ERR ramfs_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR ramfs_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
-FS_ERR ramfs_add_entry(fs_node_t* parent, const char* name, void* data, uint32_t flags, ramfs_type_t type, size_t size, fs_node_t* new_node);
+FS_ERR ramfs_add_entry(fs_node_t* parent, const char* name, void* data, uint32_t flags, size_t size, fs_node_t* new_node);
 FS_ERR ramfs_add_memory_entry(fs_node_t* parent, const char* name, void* mem_addr, size_t mem_size, fs_node_t* new_node);
-FS_ERR ramfs_create_special_node(fs_node_t* parent, const char* name, ramfs_type_t type, fs_node_t* new_node);
+FS_ERR ramfs_create_special_node(fs_node_t* parent, const char* name, uint8_t type, fs_node_t* new_node);
 FS_ERR ramfs_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
 FS_ERR ramfs_update_entry(fs_node_t* node);
 FS_ERR ramfs_mkdir(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node);

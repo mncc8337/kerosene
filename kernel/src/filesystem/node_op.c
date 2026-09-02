@@ -54,7 +54,7 @@ FS_ERR node_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node
 }
 
 FS_ERR node_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
-    if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIRECTORY(parent)) return ERR_FS_NOT_DIR;
 
     FS_ERR last_err;
     ret_node->flags = 0;
@@ -79,7 +79,7 @@ FS_ERR node_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
 
 // make a directory in parent node
 FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
-    if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIRECTORY(parent)) return ERR_FS_NOT_DIR;
 
     new_node->flags = 0;
 
@@ -90,8 +90,8 @@ FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
 
 // create strictly a file node
 FS_ERR node_create(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node) {
-    if(!FS_NODE_IS_DIR(parent)) return ERR_FS_NOT_DIR;
-    if(flags & FS_FLAG_DIRECTORY) return ERR_FS_NOT_SUPPORTED; // should use node_mkdir
+    if(!FS_NODE_IS_DIRECTORY(parent)) return ERR_FS_NOT_DIR;
+    if((flags & FS_NODE_TYPE_MASK) == FS_NODE_TYPE_DIRECTORY) return ERR_FS_NOT_SUPPORTED; // should use node_mkdir
 
     new_node->flags = 0;
 
@@ -103,8 +103,8 @@ FS_ERR node_create(fs_node_t* parent, const char* name, uint32_t flags, fs_node_
 
 // set new_name to NULL to reuse the old name
 FS_ERR node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name) {
-    if(!FS_NODE_IS_DIR(new_parent)) return ERR_FS_NOT_DIR;
-    if(FS_NODE_IS_DIR(node)) return ERR_FS_NOT_FILE;
+    if(!FS_NODE_IS_DIRECTORY(new_parent)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_FILE(node)) return ERR_FS_NOT_FILE;
 
     if(!new_name) new_name = node->name;
 
@@ -123,7 +123,7 @@ FS_ERR node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, cons
 // only works when moving to the same disk
 // set new_name to NULL to reuse the old name
 FS_ERR node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name) {
-    if(!FS_NODE_IS_DIR(new_parent)) return ERR_FS_NOT_DIR;
+    if(!FS_NODE_IS_DIRECTORY(new_parent)) return ERR_FS_NOT_DIR;
     if(node->fs != new_parent->fs) return ERR_FS_NOT_SUPPORTED;
 
     if(!new_name) new_name = node->name;

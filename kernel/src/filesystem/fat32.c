@@ -399,8 +399,8 @@ static void parse_timestamp(uint16_t* date, uint16_t* time, struct tm t) {
 
 static uint8_t to_fat_attr(uint32_t flags) {
     uint8_t ret = 0;
-    if(flags & FS_FLAG_DIRECTORY) ret |= FAT_ATTR_DIRECTORY;
-    if(flags & FS_FLAG_HIDDEN) ret |= FAT_ATTR_HIDDEN;
+    if((flags & FS_NODE_TYPE_MASK) == FS_NODE_TYPE_DIRECTORY) ret |= FAT_ATTR_DIRECTORY;
+    if(flags & FS_NODE_FLAG_HIDDEN) ret |= FAT_ATTR_HIDDEN;
 
     // TODO:
     // FAT_ATTR_READ_ONLY
@@ -412,9 +412,10 @@ static uint8_t to_fat_attr(uint32_t flags) {
 }
 
 static uint32_t to_fs_node_flags(uint8_t attr) {
-    uint8_t ret = 0;
-    if(attr & FAT_ATTR_DIRECTORY) ret |= FS_FLAG_DIRECTORY;
-    if(attr & FAT_ATTR_HIDDEN) ret |= FS_FLAG_HIDDEN;
+    uint32_t ret = 0;
+    if(attr & FAT_ATTR_DIRECTORY) ret |= FS_NODE_TYPE_DIRECTORY;
+    else ret |= FS_NODE_TYPE_FILE;
+    if(attr & FAT_ATTR_HIDDEN) ret |= FS_NODE_FLAG_HIDDEN;
 
     // TODO:
     // FAT_ATTR_READ_ONLY
@@ -1160,7 +1161,7 @@ FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove
 
     int namelen; (void)(namelen); // avoid unused param
     char entry_name[FILENAME_LIMIT];
-    if(FS_NODE_IS_DIR(remove_node) && remove_content) {
+    if(FS_NODE_IS_DIRECTORY(remove_node) && remove_content) {
         // check if it has any child entry
         uint32_t first_sector = ((remove_node->fat32.start_cluster - 2) * sectors_per_cluster) + first_data_sector;
         // TODO: check for ata pio fault
@@ -1601,7 +1602,9 @@ FS_ERR fat32_init(fs_t* fs, partition_entry_t part) {
     fs->root_node.parent = NULL;
     fs->root_node.children = NULL;
     fs->root_node.next_sibling = NULL;
-    fs->root_node.flags = FS_FLAG_DIRECTORY;
+    fs->root_node.size = 0;
+    fs->root_node.flags = FS_NODE_TYPE_DIRECTORY;
+    fs->root_node.creation_milisecond = 0;
     fs->root_node.name[0] = '/';
     fs->root_node.name[1] = '\0';
     fs->root_node.refcount = 69420;

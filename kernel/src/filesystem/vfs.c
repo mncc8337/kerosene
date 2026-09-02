@@ -46,16 +46,16 @@ bool vfs_init() {
 
     if(ramfs_init(&FS[RAMFS_DISK])) return true;
 
-    if(vfs_find_and_create_node(SYSFILE_PATH_DEV, &FS[RAMFS_DISK].root_node, &kern_dev, FILE_OPEN_CREATE, FS_FLAG_DIRECTORY, RAMFS_TYPE_NONE))
+    if(vfs_find_and_create_node(SYSFILE_PATH_DEV, &FS[RAMFS_DISK].root_node, &kern_dev, FILE_OPEN_CREATE, FS_NODE_TYPE_DIRECTORY))
         return true;
 
-    if(vfs_find_and_create_node(SYSFILE_PATH_STDIN, kern_dev, &kern_stdin, FILE_OPEN_CREATE, 0, RAMFS_TYPE_PIPE))
+    if(vfs_find_and_create_node(SYSFILE_PATH_STDIN, kern_dev, &kern_stdin, FILE_OPEN_CREATE, FS_NODE_TYPE_PIPE))
         return true;
 
-    if(vfs_find_and_create_node(SYSFILE_PATH_STDOUT, kern_dev, &kern_stdout, FILE_OPEN_CREATE, 0, RAMFS_TYPE_PIPE))
+    if(vfs_find_and_create_node(SYSFILE_PATH_STDOUT, kern_dev, &kern_stdout, FILE_OPEN_CREATE, FS_NODE_TYPE_PIPE))
         return true;
 
-    if(vfs_find_and_create_node(SYSFILE_PATH_PROC, &FS[RAMFS_DISK].root_node, &kern_proc, FILE_OPEN_CREATE, FS_FLAG_DIRECTORY, RAMFS_TYPE_NONE))
+    if(vfs_find_and_create_node(SYSFILE_PATH_PROC, &FS[RAMFS_DISK].root_node, &kern_proc, FILE_OPEN_CREATE, FS_NODE_TYPE_DIRECTORY))
         return true;
 
     // prevent these from being delete from the tree
