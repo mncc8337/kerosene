@@ -13,10 +13,6 @@
 #include <sys/filesystem.h>
 #include <semaphore.h>
 
-#define MAX_FS 32
-#define MAX_DISK_ID_STRLEN 2
-#define RAMFS_DISK (MAX_FS - 1)
-
 #define MAX_FILE 128
 
 // this must be a multiply of 4 and is larger than 5
@@ -29,11 +25,12 @@ typedef enum {
     FS_RAMFS
 } fs_type_t;
 
+// fs_node_t.flags structure:
 // lower 4 bits: node type
 #define FS_NODE_TYPE_MASK 0b1111
 #define FS_NODE_TYPE_FILE 0b0000
 #define FS_NODE_TYPE_DIRECTORY 0b0001
-#define FS_NODE_TYPE_SYMLINK 0b0010
+// #define FS_NODE_TYPE_SYMLINK 0b0010
 #define FS_NODE_TYPE_MEMORY 0b0011
 #define FS_NODE_TYPE_PIPE 0b0100
 #define FS_NODE_TYPE_SEMAPHORE 0b0101
@@ -93,7 +90,7 @@ typedef struct {
     uint32_t flags;
     semaphore_t* lock;
     union {
-        ramfs_datanode_t* datanode_chain; // FS_NODE_TYPE_FILE (directories count too)
+        ramfs_datanode_t* datanode_chain; // FS_NODE_TYPE_FILE/DIRECTORY
         void* mem_addr; // FS_NODE_TYPE_MEMORY
         semaphore_t* semaphore; // FS_NODE_TYPE_SEMAPHORE
         struct {
@@ -114,6 +111,9 @@ typedef struct fs_node {
     struct fs_node* next_sibling;
 
     uint32_t flags;
+
+    // if FS_NODE_FLAG_MOUNTPOINT is set
+    struct fs_node* mount_target;
 
     uint16_t creation_milisecond;
     time_t creation_timestamp;
@@ -233,8 +233,7 @@ fs_node_t* vfs_get_stdout();
 fs_node_t* vfs_get_stdin();
 fs_node_t* vfs_get_proc_dir();
 fs_type_t vfs_detectfs(partition_entry_t* part);
-fs_t* vfs_getfs(int id);
-bool vfs_is_fs_available(int id);
+fs_t* vfs_get_ramfs();
 file_description_t* vfs_get_kernel_file_descriptor_table();
 unsigned vfs_get_kernel_file_count();
 
@@ -249,12 +248,13 @@ void vfs_unlock(int file_descriptor);
 int vfs_read(int file_descriptor, uint8_t* buffer, size_t size);
 int vfs_write(int file_descriptor, const uint8_t* buffer, size_t size);
 void vfs_seek(int file_descriptor, uint32_t hoff, uint32_t loff, whence_t whence, int64_t* position);
+int vfs_mount(const char* target_path, const char* mount_path);
 
 // node_op.c
 FS_ERR node_setup_directory_iterator(directory_iterator_t* diriter, fs_node_t* node);
 FS_ERR node_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_node);
 FS_ERR node_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node);
-FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node);
+FS_ERR node_mkdir(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node);
 FS_ERR node_create(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node);
 FS_ERR node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
 FS_ERR node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
@@ -307,7 +307,7 @@ FS_ERR fat32_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_nod
 FS_ERR fat32_add_entry(fs_node_t* parent, const char* name, uint32_t start_cluster, uint8_t attr, size_t size, fs_node_t* new_node);
 FS_ERR fat32_remove_entry(fs_node_t* parent, fs_node_t* remove_node, bool remove_content);
 FS_ERR fat32_update_entry(fs_node_t* node);
-FS_ERR fat32_mkdir(fs_node_t* parent, const char* name, uint32_t attr, fs_node_t* new_node);
+FS_ERR fat32_mkdir(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node);
 FS_ERR fat32_node_create(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node);
 FS_ERR fat32_node_copy(fs_node_t* node, fs_node_t* new_parent, fs_node_t* copied, const char* new_name);
 FS_ERR fat32_node_move(fs_node_t* node, fs_node_t* new_parent, const char* new_name);
@@ -318,4 +318,4 @@ FS_ERR fat32_file_read(file_description_t* file, uint8_t* buffer, size_t size, s
 FS_ERR fat32_file_write(file_description_t* file, const uint8_t* buffer, size_t size, size_t* actual_write_size);
 void fat32_file_open(file_description_t* file, fs_node_t* node, const file_mode_t mode);
 
-FS_ERR fat32_init(fs_t* fs, partition_entry_t part);
+FS_ERR fat32_init(unsigned fsid, partition_entry_t* part);

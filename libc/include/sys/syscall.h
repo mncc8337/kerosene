@@ -23,6 +23,7 @@ enum {
     SYSCALL_READ,
     SYSCALL_WRITE,
     SYSCALL_SEEK,
+    SYSCALL_MOUNT,
 
     MAX_SYSCALL
 };
@@ -63,5 +64,6 @@ void syscall_unlock(int file_descriptor);
 int syscall_read(int file_descriptor, uint8_t* buffer, size_t size);
 int syscall_write(int file_descriptor, const uint8_t* buffer, size_t size);
 void syscall_seek(int file_descriptor, int64_t seek_position, int whence, int64_t* final_position);
+int syscall_mount(const char* target_path, const char* mount_path);
 
 void syscall_test();

@@ -22,7 +22,7 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
     proc->alive_ticks = 0;
     proc->sleep_ticks = 0;
     proc->is_user = is_user;
-    proc->cwd = cwd ? cwd : &vfs_getfs(RAMFS_DISK)->root_node;
+    proc->cwd = cwd ? cwd : &vfs_get_ramfs()->root_node;
 
     if(!is_user) {
         proc->page_directory = (page_directory_t*)KERNEL_PAGE_DIRECTORY;
@@ -212,7 +212,7 @@ process_t* process_make_idle() {
     proc->page_directory = (page_directory_t*)KERNEL_PAGE_DIRECTORY;
     proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
     proc->file_count = vfs_get_kernel_file_count();
-    proc->cwd = &vfs_getfs(RAMFS_DISK)->root_node;
+    proc->cwd = &vfs_get_ramfs()->root_node;
 
     // no need to allocate a new stack
     // or set up registers

@@ -3,7 +3,8 @@
 #include <mem.h>
 #include <sys/files.h>
 
-fs_t* FS;
+static fs_t ramfs;
+
 static file_description_t KERNEL_FDT[MAX_FILE];
 static unsigned KERNEL_FILE_COUNT = 0;
 
@@ -38,15 +39,9 @@ static bool fat32_check(uint8_t* sect) {
 // }
 
 bool vfs_init() {
-    FS = (fs_t*)kmalloc(sizeof(fs_t) * MAX_FS);
-    if(!FS) return true;
+    if(ramfs_init(&ramfs)) return true;
 
-    for(unsigned i = 0; i < MAX_FS; i++)
-        FS[i].type = FS_EMPTY;
-
-    if(ramfs_init(&FS[RAMFS_DISK])) return true;
-
-    if(vfs_find_and_create_node(SYSFILE_PATH_DEV, &FS[RAMFS_DISK].root_node, &kern_dev, FILE_OPEN_CREATE, FS_NODE_TYPE_DIRECTORY))
+    if(vfs_find_and_create_node(SYSFILE_PATH_DEV, &ramfs.root_node, &kern_dev, FILE_OPEN_CREATE, FS_NODE_TYPE_DIRECTORY))
         return true;
 
     if(vfs_find_and_create_node(SYSFILE_PATH_STDIN, kern_dev, &kern_stdin, FILE_OPEN_CREATE, FS_NODE_TYPE_PIPE))
@@ -55,7 +50,7 @@ bool vfs_init() {
     if(vfs_find_and_create_node(SYSFILE_PATH_STDOUT, kern_dev, &kern_stdout, FILE_OPEN_CREATE, FS_NODE_TYPE_PIPE))
         return true;
 
-    if(vfs_find_and_create_node(SYSFILE_PATH_PROC, &FS[RAMFS_DISK].root_node, &kern_proc, FILE_OPEN_CREATE, FS_NODE_TYPE_DIRECTORY))
+    if(vfs_find_and_create_node(SYSFILE_PATH_PROC, &ramfs.root_node, &kern_proc, FILE_OPEN_CREATE, FS_NODE_TYPE_DIRECTORY))
         return true;
 
     // prevent these from being delete from the tree
@@ -97,14 +92,8 @@ fs_type_t vfs_detectfs(partition_entry_t* part) {
     return FS_EMPTY;
 }
 
-fs_t* vfs_getfs(int id) {
-    if(id >= MAX_FS) return 0;
-    return FS + id;
-}
-
-bool vfs_is_fs_available(int id) {
-    if(id >= MAX_FS) return false;
-    return FS[id].type != FS_EMPTY;
+fs_t* vfs_get_ramfs() {
+    return &ramfs;
 }
 
 file_description_t* vfs_get_kernel_file_descriptor_table() {

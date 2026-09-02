@@ -28,6 +28,7 @@ static void* syscalls[MAX_SYSCALL] = {
     [SYSCALL_READ] = &vfs_read,
     [SYSCALL_WRITE] = &vfs_write,
     [SYSCALL_SEEK] = &vfs_seek,
+    [SYSCALL_MOUNT] = &vfs_mount,
 };
 
 static bool context_switchers[MAX_SYSCALL] = {

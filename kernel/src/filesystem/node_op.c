@@ -78,13 +78,11 @@ FS_ERR node_find(fs_node_t* parent, const char* nodename, fs_node_t* ret_node) {
 }
 
 // make a directory in parent node
-FS_ERR node_mkdir(fs_node_t* parent, const char* name, fs_node_t* new_node) {
+FS_ERR node_mkdir(fs_node_t* parent, const char* name, uint32_t flags, fs_node_t* new_node) {
     if(!FS_NODE_IS_DIRECTORY(parent)) return ERR_FS_NOT_DIR;
 
-    new_node->flags = 0;
-
     if(parent->fs->mkdir)
-        return parent->fs->mkdir(parent, name, 0, new_node);
+        return parent->fs->mkdir(parent, name, flags, new_node);
     return ERR_FS_NOT_SUPPORTED;
 }
 

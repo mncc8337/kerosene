@@ -1055,6 +1055,7 @@ FS_ERR ramfs_init(fs_t* fs) {
     fs->root_node.name[0] = '/';
     fs->root_node.name[1] = '\0';
     fs->root_node.refcount = 69420;
+    semaphore_init(&fs->root_node.lock, 1);
 
     fs->remove_entry = ramfs_remove_entry;
     fs->make_diriter_adapter = ramfs_make_diriter_adapter;

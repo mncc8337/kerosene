@@ -172,12 +172,11 @@ void disk_init() {
                 break;
 
             case FS_FAT32:
-                err = fat32_init(vfs_getfs(fs_count), part);
+                err = fat32_init(fs_count, &part);
                 if(err)
                     kprint_debug(LT_ER, "failed to initialise FAT32 filesystem on partition %d. error code %d\n", i+1, err);
                 else {
-                    kprint_debug(LT_OK, "initialised FAT32 filesystem on partition %d", i+1);
-                    kprintf(" on fs (%d)\n", fs_count);
+                    kprint_debug(LT_OK, "mounted a FAT32 filesystem in partition %d onto /fs%d\n", i+1, fs_count);
                     fs_count++;
                 }
                 break;
@@ -285,23 +284,11 @@ void kinit(multiboot_info_t* mbd) {
     kprint_debug(LT_OK, "syscall initialised\n");
 
     if(!vfs_init()) {
-        kprint_debug(LT_OK, "initialised ramFS on fs (%d)\n", RAMFS_DISK);
-        disk_init();
+        kprint_debug(LT_OK, "initialised RAMFS\n");
     } else {
-        kprint_debug(LT_CR, "failed to initialise FS. not enough memory\n");
+        kprint_debug(LT_CR, "failed to initialise RAMFS. not enough memory\n");
         kernel_panic(NULL);
     }
-
-    kprint_debug(LT_IF, "detected disks: ");
-    for(int i = 0; i < MAX_FS; i++)
-        if(vfs_is_fs_available(i)) kprintf("%d ", i);
-    kputchar('\n');
-
-    locale_set_keyboard_layout(KBD_LAYOUT_US);
-    kprint_debug(LT_IF, "set keyboard layout to US\n");
-
-    kbd_init();
-    kprint_debug(LT_OK, "keyboard initialised\n");
 
     timer_init();
     kprint_debug(LT_OK, "timer initialised\n");
@@ -326,8 +313,6 @@ void kinit(multiboot_info_t* mbd) {
         kprint_debug(LT_CR, "failed to create main process. not enough memory\n");
         kernel_panic(NULL);
     }
-
-    kprint_debug(LT_IF, "done initialising\n");
 
     // start interrupts again after setting up everything
     // this will also enable the timer callback (scheduler switch, see kernel/driver/timer.c)
@@ -369,11 +354,15 @@ process_t* start_user_process(const char* path) {
 }
 
 void kmain() {
-    // should the kernel main process the init process?
-    // currently the purpose of the kernel main process is to start other processes
-    // that should be the job of the init process right?
-
     kprint_debug(LT_OK, "jumped into main kernel process\n");
+
+    kbd_init();
+    kprint_debug(LT_OK, "keyboard initialised\n");
+
+    locale_set_keyboard_layout(KBD_LAYOUT_US);
+    kprint_debug(LT_IF, "set keyboard layout to US\n");
+
+    disk_init();
 
     process_t* proc_stdout = process_new((uint32_t)kproc_stdout, false, NULL);
     if(proc_stdout) scheduler_add_process(proc_stdout);
@@ -384,10 +373,17 @@ void kmain() {
     else kprint_debug(LT_CR, "cannot start standard in process\n");
 
     kprint_debug(LT_IF, "done initialising\n");
-    // free now
 
-    // start the init process
-    start_user_process("(0)/bin/keroshell.elf");
+    // should the kernel main process the init process?
+    // currently the purpose of the kernel main process is to start other processes
+    // that should be the job of the init process right?
+
+    if(!vfs_mount("/fs0/bin", "/bin")) {
+        // start the init process
+        start_user_process("/bin/keroshell.elf");
+    }
+
+    start_user_process("/fs0/hi.elf");
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL);
     if(proc1) scheduler_add_process(proc1);

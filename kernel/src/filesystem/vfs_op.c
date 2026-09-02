@@ -3,11 +3,7 @@
 #include <sys/syscall.h>
 
 #include <kutils.h>
-#include <stdlib.h>
 #include <string.h>
-
-// from vfs.c
-extern fs_t* FS;
 
 static void unlink_and_free_node(fs_node_t* node) {
     fs_node_t* parent = node->parent;
@@ -74,37 +70,9 @@ FS_ERR vfs_find_and_create_node(
     }
     unsigned search_stack_counter = 0;
 
-    // disk specified
-    if(pathcpy[0] == '(') {
-        char diskid_string[MAX_DISK_ID_STRLEN + 1];
-        bool valid_disk_syntax = false;
-
-        for(unsigned i = 0; i < MAX_DISK_ID_STRLEN; i++) {
-            if(pathcpy[i + 1] == ')') {
-                diskid_string[i] = '\0';
-                valid_disk_syntax = true;
-                break;
-            }
-            diskid_string[i] = pathcpy[i + 1];
-        }
-
-        if(!valid_disk_syntax) {
-            ret_err = ERR_FS_NOT_SUPPORTED;
-            goto ret;
-        }
-
-        unsigned diskid = atoi(diskid_string);
-        if(FS[diskid].type != FS_EMPTY) {
-            current_node = &FS[diskid].root_node;
-            parent_node = current_node;
-        } else {
-            ret_err = ERR_FS_NOT_SUPPORTED;
-            goto ret;
-        }
-
-        pathcpy += strlen(diskid_string) + 3;
-    } else if(pathcpy[0] == '/') {
-        current_node = &FS[RAMFS_DISK].root_node;
+    // handling absolute path
+    if(pathcpy[0] == '/') {
+        current_node = &vfs_get_ramfs()->root_node;
         parent_node = current_node;
         pathcpy++;
     }
@@ -117,9 +85,13 @@ FS_ERR vfs_find_and_create_node(
         if(!strcmp(current_name, "."))
             goto skip_search;
 
-        // root_node does not have .. dir so we need to handle it separately
-        if(current_node->name[0] == '/' && !strcmp(current_name, ".."))
+        if(!strcmp(current_name, "..")) {
+            if(current_node->parent != NULL) {
+                current_node = current_node->parent;
+                parent_node = current_node->parent ? current_node->parent : current_node;
+            }
             goto skip_search;
+        }
 
         parent_node = current_node;
         current_node = current_node->children;
@@ -168,10 +140,10 @@ FS_ERR vfs_find_and_create_node(
             }
 
             // add to vfs tree
-            if(!parent_node->children) {
+            fs_node_t* current_sibling = parent_node->children;
+            if(!current_sibling) {
                 parent_node->children = new_node;
             } else {
-                fs_node_t* current_sibling = parent_node->children;
                 while(current_sibling->next_sibling)
                     current_sibling = current_sibling->next_sibling;
                 current_sibling->next_sibling = new_node;
@@ -180,6 +152,10 @@ FS_ERR vfs_find_and_create_node(
         }
 
         skip_search:
+        if(FS_NODE_IS_MOUNTPOINT(current_node) && current_node->mount_target) {
+            current_node = current_node->mount_target;
+        }
+
         current_name = strtok_r(NULL, "/", &token);
     }
 
@@ -199,10 +175,11 @@ FS_ERR vfs_find_and_create_node(
                 goto nuke_search_stack_and_ret;
             }
             op_err = ramfs_create_special_node(parent_node, current_name, (create_flags & FS_NODE_TYPE_MASK), new_node);
-        } else if((create_flags & FS_NODE_TYPE_MASK) == FS_NODE_TYPE_DIRECTORY)
-            op_err = node_mkdir(parent_node, current_name, new_node);
-        else
+        } else if((create_flags & FS_NODE_TYPE_MASK) == FS_NODE_TYPE_DIRECTORY) {
+            op_err = node_mkdir(parent_node, current_name, create_flags, new_node);
+        } else {
             op_err = node_create(parent_node, current_name, create_flags, new_node);
+        }
                                 
         if(op_err) {
             kfree(new_node);
@@ -211,10 +188,10 @@ FS_ERR vfs_find_and_create_node(
         }
 
         // link the new node to the tree
-        if(!parent_node->children) {
+        fs_node_t* current_sibling = parent_node->children;
+        if(!current_sibling) {
             parent_node->children = new_node;
         } else {
-            fs_node_t* current_sibling = parent_node->children;
             while(current_sibling->next_sibling)
                 current_sibling = current_sibling->next_sibling;
             current_sibling->next_sibling = new_node;
@@ -228,7 +205,8 @@ FS_ERR vfs_find_and_create_node(
         goto nuke_search_stack_and_ret;
     }
 
-    *ret_node = current_node;
+    if(ret_node)
+        *ret_node = current_node;
     goto ret; // dont nuke search stack
 
 nuke_search_stack_and_ret:
@@ -239,11 +217,13 @@ nuke_search_stack_and_ret:
             fs_node_t* current_sibling = search_stack[0]->parent->children;
             if(current_sibling == search_stack[0]) {
                 search_stack[0]->parent->children = current_sibling->next_sibling;
-            } else {
-                while(current_sibling->next_sibling != search_stack[0]) {
+            } else if(current_sibling != NULL) {
+                while(current_sibling->next_sibling && current_sibling->next_sibling != search_stack[0]) {
                     current_sibling = current_sibling->next_sibling;
                 }
-                current_sibling->next_sibling = search_stack[0]->next_sibling;
+                if(current_sibling->next_sibling == search_stack[0]) {
+                    current_sibling->next_sibling = search_stack[0]->next_sibling;
+                }
             }
         }
 
@@ -529,4 +509,28 @@ void vfs_seek(
 
     if(seek_err != ERR_FS_SUCCESS)
         *position = -1;
+}
+
+int vfs_mount(const char* target_path, const char* mount_path) {
+    process_t* proc = scheduler_get_current();
+    if(proc && (!validate_user_string(proc, target_path) || !validate_user_string(proc, mount_path)))
+        return -1;
+
+    fs_node_t* target_node;
+    FS_ERR err = vfs_find_and_create_node(target_path, &vfs_get_ramfs()->root_node, &target_node, FILE_OPEN_READ, 0);
+    if(err) return -1;
+
+    fs_node_t* mount_node;
+    err = vfs_find_and_create_node(mount_path, &vfs_get_ramfs()->root_node, &mount_node, FILE_OPEN_CREATE, FS_NODE_TYPE_DIRECTORY | FS_NODE_FLAG_MOUNTPOINT);
+    if(err) return -1;
+
+    if(!FS_NODE_IS_DIRECTORY(mount_node)) {
+        // TODO: free both of the created node
+        return ERR_FS_NOT_DIR;
+    }
+
+    mount_node->mount_target = target_node;
+    mount_node->flags |= FS_NODE_FLAG_MOUNTPOINT;
+
+    return 0;
 }

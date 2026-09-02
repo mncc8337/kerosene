@@ -3,6 +3,7 @@
 #include <timer.h>
 
 #include <string.h>
+#include <stdlib.h>
 
 // FIXME:
 // in almost all functions below, there is a stack allocated on the stack
@@ -153,18 +154,18 @@ static uint8_t gen_checksum(char* shortname) {
     return sum;
 }
 
-static void get_bootrec(partition_entry_t part, uint8_t* bootrec) {
+static void get_bootrec(partition_entry_t* part, uint8_t* bootrec) {
     // TODO: check for ata pio fault
-    ata_pio_LBA28_access(true, part.LBA_start, 1, bootrec);
+    ata_pio_LBA28_access(true, part->LBA_start, 1, bootrec);
 }
 // static void update_bootrecord(fs_t* fs) {
 //     // TODO: check for ata pio fault
 //     ata_pio_LBA28_access(false, fs->partition.LBA_start, 1, fs->info_table1);
 // }
 
-static void get_fsinfo(partition_entry_t part, fat32_bootrecord_t* bootrec, uint8_t* fsinfo) {
+static void get_fsinfo(partition_entry_t* part, fat32_bootrecord_t* bootrec, uint8_t* fsinfo) {
     // TODO: check for ata pio fault
-    ata_pio_LBA28_access(true, part.LBA_start + bootrec->ebpb.fsinfo_sector, 1, fsinfo);
+    ata_pio_LBA28_access(true, part->LBA_start + bootrec->ebpb.fsinfo_sector, 1, fsinfo);
 }
 static void update_fsinfo(fs_t* fs) {
     // TODO: check for ata pio fault
@@ -854,6 +855,7 @@ FS_ERR fat32_iterate_directory(directory_iterator_t* diriter, fs_node_t* ret_nod
 
             ret_node->size = temp_dir->size;
             ret_node->refcount = 0;
+            semaphore_init(&ret_node->lock, 1);
 
             ret_node->fat32.parent_cluster = current_cluster;
             ret_node->fat32.parent_cluster_index = i;
@@ -1569,8 +1571,11 @@ void fat32_file_open(file_description_t* file, fs_node_t* node, const file_mode_
 
 // initialize FAT 32
 // return the root node
-FS_ERR fat32_init(fs_t* fs, partition_entry_t part) {
-    fs->partition = part;
+FS_ERR fat32_init(unsigned fsid, partition_entry_t* part) {
+    fs_t* fs = (fs_t*)kmalloc(sizeof(fs_t));
+    if(!fs) return ERR_FS_OOM;
+
+    fs->partition = *part;
     fs->type = FS_FAT32;
 
     // parsing info tables
@@ -1608,6 +1613,7 @@ FS_ERR fat32_init(fs_t* fs, partition_entry_t part) {
     fs->root_node.name[0] = '/';
     fs->root_node.name[1] = '\0';
     fs->root_node.refcount = 69420;
+    semaphore_init(&fs->root_node.lock, 1);
 
     fs->remove_entry = fat32_remove_entry;
     fs->make_diriter_adapter = fat32_make_diriter_adapter;
@@ -1625,5 +1631,21 @@ FS_ERR fat32_init(fs_t* fs, partition_entry_t part) {
     fs->file_write = fat32_file_write;
     fs->file_open = fat32_file_open;
 
-    return ERR_FS_SUCCESS;
+    char fsstr[4 + 3] = "/fs";
+    itoa(fsid, fsstr + 3, 16);
+
+    fs_node_t* fat32_node;
+    FS_ERR ret = vfs_find_and_create_node(
+        fsstr,
+        &vfs_get_ramfs()->root_node,
+        &fat32_node,
+        FILE_OPEN_CREATE,
+        FS_NODE_TYPE_DIRECTORY | FS_NODE_FLAG_MOUNTPOINT
+    );
+
+    if(ret == ERR_FS_SUCCESS) {
+        fat32_node->mount_target = &fs->root_node;
+    }
+
+    return ret;
 }
