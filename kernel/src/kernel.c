@@ -1,5 +1,6 @@
 #include <multiboot.h>
 
+#include <stdio.h>
 #include <video.h>
 #include <ata.h>
 #include <kbd.h>

@@ -18,6 +18,9 @@
 // this must be a multiply of 4 and is larger than 5
 #define RAMFS_DATANODE_SIZE 512
 
+// should be a multiple of RAMFS_DATANODE_SIZE
+#define RAMFS_PIPE_SIZE (RAMFS_DATANODE_SIZE * 1)
+
 typedef enum {
     FS_EMPTY,
     FS_FAT32,
@@ -94,9 +97,12 @@ typedef struct {
         void* mem_addr; // FS_NODE_TYPE_MEMORY
         semaphore_t* semaphore; // FS_NODE_TYPE_SEMAPHORE
         struct {
-            ramfs_datanode_t* datanode_chain;
+            ramfs_datanode_t* first_datanode;
+            ramfs_datanode_t* last_datanode;
             semaphore_t* bytes_available;
             semaphore_t* space_available;
+            uint32_t head;
+            uint32_t tail;
         } pipe; // FS_NODE_TYPE_PIPE
     };
 } ramfs_node_t;

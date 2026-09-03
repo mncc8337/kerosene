@@ -86,9 +86,12 @@ static ramfs_node_t* create_new_node(
             node->datanode_chain = (ramfs_datanode_t*)data;
             break;
         case FS_NODE_TYPE_PIPE:
-            node->pipe.datanode_chain = (ramfs_datanode_t*)data;
+            node->pipe.first_datanode = (ramfs_datanode_t*)data;
+            node->pipe.last_datanode = (ramfs_datanode_t*)data;
+            node->pipe.head = 0;
+            node->pipe.tail = 0;
             node->pipe.bytes_available = semaphore_create(0);
-            node->pipe.space_available = semaphore_create(RAMFS_DATANODE_SIZE);
+            node->pipe.space_available = semaphore_create(RAMFS_PIPE_SIZE);
             if(!node->pipe.bytes_available || !node->pipe.space_available) {
                 if(node->pipe.bytes_available) kfree(node->pipe.bytes_available);
                 if(node->pipe.space_available) kfree(node->pipe.space_available);
@@ -779,10 +782,10 @@ FS_ERR ramfs_pipe_read(
     }
 
     size_t remaining = to_read_total;
-    unsigned head_offset = file->position;
+    unsigned head_offset = ramnode->pipe.head;
 
     while(remaining > 0) {
-        ramfs_datanode_t* head = ramnode->pipe.datanode_chain;
+        ramfs_datanode_t* head = ramnode->pipe.first_datanode;
         if(!head) break;
 
         unsigned chunk_avail = RAMFS_DATANODE_SIZE - head_offset;
@@ -798,7 +801,7 @@ FS_ERR ramfs_pipe_read(
         if(head_offset == RAMFS_DATANODE_SIZE) {
             if(head->next) {
                 // fully consumed: free this datanode and advance chain
-                ramnode->pipe.datanode_chain = head->next;
+                ramnode->pipe.first_datanode = head->next;
                 rfree(head);
             }
             // whether freed or last node, reset offset for next iteration
@@ -806,8 +809,9 @@ FS_ERR ramfs_pipe_read(
         }
     }
 
+    ramnode->pipe.head = head_offset;
     file->position = head_offset;
-    file->ramfs.current_datanode = (uint32_t)ramnode->pipe.datanode_chain;
+    file->ramfs.current_datanode = (uint32_t)ramnode->pipe.first_datanode;
     file->node->size -= *actual_read_size;
     ramnode->size = file->node->size;
 
@@ -840,10 +844,10 @@ FS_ERR ramfs_pipe_write(
     }
 
     size_t remaining = to_write_total;
-    unsigned tail_offset = file->position;
+    unsigned tail_offset = ramnode->pipe.tail;
 
     while(remaining > 0) {
-        ramfs_datanode_t* tail = (ramfs_datanode_t*)file->ramfs.last_datanode;
+        ramfs_datanode_t* tail = ramnode->pipe.last_datanode;
         if(!tail) break;
 
         unsigned chunk_avail = RAMFS_DATANODE_SIZE - tail_offset;
@@ -862,11 +866,12 @@ FS_ERR ramfs_pipe_write(
                 tail->next = ramfs_allocate_datanodes(1, false);
                 if(!tail->next) break; // Out of memory
             }
-            file->ramfs.last_datanode = (uint32_t)tail->next;
+            ramnode->pipe.last_datanode = tail->next;
             tail_offset = 0;
         }
     }
 
+    ramnode->pipe.tail = tail_offset;
     file->position = tail_offset;
     file->node->size += *actual_write_size;
     ramnode->size = file->node->size;
@@ -1017,13 +1022,13 @@ void ramfs_file_open(file_description_t* file, fs_node_t* node, const file_mode_
     }
 
     ramfs_datanode_t* chain = (FS_NODE_IS_PIPE(node))
-        ? ((ramfs_node_t*)node->ramfs.node_addr)->pipe.datanode_chain
+        ? ((ramfs_node_t*)node->ramfs.node_addr)->pipe.first_datanode
         : ((ramfs_node_t*)node->ramfs.node_addr)->datanode_chain;
 
     if(mode & FILE_OPEN_WRITE || mode & FILE_OPEN_READ) {
         file->ramfs.current_datanode = (uint32_t)chain;
     }
-    if(mode & FILE_OPEN_APPEND || FS_NODE_IS_PIPE(node)) {
+    if(mode & FILE_OPEN_APPEND) {
         file->ramfs.last_datanode = (uint32_t)(ramfs_get_last_datanode_of_chain(chain));
     }
 }
