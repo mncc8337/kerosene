@@ -28,7 +28,8 @@ typedef struct process {
     page_directory_t* page_directory;
     bool is_user;
 
-    int exit_code;
+    int received_exit_code;
+    struct process* attached_from;
 
     uint32_t stack_addr; // stack addr used to freeing
     uint32_t saved_esp; // saved stack state of current process
@@ -69,6 +70,8 @@ process_t* scheduler_get_current();
 void scheduler_push_ready(process_t* proc);
 void scheduler_add_process(process_t* proc);
 uint32_t scheduler_to_next_process(const regs_t* regs, bool add_back);
+uint32_t scheduler_attach(const regs_t* regs, process_t* proc);
+int scheduler_spawn(const char* path, bool is_user, bool attach, int* returned_value);
 uint32_t scheduler_kill_process(const regs_t* regs, int exit_code);
 uint32_t scheduler_set_sleep(const regs_t* regs, unsigned ticks);
 uint32_t scheduler_switch(const regs_t* regs);

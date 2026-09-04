@@ -95,7 +95,7 @@ $(BIN_DIR)coreutils/%.elf: coreutils/%.c $(BIN_DIR)libc.a
 	$(CC) $(CFLAGS) -I./libc/include $(LDFLAGS) -e _start -o $@ $< -L./bin $(LDLIBS)
 
 # user app
-fsfiles/%.elf: userapp/%.c
+fsfiles/%.elf: userapp/%.c $(BIN_DIR)libc.a
 	$(CC) $(CFLAGS) -I./libc/include $(LDFLAGS) -e _start -o $@ $< -L./bin $(LDLIBS)
 
 libc: $(BIN_DIR)libc.a
@@ -128,10 +128,10 @@ run-debug:
 	./script/run.sh debug
 
 clean:
-	rm -r $(OBJ_DIR) $(BIN_DIR)kerosene.elf $(BIN_DIR)libc.a $(BIN_DIR)coreutils/ $(BIN_DIR)keroshell.elf
+	rm -rf $(OBJ_DIR) $(BIN_DIR)kerosene.elf $(BIN_DIR)libc.a $(BIN_DIR)coreutils/ $(BIN_DIR)keroshell.elf $(USER_ELF)
 
 clean-all:
-	rm -r $(BIN_DIR) $(OBJ_DIR)
+	rm -rf $(BIN_DIR) $(OBJ_DIR) $(USER_ELF)
 
 DEPS  = $(patsubst %.o,%.d,$(OBJ))
 DEPS += $(patsubst %.o,%.d,$(LIBC_OBJ))

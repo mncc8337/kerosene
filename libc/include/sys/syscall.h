@@ -13,7 +13,9 @@ enum {
     SYSCALL_SEMAPHORE_KACQUIRE,
 
     SYSCALL_YIELD,
-    SYSCALL_KILL_PROCESS,
+    SYSCALL_DETACH,
+    SYSCALL_SPAWN,
+    SYSCALL_KILL,
     SYSCALL_SLEEP,
 
     SYSCALL_OPEN,
@@ -54,7 +56,8 @@ void syscall_semaphore_release(int fd, uint32_t count);
 void syscall_semaphore_kacquire(void* semaphore_ptr, uint32_t count);
 
 void syscall_yield();
-void syscall_kill_process(int exit_code);
+void syscall_attach(void* process_addr);
+void syscall_kill(int exit_code);
 void syscall_sleep(unsigned ticks);
 
 int syscall_open(const char* path, const file_mode_t mode);

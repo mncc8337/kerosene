@@ -1,5 +1,7 @@
 #include <process.h>
 #include <system.h>
+#include <misc/elf.h>
+#include <sys/syscall.h>
 
 static process_queue_t ready_queue = PROCESS_QUEUE_INIT;
 // this is a linked list sorted by sleep_ticks
@@ -41,6 +43,7 @@ process_t* scheduler_get_current() {
 }
 
 void scheduler_push_ready(process_t* proc) {
+    proc->state = PROCESS_STATE_READY;
     process_queue_push(&ready_queue, proc);
 }
 
@@ -54,10 +57,8 @@ uint32_t scheduler_to_next_process(const regs_t* regs, bool add_back) {
     // save regs before switching
     current_process->saved_esp = (uint32_t)regs;
 
-    if(add_back) {
-        current_process->state = PROCESS_STATE_READY;
-        process_queue_push(&ready_queue, current_process);
-    }
+    if(add_back)
+        scheduler_push_ready(current_process);
 
     current_process = process_queue_pop(&ready_queue);
     current_process->state = PROCESS_STATE_ACTIVE;
@@ -67,11 +68,65 @@ uint32_t scheduler_to_next_process(const regs_t* regs, bool add_back) {
     return current_process->saved_esp;
 }
 
+// this function remove the current process from the scheduler,
+// store it to the attached process and only push it back to the
+// scheduler when the attached process dies
+uint32_t scheduler_attach(const regs_t* regs, process_t* proc) {
+    // NOTE: proc must be a newly created process and not added to the ready queue before
+
+    // should only be called by the kernel
+    if((regs->cs & 0x03) != 0) {
+        return scheduler_kill_process(regs, 13);
+        return (uint32_t)regs;
+    }
+
+    proc->attached_from = current_process;
+    scheduler_add_process(proc);
+    return scheduler_to_next_process(regs, false);
+}
+
+int scheduler_spawn(
+    const char* path,
+    bool is_user,
+    bool attach,
+    int* returned_value
+) {
+    process_t* current = scheduler_get_current();
+    if(current->is_user && !is_user)
+        return -1;
+
+    process_t* proc = process_new(0, is_user, NULL);
+    if(!proc)
+        return -1;
+
+    ELF_ERR load_err = elf_load_to_proc((char*)path, proc);
+    if(load_err) {
+        // FS_ERR ferr = elf_get_err();
+        process_delete(proc);
+        return -1;
+    }
+
+
+    if(attach) {
+        syscall_attach(proc);
+        if(returned_value)
+            *returned_value = current->received_exit_code;
+        return 0;
+    }
+
+    scheduler_add_process(proc);
+    return 0;
+}
+
 // put current process to delete queue, delete it later
 uint32_t scheduler_kill_process(const regs_t* regs, int exit_code) {
     if(current_process->id == 1) return (uint32_t)regs; // avoid deleting idle process
 
-    current_process->exit_code = exit_code;
+    if(current_process->attached_from) {
+        // push the original process back to the queue
+        current_process->attached_from->received_exit_code = exit_code;
+        scheduler_push_ready(current_process->attached_from);
+    }
 
     // because we are using the stack of the process
     // and process_delete() will free the stack
@@ -101,8 +156,6 @@ uint32_t scheduler_switch(const regs_t* regs) {
     // because upon deleting process it need to save opended files
     // accessing files on an interrupts requests blocks system progress
 
-    // TODO:
-    // only delete process with its exit_code read
     while(delete_queue.size) {
         process_t* proc = process_queue_pop(&delete_queue);
         global_list_pop(proc);
@@ -113,8 +166,7 @@ uint32_t scheduler_switch(const regs_t* regs) {
         global_sleep_ticks++;
         while(sleep_queue.top && sleep_queue.top->sleep_ticks <= global_sleep_ticks) {
             process_t* proc = process_queue_pop(&sleep_queue);
-            proc->state = PROCESS_STATE_READY;
-            process_queue_push(&ready_queue, proc);
+            scheduler_push_ready(proc);
         }
 
         // avoid overflow

@@ -24,6 +24,8 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
     proc->is_user = is_user;
     proc->cwd = cwd ? cwd : &vfs_get_ramfs()->root_node;
 
+    proc->attached_from = NULL;
+
     if(!is_user) {
         proc->page_directory = (page_directory_t*)KERNEL_PAGE_DIRECTORY;
         proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();

@@ -381,10 +381,13 @@ void kmain() {
 
     if(!vfs_mount("/fs0/bin", "/bin")) {
         // start the init process
-        start_user_process("/bin/keroshell.elf");
+        scheduler_spawn("/bin/keroshell.elf", true, false, NULL);
     }
 
-    start_user_process("/fs0/hi.elf");
+    int ret;
+    scheduler_spawn("/fs0/hi.elf", true, true, &ret);
+    syscall_sleep(2000);
+    kprintf("hi.elf ret: %d\n", ret);
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL);
     if(proc1) scheduler_add_process(proc1);
