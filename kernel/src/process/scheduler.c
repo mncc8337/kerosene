@@ -2,6 +2,7 @@
 #include <system.h>
 #include <misc/elf.h>
 #include <sys/syscall.h>
+#include <sys/files.h>
 
 static process_queue_t ready_queue = PROCESS_QUEUE_INIT;
 // this is a linked list sorted by sleep_ticks
@@ -89,6 +90,8 @@ int scheduler_spawn(
     const char* path,
     bool is_user,
     bool attach,
+    fs_node_t* stdin,
+    fs_node_t* stdout,
     int* returned_value
 ) {
     process_t* current = scheduler_get_current();
@@ -106,6 +109,25 @@ int scheduler_spawn(
         return -1;
     }
 
+    if(is_user) {
+        file_description_t* fdt = proc->file_descriptor_table;
+        file_description_t* caller_fdt = current_process->file_descriptor_table;
+
+        if(!stdin)
+            stdin = caller_fdt[SYSFILE_FD_STDIN].node;
+
+        if(!stdout)
+            stdout = caller_fdt[SYSFILE_FD_STDOUT].node;
+
+        // should always success
+        file_open(fdt + SYSFILE_FD_STDIN,  stdin,  FILE_OPEN_READ);
+        file_open(fdt + SYSFILE_FD_STDOUT, stdout, FILE_OPEN_WRITE | FILE_OPEN_APPEND);
+
+        fdt[SYSFILE_FD_STDIN].node->refcount++;
+        fdt[SYSFILE_FD_STDOUT].node->refcount++;
+
+        proc->file_count = 2;
+    }
 
     if(attach) {
         syscall_attach(proc);

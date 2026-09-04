@@ -2,7 +2,6 @@
 #include <filesystem.h>
 #include <system.h>
 #include <mem.h>
-#include <sys/files.h>
 
 #include <stdlib.h>
 
@@ -167,8 +166,6 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
 
     // create standard files
     if(is_user) {
-        // fs_t* ramfs = vfs_getfs(RAMFS_DISK);
-
         fs_node_t* sysproc_dir = vfs_get_proc_dir();
 
         char buff[10];
@@ -186,17 +183,6 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
             process_delete(proc);
             return NULL;
         }
-
-        file_description_t* fdt = proc->file_descriptor_table;
-
-        // should always success
-        file_open(fdt + SYSFILE_FD_STDIN,  vfs_get_stdin(),  FILE_OPEN_READ);
-        file_open(fdt + SYSFILE_FD_STDOUT, vfs_get_stdout(), FILE_OPEN_WRITE | FILE_OPEN_APPEND);
-
-        fdt[SYSFILE_FD_STDIN].node->refcount++;
-        fdt[SYSFILE_FD_STDOUT].node->refcount++;
-
-        proc->file_count = 2;
     }
 
     return proc;

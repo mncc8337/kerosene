@@ -381,11 +381,25 @@ void kmain() {
 
     if(!vfs_mount("/fs0/bin", "/bin")) {
         // start the init process
-        scheduler_spawn("/bin/keroshell.elf", true, false, NULL);
+        scheduler_spawn(
+            "/bin/keroshell.elf",
+            true,
+            false,
+            vfs_get_stdin(),
+            vfs_get_stdout(),
+            NULL
+        );
     }
 
     int ret;
-    scheduler_spawn("/fs0/hi.elf", true, true, &ret);
+    scheduler_spawn(
+        "/fs0/hi.elf",
+        true,
+        true,
+        vfs_get_stdin(),
+        vfs_get_stdout(),
+        &ret
+    );
     syscall_sleep(2000);
     kprintf("hi.elf ret: %d\n", ret);
 
