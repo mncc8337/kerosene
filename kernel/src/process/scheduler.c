@@ -109,25 +109,26 @@ int scheduler_spawn(
         return -1;
     }
 
-    if(is_user) {
-        file_description_t* fdt = proc->file_descriptor_table;
-        file_description_t* caller_fdt = current_process->file_descriptor_table;
-
+    file_description_t* caller_fdt = current_process->file_descriptor_table;
+    if(!stdin) {
+        stdin = caller_fdt[SYSFILE_FD_STDIN].node;
         if(!stdin)
-            stdin = caller_fdt[SYSFILE_FD_STDIN].node;
-
-        if(!stdout)
-            stdout = caller_fdt[SYSFILE_FD_STDOUT].node;
-
-        // should always success
-        file_open(fdt + SYSFILE_FD_STDIN,  stdin,  FILE_OPEN_READ);
-        file_open(fdt + SYSFILE_FD_STDOUT, stdout, FILE_OPEN_WRITE | FILE_OPEN_APPEND);
-
-        fdt[SYSFILE_FD_STDIN].node->refcount++;
-        fdt[SYSFILE_FD_STDOUT].node->refcount++;
-
-        proc->file_count = 2;
+            stdin = vfs_get_stdin();
     }
+
+    if(!stdout) {
+        stdout = caller_fdt[SYSFILE_FD_STDOUT].node;
+        if(!stdout)
+            stdout = vfs_get_stdout();
+    }
+
+    process_set_stdfile(
+        proc,
+        stdin,
+        FILE_OPEN_READ,
+        stdout,
+        FILE_OPEN_WRITE | FILE_OPEN_APPEND
+    );
 
     if(attach) {
         syscall_attach(proc);

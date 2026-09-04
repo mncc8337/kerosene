@@ -240,8 +240,6 @@ fs_node_t* vfs_get_stdin();
 fs_node_t* vfs_get_proc_dir();
 fs_type_t vfs_detectfs(partition_entry_t* part);
 fs_t* vfs_get_ramfs();
-file_description_t* vfs_get_kernel_file_descriptor_table();
-unsigned vfs_get_kernel_file_count();
 
 // vfs_op.c
 FS_ERR vfs_find_and_create_node(const char* path, fs_node_t* cwd, fs_node_t** ret_node, const file_mode_t mode, const uint32_t create_flags);

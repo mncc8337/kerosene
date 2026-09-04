@@ -5,9 +5,6 @@
 
 static fs_t ramfs;
 
-static file_description_t KERNEL_FDT[MAX_FILE];
-static unsigned KERNEL_FILE_COUNT = 0;
-
 static fs_node_t* kern_dev = NULL;
 static fs_node_t* kern_stdout = NULL;
 static fs_node_t* kern_stdin = NULL;
@@ -54,12 +51,10 @@ bool vfs_init() {
         return true;
 
     // prevent these from being delete from the tree
-    kern_stdout->refcount = 69420;
+    kern_dev->refcount = 69420;
     kern_stdin->refcount = 69420;
-    KERNEL_FILE_COUNT = 2;
-
-    file_open(KERNEL_FDT + SYSFILE_FD_STDIN,  kern_stdin,  FILE_OPEN_WRITE | FILE_OPEN_APPEND);
-    file_open(KERNEL_FDT + SYSFILE_FD_STDOUT, kern_stdout, FILE_OPEN_READ);
+    kern_stdout->refcount = 69420;
+    kern_proc->refcount = 69420;
 
     return false;
 }
@@ -94,12 +89,4 @@ fs_type_t vfs_detectfs(partition_entry_t* part) {
 
 fs_t* vfs_get_ramfs() {
     return &ramfs;
-}
-
-file_description_t* vfs_get_kernel_file_descriptor_table() {
-    return KERNEL_FDT;
-}
-
-unsigned vfs_get_kernel_file_count() {
-    return KERNEL_FILE_COUNT;
 }

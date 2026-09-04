@@ -23,7 +23,6 @@
 uint32_t kernel_size;
 
 void kmain();
-process_t* kernel_process = 0;
 
 void mem_init(void* mmap_addr, uint32_t mmap_length) {
     // get memsize
@@ -306,9 +305,14 @@ void kinit(multiboot_info_t* mbd) {
     scheduler_init(idle_proc);
     kprint_debug(LT_OK, "scheduler initialised\n");
 
-    kernel_process = process_new((uint32_t)kmain, false, NULL);
-    if(kernel_process) {
-        scheduler_add_process(kernel_process);
+    process_t* kern_proc = process_new((uint32_t)kmain, false, NULL);
+    if(kern_proc) {
+        process_set_stdfile(
+            kern_proc,
+            vfs_get_stdin(), FILE_OPEN_READ,
+            vfs_get_stdout(), FILE_OPEN_WRITE | FILE_OPEN_APPEND
+        );
+        scheduler_add_process(kern_proc);
         kprint_debug(LT_OK, "created kernel main process\n");
     } else {
         kprint_debug(LT_CR, "failed to create main process. not enough memory\n");
@@ -367,11 +371,11 @@ void kmain() {
 
     process_t* proc_stdout = process_new((uint32_t)kproc_stdout, false, NULL);
     if(proc_stdout) scheduler_add_process(proc_stdout);
-    else kprint_debug(LT_CR, "cannot start standard out process\n");
+    else kprint_debug(LT_CR, "cannot start standard output process\n");
 
     process_t* proc_stdin = process_new((uint32_t)kproc_stdin, false, NULL);
     if(proc_stdin) scheduler_add_process(proc_stdin);
-    else kprint_debug(LT_CR, "cannot start standard in process\n");
+    else kprint_debug(LT_CR, "cannot start standard input process\n");
 
     kprint_debug(LT_IF, "done initialising\n");
 
@@ -400,8 +404,7 @@ void kmain() {
         vfs_get_stdout(),
         &ret
     );
-    syscall_sleep(2000);
-    kprintf("hi.elf ret: %d\n", ret);
+    printf("hi.elf ret: %d\n", ret);
 
     process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL);
     if(proc1) scheduler_add_process(proc1);

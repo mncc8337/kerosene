@@ -58,6 +58,7 @@ typedef struct {
 process_t* process_new(uint32_t eip, bool is_user, struct fs_node* cwd);
 process_t* process_make_idle();
 void process_delete(process_t* proc);
+void process_set_stdfile(process_t* proc, struct fs_node* stdin, uint32_t stdin_flags, struct fs_node* stdout, uint32_t stdout_flags);
 
 // process_queue.c
 bool process_sort_by_sleep_ticks(process_t* a, process_t* b);

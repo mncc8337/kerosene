@@ -4,11 +4,9 @@
 #include <mem.h>
 
 #include <stdlib.h>
+#include <sys/files.h>
 
 static unsigned process_count = 0;
-
-// from kernel.c
-extern process_t* kernel_process;
 
 process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
@@ -27,26 +25,23 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
 
     if(!is_user) {
         proc->page_directory = (page_directory_t*)KERNEL_PAGE_DIRECTORY;
-        proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
-        proc->file_count = vfs_get_kernel_file_count();
     } else {
-        // create a new page directory
         proc->page_directory = vmmngr_alloc_page_directory();
         if(!proc->page_directory) {
             kfree(proc);
             return NULL;
         }
-
-        // create a file descriptor table
-        void* fdt = kmalloc(sizeof(file_description_t) * MAX_FILE);
-        if(!fdt) {
-            vmmngr_free_page_directory(proc->page_directory);
-            kfree(proc);
-            return NULL;
-        }
-        proc->file_descriptor_table = fdt;
-        proc->file_count = 0;
     }
+
+    // create a file descriptor table
+    void* fdt = kmalloc(sizeof(file_description_t) * MAX_FILE);
+    if(!fdt) {
+        if(is_user) vmmngr_free_page_directory(proc->page_directory);
+        kfree(proc);
+        return NULL;
+    }
+    proc->file_descriptor_table = fdt;
+    proc->file_count = 0;
 
     // allocate the new stack
     size_t stack_size;
@@ -198,8 +193,12 @@ process_t* process_make_idle() {
     proc->sleep_ticks = 0;
 
     proc->page_directory = (page_directory_t*)KERNEL_PAGE_DIRECTORY;
-    proc->file_descriptor_table = vfs_get_kernel_file_descriptor_table();
-    proc->file_count = vfs_get_kernel_file_count();
+
+    // idle process does not need to access any files
+    // so these can be ignored (until some nasty bugs occurs)
+    void* fdt = kmalloc(sizeof(file_description_t) * MAX_FILE);
+    proc->file_descriptor_table = fdt;
+    proc->file_count = 0;
     proc->cwd = &vfs_get_ramfs()->root_node;
 
     // no need to allocate a new stack
@@ -216,39 +215,49 @@ process_t* process_make_idle() {
 }
 
 void process_delete(process_t* proc) {
-    if(proc != kernel_process) {
+    if(proc->is_user) {
         vmmngr_free_page_directory(proc->page_directory);
-
         kfree((void*)proc->tss_esp0 - KERNEL_STACK_SIZE);
-
-        // close opened file
-        unsigned i = 0;
-        while(proc->file_count && i < MAX_FILE) {
-            file_description_t* fde = proc->file_descriptor_table + i;
-            if(!(fde->node)) {
-                i++;
-                continue;
-            }
-
-            // TODO:
-            // wait for IO op to be done
-            // before closing
-            node_sync(fde->node);
-
-            fde->node->refcount--;
-            vfs_cleanup_node_tree(fde->node);
-
-            fde->node = NULL;
-            proc->file_count--;
-
-            i++;
-        }
-        kfree(proc->file_descriptor_table);
     } else {
-        // kernel resources are shared so dont touch them
-        // only delete the stack
         kfree((void*)proc->stack_addr);
     }
 
+    // close opened file
+    unsigned i = 0;
+    while(proc->file_count && i < MAX_FILE) {
+        file_description_t* fde = proc->file_descriptor_table + i;
+        if(!(fde->node)) {
+            i++;
+            continue;
+        }
+
+        // TODO:
+        // wait for IO op to be done
+        // before closing
+        node_sync(fde->node);
+
+        fde->node->refcount--;
+        vfs_cleanup_node_tree(fde->node);
+
+        fde->node = NULL;
+        proc->file_count--;
+
+        i++;
+    }
+    kfree(proc->file_descriptor_table);
+
     kfree(proc);
+}
+
+void process_set_stdfile(process_t* proc, fs_node_t* stdin, uint32_t stdin_flags, fs_node_t* stdout, uint32_t stdout_flags) {
+    file_description_t* fdt = proc->file_descriptor_table;
+
+    // should always success
+    file_open(fdt + SYSFILE_FD_STDIN,  stdin,  stdin_flags);
+    file_open(fdt + SYSFILE_FD_STDOUT, stdout, stdout_flags);
+
+    fdt[SYSFILE_FD_STDIN].node->refcount++;
+    fdt[SYSFILE_FD_STDOUT].node->refcount++;
+
+    proc->file_count = 2;
 }
