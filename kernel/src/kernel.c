@@ -305,7 +305,7 @@ void kinit(multiboot_info_t* mbd) {
     scheduler_init(idle_proc);
     kprint_debug(LT_OK, "scheduler initialised\n");
 
-    process_t* kern_proc = process_new((uint32_t)kmain, false, NULL, NULL);
+    process_t* kern_proc = process_new((uint32_t)kmain, false, NULL, NULL, 0, NULL);
     if(kern_proc) {
         process_set_stdfile(
             kern_proc,
@@ -351,11 +351,11 @@ void kmain() {
 
     disk_init();
 
-    process_t* proc_stdout = process_new((uint32_t)kproc_stdout, false, NULL, NULL);
+    process_t* proc_stdout = process_new((uint32_t)kproc_stdout, false, NULL, NULL, 0, NULL);
     if(proc_stdout) scheduler_add_process(proc_stdout);
     else kprint_debug(LT_CR, "cannot start standard output process\n");
 
-    process_t* proc_stdin = process_new((uint32_t)kproc_stdin, false, NULL, NULL);
+    process_t* proc_stdin = process_new((uint32_t)kproc_stdin, false, NULL, NULL, 0, NULL);
     if(proc_stdin) scheduler_add_process(proc_stdin);
     else kprint_debug(LT_CR, "cannot start standard input process\n");
 
@@ -370,6 +370,8 @@ void kmain() {
         scheduler_spawn(
             "/bin/keroshell.elf",
             true,
+            1,
+            "keroshell.elf",
             false,
             vfs_get_stdin(),
             vfs_get_stdout(),
@@ -381,6 +383,8 @@ void kmain() {
     scheduler_spawn(
         "/fs0/hi.elf",
         true,
+        4,
+        "hi.elf\0test1\0test2\0test3",
         true,
         vfs_get_stdin(),
         vfs_get_stdout(),
@@ -388,10 +392,10 @@ void kmain() {
     );
     printf("hi.elf ret: %d\n", ret);
 
-    process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL, NULL);
+    process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL, NULL, 0, NULL);
     if(proc1) scheduler_add_process(proc1);
 
-    process_t* proc2 = process_new((uint32_t)kernel_proc2, false, NULL, NULL);
+    process_t* proc2 = process_new((uint32_t)kernel_proc2, false, NULL, NULL, 0, NULL);
     if(proc2) scheduler_add_process(proc2);
 
     while(true) {

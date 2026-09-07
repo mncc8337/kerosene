@@ -1,5 +1,5 @@
-#include "mem.h"
 #include <process.h>
+#include <string.h>
 #include <system.h>
 #include <misc/elf.h>
 #include <sys/syscall.h>
@@ -90,6 +90,8 @@ uint32_t scheduler_attach(const regs_t* regs, process_t* proc) {
 int scheduler_spawn(
     const char* path,
     bool is_user,
+    unsigned argc,
+    char* argv,
     bool attach,
     fs_node_t* stdin,
     fs_node_t* stdout,
@@ -98,6 +100,8 @@ int scheduler_spawn(
     process_t* current = scheduler_get_current();
     if(current->is_user && !is_user)
         return -1;
+
+    // TODO: validate argv
 
     page_directory_t* pd = NULL;
     if(is_user) {
@@ -108,14 +112,18 @@ int scheduler_spawn(
 
     uint32_t eip;
     ELF_ERR load_err = elf_load((char*)path, pd, &eip);
+
     if(load_err) {
         // FS_ERR ferr = elf_get_err();
+        if(is_user) vmmngr_free_page_directory(pd);
         return -1;
     }
 
-    process_t* proc = process_new(eip, is_user, pd, NULL);
-    if(!proc)
+    process_t* proc = process_new(eip, is_user, pd, NULL, argc, argv);
+    if(!proc) {
+        if(is_user) vmmngr_free_page_directory(pd);
         return -1;
+    }
 
     file_description_t* caller_fdt = current_process->file_descriptor_table;
     if(!stdin) {

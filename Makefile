@@ -10,13 +10,15 @@ $(shell mkdir $(BIN_DIR) $(BIN_DIR)coreutils/ $(OBJ_DIR))
 
 C_INCLUDES := -I./kernel/src -I./kernel/include -I./libc/include
 
-LIBC_SRC := $(shell cd libc/src && find -L * -type f -name '*.c' | sort)
-C_SRC := $(shell cd kernel/src && find -L * -type f -name '*.c' | sort)
-A_SRC := $(shell cd kernel/src && find -L * -type f -name '*.asm' | sort)
+KERNEL_C_SRC := $(shell cd kernel/src && find -L * -type f -name '*.c' | sort)
+KERNEL_A_SRC := $(shell cd kernel/src && find -L * -type f -name '*.asm' | sort)
+KERNEL_OBJ := $(addprefix $(OBJ_DIR)kernel/, $(KERNEL_C_SRC:.c=.o))
+KERNEL_OBJ += $(addprefix $(OBJ_DIR)kernel/, $(addsuffix .o, $(KERNEL_A_SRC)))
 
-LIBC_OBJ := $(addprefix $(OBJ_DIR)libc/, $(LIBC_SRC:.c=.o))
-OBJ := $(addprefix $(OBJ_DIR)kernel/, $(C_SRC:.c=.o))
-OBJ += $(addprefix $(OBJ_DIR)kernel/, $(addsuffix .o, $(A_SRC)))
+LIBC_C_SRC := $(shell cd libc/src && find -L * -type f -name '*.c' | sort)
+LIBC_A_SRC := $(shell cd libc/src && find -L * -type f -name '*.asm' | sort)
+LIBC_OBJ := $(addprefix $(OBJ_DIR)libc/, $(LIBC_C_SRC:.c=.o))
+LIBC_OBJ += $(addprefix $(OBJ_DIR)libc/, $(addsuffix .o, $(LIBC_A_SRC)))
 
 COREUTILS_SRC := $(shell cd coreutils && find -L * -type f -name '*.c')
 COREUTILS_ELF := $(addprefix $(BIN_DIR)coreutils/, $(COREUTILS_SRC:.c=.elf))
@@ -66,8 +68,10 @@ all: libc kernel coreutils shell userapp disk copyfs
 # libc
 $(OBJ_DIR)libc/%.o: libc/src/%.c
 	mkdir -p $$(dirname $@)
-	echo $@
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+$(OBJ_DIR)libc/%.asm.o: libc/src/%.asm
+	mkdir -p $$(dirname $@)
+	$(AS) $(ASFLAGS) -o $@ $<
 $(BIN_DIR)libc.a: $(LIBC_OBJ)
 	$(AR) rcs $@ $^
 	@echo done building libc
@@ -79,7 +83,7 @@ $(OBJ_DIR)kernel/%.o: kernel/src/%.c
 $(OBJ_DIR)kernel/%.asm.o: kernel/src/%.asm
 	mkdir -p $$(dirname $@)
 	$(AS) $(ASFLAGS) -o $@ $<
-$(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(OBJ)
+$(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(KERNEL_OBJ)
 	# use GCC to link instead of LD because LD cannot find the libgcc
 	$(CC) $(CFLAGS) -T linker.ld $(LDFLAGS) -o $@ $^ -L./bin $(LDLIBS)
 
@@ -133,7 +137,7 @@ clean:
 clean-all:
 	rm -rf $(BIN_DIR) $(OBJ_DIR) $(USER_ELF)
 
-DEPS  = $(patsubst %.o,%.d,$(OBJ))
+DEPS  = $(patsubst %.o,%.d,$(KERNEL_OBJ))
 DEPS += $(patsubst %.o,%.d,$(LIBC_OBJ))
 DEPS += $(patsubst %.o,%.d,$(SHELL_OBJ))
 -include $(DEPS)

@@ -4,11 +4,12 @@
 #include <mem.h>
 
 #include <stdlib.h>
+#include <string.h>
 #include <sys/files.h>
 
 static unsigned process_count = 0;
 
-process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs_node_t* cwd) {
+process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs_node_t* cwd, unsigned argc, char* args) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
 
@@ -144,6 +145,46 @@ process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs
 
     proc->saved_esp = (uint32_t)regs;
 
+    // pass argc and argv to user processes
+    if(is_user && argc > 0) {
+        // build argv
+
+        // find all the \0 on args and store it on null_pos
+        unsigned null_pos[argc];
+        for(unsigned idx = 0, cnt = 0; cnt < argc; idx++) {
+            if(idx >= ARGS_MAX_LEN) {
+                // ignore the rest of the args and fix argc
+                argc = cnt;
+                break;
+            }
+            if(args[idx] != '\0') continue;
+            null_pos[cnt] = idx;
+            cnt++;
+        }
+
+        // if the fixed argc is 0
+        if(argc == 0) {
+            regs->ecx = 0;
+            regs->esi = 0;
+        } else {
+            // copy the truncated args to userstack
+            char* trunc_args = (void*)(regs->useresp - null_pos[argc - 1] - 1);
+            memcpy(trunc_args, args, null_pos[argc - 1] + 1);
+
+            // build argv
+            char** argv = (char**)(trunc_args - sizeof(char*) * (argc + 1));
+            argv[0] = trunc_args;
+            for(unsigned i = 1; i < argc; i++) {
+                argv[i] = trunc_args + null_pos[i - 1] + 1;
+            }
+            argv[argc] = NULL;
+
+            regs->useresp = (uint32_t)argv;
+            regs->esi = (uint32_t)argv;
+            regs->ecx = argc;
+        }
+    }
+
     // restore to active pd
     vmmngr_switch_page_directory(active_pd);
 
@@ -159,7 +200,6 @@ process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs
 
         char buff[10];
         itoa(proc->id, buff, 10);
-
 
         fs_node_t* proc_dir;
         if(vfs_find_and_create_node(

@@ -12,7 +12,7 @@ Quisque lacinia orci vitae diam tempus finibus. Curabitur tincidunt et diam vel 
 Nulla viverra fringilla mi accumsan malesuada. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Phasellus posuere quam et arcu tincidunt, volutpat ultricies lectus varius. Vestibulum venenatis sem et nisi pharetra congue. Nunc a odio accumsan, semper lorem sit amet, rutrum arcu. Maecenas porta, ligula ut scelerisque finibus, sapien odio tincidunt nisi, ac elementum lorem nisl vitae lacus. Praesent et est id lectus commodo mollis ac vitae lectus. Proin rutrum ornare nulla ac ultrices. Nam quis pharetra turpis. Morbi at tortor ut odio interdum pulvinar nec sed libero. Donec vel accumsan nulla. Donec purus leo, maximus vitae tellus vel, bibendum rutrum felis.\n\n\
 Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aenean vitae lorem mollis, facilisis justo vel, congue erat. Nunc dictum tempor ex, eu cursus quam sodales viverra. Mauris in urna vel nunc convallis luctus. In quis euismod elit, quis vestibulum massa. Duis sapien nisl, luctus eget leo vel, posuere eleifend velit. Praesent sed tincidunt dolor, id blandit tellus. Maecenas elementum tempus dapibus. Pellentesque convallis sed tellus et euismod. Proin malesuada augue sit amet nulla volutpat, ac porttitor mi maximus. Vestibulum ante ipsum primis in faucibus orci luctus et ultrices posuere cubilia curae; Quisque libero ex, sollicitudin et pretium nec, convallis sit amet odio. Aenean at justo tortor. Nullam felis magna, lacinia lacinia ligula vel, commodo scelerisque augue.\n";
 
-int main() {
+int main(int argc, char** argv) {
     printf("hi user eeee!\n");
 
     puts("buffer manipulation test");
@@ -39,6 +39,14 @@ int main() {
     }
 
     printf("current time: %d\n", time(NULL));
+
+    if(argc > 0) {
+        printf("args: ");
+        for(int i = 0; i < argc; i++) {
+            printf("%s ", argv[i]);
+        }
+        putchar('\n');
+    }
 
     return 0;
 }
