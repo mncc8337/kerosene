@@ -8,7 +8,7 @@
 
 static unsigned process_count = 0;
 
-process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
+process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs_node_t* cwd) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
 
@@ -26,17 +26,12 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
     if(!is_user) {
         proc->page_directory = (page_directory_t*)KERNEL_PAGE_DIRECTORY;
     } else {
-        proc->page_directory = vmmngr_alloc_page_directory();
-        if(!proc->page_directory) {
-            kfree(proc);
-            return NULL;
-        }
+        proc->page_directory = pagedir;
     }
 
     // create a file descriptor table
     void* fdt = kmalloc(sizeof(file_description_t) * MAX_FILE);
     if(!fdt) {
-        if(is_user) vmmngr_free_page_directory(proc->page_directory);
         kfree(proc);
         return NULL;
     }
@@ -79,7 +74,6 @@ process_t* process_new(uint32_t eip, bool is_user, fs_node_t* cwd) {
         clean_up:
         if(clean_up) {
             vmmngr_switch_page_directory(active_pd);
-            vmmngr_free_page_directory(proc->page_directory);
             kfree(proc->file_descriptor_table);
             kfree(proc);
             asm volatile("push %0; popf" : : "r"(eflags_cr3));

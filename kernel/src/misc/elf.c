@@ -37,7 +37,7 @@ int elf_get_err() {
     return errcode;
 }
 
-ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry) {
+static ELF_ERR _elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* entry) {
     file_description_t f;
     errcode = file_open(&f, node, FILE_OPEN_READ);
     if(errcode)
@@ -119,7 +119,7 @@ ELF_ERR elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint32_t* en
     return ERR_ELF_SUCCESS;
 }
 
-ELF_ERR elf_load_to_proc(const char* path, process_t* proc) {
+ELF_ERR elf_load(const char* path, page_directory_t* pd, uint32_t* entry) {
     fs_t* fs = vfs_get_ramfs();
 
     fs_node_t* elf;
@@ -131,25 +131,10 @@ ELF_ERR elf_load_to_proc(const char* path, process_t* proc) {
     if(!addr)
         return ERR_ELF_OOM;
 
-    uint32_t entry;
-    errcode = elf_load(elf, addr, proc->page_directory, &entry);
+    errcode = _elf_load(elf, addr, pd, entry);
     kfree(addr);
     if(errcode)
         return errcode;
-
-    // kprintf("jumping to entry (0x%x)\n", entry);
-    // int (*prog)(void) = (void*)entry;
-    // int exit_code = prog();
-    // kprintf("program exited with code %d\n", exit_code);
-    
-    uint32_t eflags;
-    asm volatile("pushf; pop %0; cli" : "=r"(eflags));
-    page_directory_t* active_pd = vmmngr_get_page_directory();
-    vmmngr_switch_page_directory(proc->page_directory);
-    regs_t* regs = (regs_t*)proc->saved_esp;
-    regs->eip = entry;
-    vmmngr_switch_page_directory(active_pd);
-    asm volatile("push %0; popf" : : "r"(eflags));
 
     return ERR_ELF_SUCCESS;
 }

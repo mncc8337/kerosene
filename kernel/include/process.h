@@ -55,7 +55,7 @@ typedef struct {
 #define PROCESS_QUEUE_INIT {NULL, NULL, 0}
 
 // process.c
-process_t* process_new(uint32_t eip, bool is_user, struct fs_node* cwd);
+process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, struct fs_node* cwd);
 process_t* process_make_idle();
 void process_delete(process_t* proc);
 void process_set_stdfile(process_t* proc, struct fs_node* stdin, uint32_t stdin_flags, struct fs_node* stdout, uint32_t stdout_flags);

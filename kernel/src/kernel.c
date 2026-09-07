@@ -305,7 +305,7 @@ void kinit(multiboot_info_t* mbd) {
     scheduler_init(idle_proc);
     kprint_debug(LT_OK, "scheduler initialised\n");
 
-    process_t* kern_proc = process_new((uint32_t)kmain, false, NULL);
+    process_t* kern_proc = process_new((uint32_t)kmain, false, NULL, NULL);
     if(kern_proc) {
         process_set_stdfile(
             kern_proc,
@@ -340,24 +340,6 @@ void kernel_proc2() {
     }
 }
 
-process_t* start_user_process(const char* path) {
-    process_t* proc = process_new(0, true, NULL);
-    if(proc) {
-        ELF_ERR load_err = elf_load_to_proc((char*)path, proc);
-        if(load_err) {
-            FS_ERR ferr = elf_get_err();
-            kprintf("file err while loading %s: %d\n", path, ferr);
-        } else {
-            scheduler_add_process(proc);
-            kprintf("%s started with id %d\n", path, proc->id);
-        }
-    } else {
-        kprintf("failed to start %s\n", path);
-    }
-
-    return proc;
-}
-
 void kmain() {
     kprint_debug(LT_OK, "jumped into main kernel process\n");
 
@@ -369,11 +351,11 @@ void kmain() {
 
     disk_init();
 
-    process_t* proc_stdout = process_new((uint32_t)kproc_stdout, false, NULL);
+    process_t* proc_stdout = process_new((uint32_t)kproc_stdout, false, NULL, NULL);
     if(proc_stdout) scheduler_add_process(proc_stdout);
     else kprint_debug(LT_CR, "cannot start standard output process\n");
 
-    process_t* proc_stdin = process_new((uint32_t)kproc_stdin, false, NULL);
+    process_t* proc_stdin = process_new((uint32_t)kproc_stdin, false, NULL, NULL);
     if(proc_stdin) scheduler_add_process(proc_stdin);
     else kprint_debug(LT_CR, "cannot start standard input process\n");
 
@@ -406,10 +388,10 @@ void kmain() {
     );
     printf("hi.elf ret: %d\n", ret);
 
-    process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL);
+    process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL, NULL);
     if(proc1) scheduler_add_process(proc1);
 
-    process_t* proc2 = process_new((uint32_t)kernel_proc2, false, NULL);
+    process_t* proc2 = process_new((uint32_t)kernel_proc2, false, NULL, NULL);
     if(proc2) scheduler_add_process(proc2);
 
     while(true) {

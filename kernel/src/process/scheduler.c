@@ -1,3 +1,4 @@
+#include "mem.h"
 #include <process.h>
 #include <system.h>
 #include <misc/elf.h>
@@ -98,16 +99,23 @@ int scheduler_spawn(
     if(current->is_user && !is_user)
         return -1;
 
-    process_t* proc = process_new(0, is_user, NULL);
-    if(!proc)
-        return -1;
+    page_directory_t* pd = NULL;
+    if(is_user) {
+        pd = vmmngr_alloc_page_directory();
+        if(!pd)
+            return -1;
+    }
 
-    ELF_ERR load_err = elf_load_to_proc((char*)path, proc);
+    uint32_t eip;
+    ELF_ERR load_err = elf_load((char*)path, pd, &eip);
     if(load_err) {
         // FS_ERR ferr = elf_get_err();
-        process_delete(proc);
         return -1;
     }
+
+    process_t* proc = process_new(eip, is_user, pd, NULL);
+    if(!proc)
+        return -1;
 
     file_description_t* caller_fdt = current_process->file_descriptor_table;
     if(!stdin) {
