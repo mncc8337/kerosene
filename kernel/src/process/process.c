@@ -77,6 +77,15 @@ static void parse_null_separated_strings(
     *ptr_map = string_map;
 }
 
+
+static void copy_double_null(char* dest, const char* src, size_t max_len) {
+    if(!src) return;
+    for(size_t i = 0; i < max_len; i++) {
+        dest[i] = src[i];
+        if(i > 0 && src[i] == '\0' && src[i-1] == '\0') break;
+    }
+}
+
 process_t* process_new(
     uint32_t eip,
     bool is_user,
@@ -90,8 +99,8 @@ process_t* process_new(
 
     if(is_user) {
         // copy args and envs to the shared memory
-        if(args) memcpy(args_buffer, args, ARGS_MAX_LEN);
-        if(envs) memcpy(envs_buffer, envs, ENVS_MAX_LEN);
+        if(args) copy_double_null(args_buffer, args, ARGS_MAX_LEN);
+        if(envs) copy_double_null(envs_buffer, envs, ENVS_MAX_LEN);
     }
 
     // save active pd for reverting

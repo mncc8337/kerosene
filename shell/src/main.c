@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
-char buffer[512];
+char buffer[4096];
 unsigned buffer_ptr = 0;
 int exit_code = 0;
 

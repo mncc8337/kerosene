@@ -102,8 +102,8 @@ int scheduler_spawn(
 
     if(current->is_user) {
         if(!is_user) return -1;
-        if(!validate_user_buffer(current, args, ARGS_MAX_LEN)) return -1;
-        if(!validate_user_buffer(current, envs, ENVS_MAX_LEN)) return -1;
+        if(!validate_user_double_null(current, args, ARGS_MAX_LEN)) return -1;
+        if(!validate_user_double_null(current, envs, ENVS_MAX_LEN)) return -1;
     }
 
     page_directory_t* pd = NULL;

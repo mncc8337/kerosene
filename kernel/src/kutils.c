@@ -197,3 +197,12 @@ bool validate_user_string(const process_t* current_process, const char* str) {
 
     return false;
 }
+
+bool validate_user_double_null(process_t* current_process, const char* str, size_t max_len) {
+    if(!str) return true;
+    for(size_t i = 0; i < max_len; i++) {
+        if(!validate_user_buffer(current_process, str + i, 1)) return false;
+        if(i > 0 && str[i] == '\0' && str[i-1] == '\0') return true;
+    }
+    return true;
+}

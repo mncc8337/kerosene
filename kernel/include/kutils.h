@@ -23,3 +23,4 @@ void kprint_debug(int log_tag, const char* restrict format, ...);
 
 bool validate_user_buffer(const process_t* current_process, const void* buf, size_t size);
 bool validate_user_string(const process_t* current_process, const char* str);
+bool validate_user_double_null(process_t* current_process, const char* str, size_t max_len);
