@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdbool.h>
 #include <sys/filesystem.h>
 
 enum {
@@ -48,6 +49,16 @@ asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), 
 #define SYSCALL_5P(id, ret, p1, p2, p3, p4, p5) \
 asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), "S" (p4), "D" (p5) : "memory")
 
+typedef struct {
+    const char* path;
+    bool is_user;
+    unsigned argc;
+    char* args;
+    bool attach;
+    const char* stdin_path;
+    const char* stdout_path;
+} syscall_spawn_args_t;
+
 uint64_t syscall_time();
 
 int syscall_semaphore_create(const char* name, uint32_t initial_count);
@@ -57,6 +68,7 @@ void syscall_semaphore_kacquire(void* semaphore_ptr, uint32_t count);
 
 void syscall_yield();
 void syscall_attach(void* process_addr);
+int syscall_spawn(const char* path, bool is_user, unsigned argc, char* args, bool attach, const char* stdin_path, const char* stdout_path);
 void syscall_kill(int exit_code);
 void syscall_sleep(unsigned ticks);
 

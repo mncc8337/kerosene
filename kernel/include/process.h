@@ -1,9 +1,10 @@
 #pragma once
 
+#include <stdint.h>
+#include <sys/syscall.h>
+
 #include <mem.h>
 #include <system.h>
-
-#include <stdint.h>
 
 // how many ticks a process will run before got switch to others
 #define PROCESS_ALIVE_TICKS 4
@@ -79,6 +80,7 @@ void scheduler_add_process(process_t* proc);
 uint32_t scheduler_to_next_process(const regs_t* regs, bool add_back);
 uint32_t scheduler_attach(const regs_t* regs, process_t* proc);
 int scheduler_spawn(const char* path, bool is_user, unsigned argc, char* args, bool attach, struct fs_node* stdin, struct fs_node* stdout, int* returned_value);
+int scheduler_syscall_spawn(syscall_spawn_args_t* args);
 uint32_t scheduler_kill_process(const regs_t* regs, int exit_code);
 uint32_t scheduler_set_sleep(const regs_t* regs, unsigned ticks);
 uint32_t scheduler_switch(const regs_t* regs);

@@ -19,7 +19,7 @@ static void* syscalls[MAX_SYSCALL] = {
 
     [SYSCALL_YIELD] = &scheduler_to_next_process,
     [SYSCALL_DETACH] = &scheduler_attach,
-    [SYSCALL_SPAWN] = &scheduler_spawn,
+    [SYSCALL_SPAWN] = &scheduler_syscall_spawn,
     [SYSCALL_KILL] = &scheduler_kill_process,
     [SYSCALL_SLEEP] = &scheduler_set_sleep,
 

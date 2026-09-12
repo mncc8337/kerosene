@@ -1,7 +1,8 @@
 #include <process.h>
-#include <string.h>
+#include <kutils.h>
 #include <system.h>
 #include <misc/elf.h>
+#include <string.h>
 #include <sys/syscall.h>
 #include <sys/files.h>
 
@@ -91,17 +92,18 @@ int scheduler_spawn(
     const char* path,
     bool is_user,
     unsigned argc,
-    char* argv,
+    char* args,
     bool attach,
     fs_node_t* stdin,
     fs_node_t* stdout,
     int* returned_value
 ) {
-    process_t* current = scheduler_get_current();
+    process_t* current = current_process;
     if(current->is_user && !is_user)
         return -1;
 
-    // TODO: validate argv
+    if(current->is_user && !validate_user_buffer(current, args, ARGS_MAX_LEN))
+        return -1;
 
     page_directory_t* pd = NULL;
     if(is_user) {
@@ -119,7 +121,7 @@ int scheduler_spawn(
         return -1;
     }
 
-    process_t* proc = process_new(eip, is_user, pd, NULL, argc, argv);
+    process_t* proc = process_new(eip, is_user, pd, NULL, argc, args);
     if(!proc) {
         if(is_user) vmmngr_free_page_directory(pd);
         return -1;
@@ -155,6 +157,50 @@ int scheduler_spawn(
 
     scheduler_add_process(proc);
     return 0;
+}
+
+int scheduler_syscall_spawn(syscall_spawn_args_t* args) {
+    fs_node_t* stdin_node = NULL;
+    fs_node_t* stdout_node = NULL;
+
+    process_t* current = current_process;
+
+    if(args->stdin_path) {
+        FS_ERR err = vfs_find_and_create_node(
+            args->stdin_path,
+            current->cwd,
+            &stdin_node,
+            FILE_OPEN_READ,
+            0
+        );
+        if(err) return -1;
+    }
+
+    if(args->stdout_path) {
+        FS_ERR err = vfs_find_and_create_node(
+            args->stdout_path,
+            current->cwd,
+            &stdout_node,
+            FILE_OPEN_WRITE | FILE_OPEN_APPEND,
+            0
+        );
+        if(err) return -1;
+    }
+
+    int ret;
+    int result = scheduler_spawn(
+        args->path,
+        args->is_user,
+        args->argc,
+        args->args,
+        args->attach,
+        stdin_node,
+        stdout_node,
+        &ret
+    );
+    if(result >= 0)
+        return ret;
+    return result;
 }
 
 // put current process to delete queue, delete it later
