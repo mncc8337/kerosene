@@ -532,5 +532,8 @@ int vfs_mount(const char* target_path, const char* mount_path) {
     mount_node->mount_target = target_node;
     mount_node->flags |= FS_NODE_FLAG_MOUNTPOINT;
 
+    target_node->refcount++;
+    mount_node->refcount++;
+
     return 0;
 }
