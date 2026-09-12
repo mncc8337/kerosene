@@ -1,5 +1,6 @@
 #include <process.h>
 #include <filesystem.h>
+#include <stdint.h>
 #include <system.h>
 #include <mem.h>
 
@@ -13,15 +14,84 @@ static unsigned process_count = 0;
 // args may allocated in lower half of the current process's page dir, which is not available
 // when switched to the new process (when creating new process)
 // so we need to copy it into the kernel memory heap, which is shared
+// the same reason for envs
 static char args_buffer[ARGS_MAX_LEN];
+static char envs_buffer[ENVS_MAX_LEN];
 
-process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs_node_t* cwd, unsigned argc, char* args) {
+// parse null-separated, double null-terminated strings into string map
+// like argc and envp
+static void parse_null_separated_strings(
+    uint32_t* useresp,
+    const unsigned max_len,
+    const char* strings,
+    unsigned* count,
+    char*** ptr_map
+) {
+    *count = 0;
+    *ptr_map = NULL;
+
+    if(!strings || strings[0] == '\0') return;
+
+    // find the total byte length of all strings combined
+    unsigned strings_len = 0;
+    unsigned string_count = 0;
+    while(strings_len < max_len) {
+        // go to the next string
+        while(strings_len < max_len && strings[strings_len] != '\0')
+            strings_len++;
+
+        if(strings_len < max_len - 1) {
+            strings_len++; // skip '\0'
+            string_count++;
+
+            // double null-termination
+            if(strings[strings_len] == '\0') {
+                strings_len++;
+                break;
+            }
+        } else break;
+    }
+    if(string_count == 0) return;
+
+    // allocate space on stack for the strings and copy them here
+    *useresp -= strings_len;
+    char* trunc_strings = (char*)(*useresp);
+    memcpy(trunc_strings, strings, strings_len);
+
+    // allocate space on stack for the map
+    *useresp -= sizeof(char*) * (string_count + 1);
+    char** string_map = (char**)(*useresp);
+
+    // fill the map
+    char* current_str = trunc_strings;
+    for(unsigned i = 0; i < string_count; i++) {
+        string_map[i] = current_str;
+        
+        // go to the next string
+        while(*current_str != '\0') current_str++;
+        current_str++;
+    }
+    string_map[string_count] = NULL;
+
+    *count = string_count;
+    *ptr_map = string_map;
+}
+
+process_t* process_new(
+    uint32_t eip,
+    bool is_user,
+    page_directory_t* pagedir,
+    fs_node_t* cwd,
+    char* args,
+    char* envs
+) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
 
-    if(is_user && argc > 0 && args) {
-        // copy args to the shared memory
-        memcpy(args_buffer, args, ARGS_MAX_LEN);
+    if(is_user) {
+        // copy args and envs to the shared memory
+        if(args) memcpy(args_buffer, args, ARGS_MAX_LEN);
+        if(envs) memcpy(envs_buffer, envs, ENVS_MAX_LEN);
     }
 
     // save active pd for reverting
@@ -156,44 +226,20 @@ process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs
 
     proc->saved_esp = (uint32_t)regs;
 
-    // pass argc and argv to user processes
-    if(is_user && argc > 0 && args) {
-        // build argv
-
-        // find all the \0 on args and store it on null_pos
-        unsigned null_pos[argc];
-        for(unsigned idx = 0, cnt = 0; cnt < argc; idx++) {
-            if(idx >= ARGS_MAX_LEN) {
-                // ignore the rest of the args and fix argc
-                argc = cnt;
-                break;
-            }
-            if(args_buffer[idx] != '\0') continue;
-            null_pos[cnt] = idx;
-            cnt++;
-        }
-
-        // if the fixed argc is 0
-        if(argc == 0) {
-            regs->ecx = 0;
-            regs->esi = 0;
-        } else {
-            // copy the truncated args to userstack
-            char* trunc_args = (void*)(regs->useresp - null_pos[argc - 1] - 1);
-            memcpy(trunc_args, args_buffer, null_pos[argc - 1] + 1);
-
-            // build argv
-            char** argv = (char**)(trunc_args - sizeof(char*) * (argc + 1));
-            argv[0] = trunc_args;
-            for(unsigned i = 1; i < argc; i++) {
-                argv[i] = trunc_args + null_pos[i - 1] + 1;
-            }
-            argv[argc] = NULL;
-
-            regs->useresp = (uint32_t)argv;
-            regs->esi = (uint32_t)argv;
-            regs->ecx = argc;
-        }
+    // pass argc, argv, envc and envp to user processes
+    if(is_user) {
+        unsigned argc;
+        unsigned envc;
+        char** argv;
+        char** envp;
+        uint32_t useresp = regs->useresp;
+        parse_null_separated_strings(&useresp, ARGS_MAX_LEN, args_buffer, &argc, &argv);
+        parse_null_separated_strings(&useresp, ENVS_MAX_LEN, envs_buffer, &envc, &envp);
+        regs->eax = argc;
+        regs->ebx = (uint32_t)argv;
+        regs->ecx = envc;
+        regs->edx = (uint32_t)envp;
+        regs->useresp = useresp;
     }
 
     // restore to active pd

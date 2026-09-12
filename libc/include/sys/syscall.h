@@ -52,8 +52,8 @@ asm volatile("int $0x80" : "=a" (ret) : "0" (id), "b" (p1), "c" (p2), "d" (p3), 
 typedef struct {
     const char* path;
     bool is_user;
-    unsigned argc;
     char* args;
+    char* envs;
     bool attach;
     const char* stdin_path;
     const char* stdout_path;
@@ -68,7 +68,7 @@ void syscall_semaphore_kacquire(void* semaphore_ptr, uint32_t count);
 
 void syscall_yield();
 void syscall_attach(void* process_addr);
-int syscall_spawn(const char* path, bool is_user, unsigned argc, char* args, bool attach, const char* stdin_path, const char* stdout_path);
+int syscall_spawn(const char* path, bool is_user, char* args, char* envs, bool attach, const char* stdin_path, const char* stdout_path);
 void syscall_kill(int exit_code);
 void syscall_sleep(unsigned ticks);
 

@@ -12,3 +12,5 @@ void exit(int exit_code);
 
 char* itoa(int num, char* buff, int radix);
 int atoi(char* buff);
+
+const char* getenv(const char* name);

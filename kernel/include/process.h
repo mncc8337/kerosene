@@ -15,6 +15,7 @@
 #define USER_STACK_SIZE (64 * 1024)
 
 #define ARGS_MAX_LEN 512
+#define ENVS_MAX_LEN 1024
 
 enum PROCESS_STATE {
     PROCESS_STATE_READY,
@@ -32,7 +33,8 @@ typedef struct process {
     bool is_user;
 
     uint8_t argc; // arg counter
-    char args[ARGS_MAX_LEN]; // args separated by null \0
+    char args[ARGS_MAX_LEN]; // args separated by null \0, must be double null-terminated
+    char envs[ENVS_MAX_LEN]; // same as args but for env vars
 
     int received_exit_code; // return code from started process
                             // only set if the child process is attached
@@ -62,7 +64,7 @@ typedef struct {
 #define PROCESS_QUEUE_INIT {NULL, NULL, 0}
 
 // process.c
-process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, struct fs_node* cwd, unsigned argc, char* args);
+process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, struct fs_node* cwd, char* args, char* envs);
 process_t* process_make_idle();
 void process_delete(process_t* proc);
 void process_set_stdfile(process_t* proc, struct fs_node* stdin, uint32_t stdin_flags, struct fs_node* stdout, uint32_t stdout_flags);
@@ -79,7 +81,7 @@ void scheduler_push_ready(process_t* proc);
 void scheduler_add_process(process_t* proc);
 uint32_t scheduler_to_next_process(const regs_t* regs, bool add_back);
 uint32_t scheduler_attach(const regs_t* regs, process_t* proc);
-int scheduler_spawn(const char* path, bool is_user, unsigned argc, char* args, bool attach, struct fs_node* stdin, struct fs_node* stdout, int* returned_value);
+int scheduler_spawn(const char* path, bool is_user, char* args, char* envs, bool attach, struct fs_node* stdin, struct fs_node* stdout, int* returned_value);
 int scheduler_syscall_spawn(syscall_spawn_args_t* args);
 uint32_t scheduler_kill_process(const regs_t* regs, int exit_code);
 uint32_t scheduler_set_sleep(const regs_t* regs, unsigned ticks);

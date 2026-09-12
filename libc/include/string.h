@@ -10,9 +10,13 @@ void* memcpy(void* restrict dstptr, const void* restrict srcptr, size_t size);
 
 size_t strlen(const char* str);
 char* strrev(char* str);
+
 int strcmp(const char* str1, const char* str2);
 int strcmp_case_insensitive(const char* str1, const char* str2);
+int strncmp(const char* str1, const char* str2, size_t n);
+
 char* strtok_r(char* str, const char* delimiters, char** old);
 char* strtok(char* str, const char* delimiters);
+
 char* strcpy(char* restrict dst, const char* restrict src);
 char* strcat(char* restrict dst, const char* restrict src);

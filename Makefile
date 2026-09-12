@@ -21,7 +21,7 @@ LIBC_OBJ := $(addprefix $(OBJ_DIR)libc/, $(LIBC_C_SRC:.c=.o))
 LIBC_OBJ += $(addprefix $(OBJ_DIR)libc/, $(addsuffix .o, $(LIBC_A_SRC)))
 
 COREUTILS_SRC := $(shell cd coreutils && find -L * -type f -name '*.c')
-COREUTILS_ELF := $(addprefix $(BIN_DIR)coreutils/, $(COREUTILS_SRC:.c=.elf))
+COREUTILS_ELF := $(addprefix $(BIN_DIR)coreutils/, $(COREUTILS_SRC:.c=))
 
 SHELL_SRC := $(shell cd shell/src && find -L * -type f -name '*.c')
 SHELL_OBJ := $(addprefix $(OBJ_DIR)shell/, $(SHELL_SRC:.c=.o))
@@ -91,11 +91,11 @@ $(BIN_DIR)kerosene.elf: $(OBJ_DIR)kernel/kernel_entry.asm.o $(KERNEL_OBJ)
 $(OBJ_DIR)shell/%.o: shell/src/%.c
 	mkdir -p $$(dirname $@)
 	$(CC) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
-$(BIN_DIR)keroshell.elf: $(SHELL_OBJ) $(BIN_DIR)libc.a
+$(BIN_DIR)keroshell: $(SHELL_OBJ) $(BIN_DIR)libc.a
 	$(CC) $(CFLAGS) -I./libc/include $(LDFLAGS) -e _start -o $@ $(SHELL_OBJ) -L./bin $(LDLIBS)
 
 # coreutils
-$(BIN_DIR)coreutils/%.elf: coreutils/%.c $(BIN_DIR)libc.a
+$(BIN_DIR)coreutils/%: coreutils/%.c $(BIN_DIR)libc.a
 	$(CC) $(CFLAGS) -I./libc/include $(LDFLAGS) -e _start -o $@ $< -L./bin $(LDLIBS)
 
 # user app
@@ -108,7 +108,7 @@ kernel: libc $(BIN_DIR)kerosene.elf
 
 coreutils: libc $(COREUTILS_ELF)
 
-shell: libc $(BIN_DIR)keroshell.elf
+shell: libc $(BIN_DIR)keroshell
 
 userapp: libc $(USER_ELF)
 
@@ -121,7 +121,7 @@ copyfs: disk
 	cp $(BIN_DIR)kerosene.elf ./mnt/boot/ # update kernel
 	mkdir -p ./mnt/bin/
 	cp $(COREUTILS_ELF) ./mnt/bin/ # update coreutils
-	cp $(BIN_DIR)keroshell.elf ./mnt/bin/ # update shell
+	cp $(BIN_DIR)keroshell ./mnt/bin/ # update shell
 	for file in fsfiles/*; do cp -r $$file ./mnt/; done
 	./script/umount-device.sh
 

@@ -91,25 +91,25 @@ uint32_t scheduler_attach(const regs_t* regs, process_t* proc) {
 int scheduler_spawn(
     const char* path,
     bool is_user,
-    unsigned argc,
     char* args,
+    char* envs,
     bool attach,
     fs_node_t* stdin,
     fs_node_t* stdout,
     int* returned_value
 ) {
     process_t* current = current_process;
-    if(current->is_user && !is_user)
-        return -1;
 
-    if(current->is_user && !validate_user_buffer(current, args, ARGS_MAX_LEN))
-        return -1;
+    if(current->is_user) {
+        if(!is_user) return -1;
+        if(!validate_user_buffer(current, args, ARGS_MAX_LEN)) return -1;
+        if(!validate_user_buffer(current, envs, ENVS_MAX_LEN)) return -1;
+    }
 
     page_directory_t* pd = NULL;
     if(is_user) {
         pd = vmmngr_alloc_page_directory();
-        if(!pd)
-            return -1;
+        if(!pd) return -1;
     }
 
     uint32_t eip;
@@ -121,7 +121,7 @@ int scheduler_spawn(
         return -1;
     }
 
-    process_t* proc = process_new(eip, is_user, pd, NULL, argc, args);
+    process_t* proc = process_new(eip, is_user, pd, NULL, args, envs);
     if(!proc) {
         if(is_user) vmmngr_free_page_directory(pd);
         return -1;
@@ -191,8 +191,8 @@ int scheduler_syscall_spawn(syscall_spawn_args_t* args) {
     int result = scheduler_spawn(
         args->path,
         args->is_user,
-        args->argc,
         args->args,
+        args->envs,
         args->attach,
         stdin_node,
         stdout_node,
