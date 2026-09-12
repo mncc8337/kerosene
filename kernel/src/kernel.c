@@ -361,42 +361,34 @@ void kmain() {
 
     kprint_debug(LT_IF, "done initialising\n");
 
+    process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL, NULL, 0, NULL);
+    if(proc1) scheduler_add_process(proc1);
+    process_t* proc2 = process_new((uint32_t)kernel_proc2, false, NULL, NULL, 0, NULL);
+    if(proc2) scheduler_add_process(proc2);
+
+
     // should the kernel main process the init process?
     // currently the purpose of the kernel main process is to start other processes
     // that should be the job of the init process right?
 
     if(!vfs_mount("/fs0/bin", "/bin")) {
         // start the init process
+        int exit_code;
         scheduler_spawn(
             "/bin/keroshell.elf",
             true,
             1,
             "keroshell.elf",
-            false,
+            true,
             vfs_get_stdin(),
             vfs_get_stdout(),
-            NULL
+            &exit_code
         );
+
+        printf("keroshell exited with code %d\n", exit_code);
     }
 
-    int ret;
-    scheduler_spawn(
-        "/fs0/hi.elf",
-        true,
-        4,
-        "hi.elf\0test1\0test2\0test3",
-        true,
-        vfs_get_stdin(),
-        vfs_get_stdout(),
-        &ret
-    );
-    printf("hi.elf ret: %d\n", ret);
-
-    process_t* proc1 = process_new((uint32_t)kernel_proc1, false, NULL, NULL, 0, NULL);
-    if(proc1) scheduler_add_process(proc1);
-
-    process_t* proc2 = process_new((uint32_t)kernel_proc2, false, NULL, NULL, 0, NULL);
-    if(proc2) scheduler_add_process(proc2);
+    puts("idling ...");
 
     while(true) {
         asm volatile("sti; hlt;");
