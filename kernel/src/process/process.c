@@ -9,9 +9,20 @@
 
 static unsigned process_count = 0;
 
+// in process_new(),
+// args may allocated in lower half of the current process's page dir, which is not available
+// when switched to the new process (when creating new process)
+// so we need to copy it into the kernel memory heap, which is shared
+static char args_buffer[ARGS_MAX_LEN];
+
 process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs_node_t* cwd, unsigned argc, char* args) {
     process_t* proc = (process_t*)kmalloc(sizeof(process_t));
     if(!proc) return NULL;
+
+    if(is_user && argc > 0 && args) {
+        // copy args to the shared memory
+        memcpy(args_buffer, args, ARGS_MAX_LEN);
+    }
 
     // save active pd for reverting
     page_directory_t* active_pd = vmmngr_get_page_directory();
@@ -146,7 +157,7 @@ process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs
     proc->saved_esp = (uint32_t)regs;
 
     // pass argc and argv to user processes
-    if(is_user && argc > 0) {
+    if(is_user && argc > 0 && args) {
         // build argv
 
         // find all the \0 on args and store it on null_pos
@@ -157,7 +168,7 @@ process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs
                 argc = cnt;
                 break;
             }
-            if(args[idx] != '\0') continue;
+            if(args_buffer[idx] != '\0') continue;
             null_pos[cnt] = idx;
             cnt++;
         }
@@ -169,7 +180,7 @@ process_t* process_new(uint32_t eip, bool is_user, page_directory_t* pagedir, fs
         } else {
             // copy the truncated args to userstack
             char* trunc_args = (void*)(regs->useresp - null_pos[argc - 1] - 1);
-            memcpy(trunc_args, args, null_pos[argc - 1] + 1);
+            memcpy(trunc_args, args_buffer, null_pos[argc - 1] + 1);
 
             // build argv
             char** argv = (char**)(trunc_args - sizeof(char*) * (argc + 1));
