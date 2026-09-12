@@ -129,22 +129,37 @@ process_t* process_new(
     asm volatile("pushf; pop %0; cli" : "=r"(eflags_cr3));
 
     if(is_user) {
-        // switch page directory to create user heap
+        // switch page directory to set up the stack
         vmmngr_switch_page_directory(proc->page_directory);
         bool clean_up = false;
 
-        heap_t* heap = heap_new(UHEAP_START, UHEAP_INITIAL_SIZE, UHEAP_MAX_SIZE, 0b00);
-        if(!heap) {
-            clean_up = true;
-            goto clean_up;
-        }
-
-        proc->stack_addr = (uint32_t)heap_alloc(heap, USER_STACK_SIZE, false);
+        proc->stack_addr = (uint32_t)USER_STACK_TOP - USER_STACK_SIZE;
         if(!proc->stack_addr) {
             clean_up = true;
             goto clean_up;
         }
         stack_size = USER_STACK_SIZE;
+
+        // alloc/map the stack
+        size_t physical_blocks = USER_STACK_SIZE / MMNGR_PAGE_SIZE;
+        physical_addr_t phys = (physical_addr_t)pmmngr_alloc_multi_block(physical_blocks);
+        if(!phys) {
+            clean_up = true;
+            goto clean_up;
+        }
+        for(unsigned i = 0; i < USER_STACK_SIZE; i += MMNGR_PAGE_SIZE)
+            vmmngr_map(
+                NULL,
+                phys + i,
+                USER_STACK_TOP - USER_STACK_SIZE + i,
+                PTE_PRESENT | PTE_USER | PTE_WRITABLE
+            );
+
+        // NOTE:
+        // the phys allocated above is meant to be freed by calling vmmngr_free_page_directory()
+        // each page directory is created solely for one user process
+        // so this func will not try to free them to avoid double freeing
+        // and relies on the caller to do that instead
 
         proc->tss_esp0 = (uint32_t)kmalloc(KERNEL_STACK_SIZE);
         if(!proc->tss_esp0) {

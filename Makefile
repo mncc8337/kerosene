@@ -29,8 +29,12 @@ SHELL_OBJ := $(addprefix $(OBJ_DIR)shell/, $(SHELL_SRC:.c=.o))
 USER_SRC := $(shell cd userapp && find -L * -type f -name '*.c')
 USER_ELF := $(addprefix fsfiles/, $(USER_SRC:.c=.elf))
 
-# see .env
+# see example.env
 KERNEL_PARAMS := -DKERNEL_START=$(KERNEL_START) \
+				 -DKERNEL_STACK_SIZE=$(KERNEL_STACK_SIZE) \
+				 -DDEFAULT_EFLAGS=$(DEFAULT_EFLAGS) \
+				 -DMAX_FILE=$(MAX_FILE) \
+				 -DPROCESS_ALIVE_TICKS=$(PROCESS_ALIVE_TICKS) \
 				 -DVMMNGR_TEMP_TABLE=$(VMMNGR_TEMP_TABLE) \
 				 -DVMMNGR_TEMP_PD=$(VMMNGR_TEMP_PD) \
 				 -DVIDEO_START=$(VIDEO_START) \
@@ -40,9 +44,10 @@ KERNEL_PARAMS := -DKERNEL_START=$(KERNEL_START) \
 				 -DRHEAP_START=$(RHEAP_START) \
 				 -DRHEAP_INITIAL_SIZE=$(RHEAP_INITIAL_SIZE) \
 				 -DRHEAP_MAX_SIZE=$(RHEAP_MAX_SIZE) \
-				 -DUHEAP_START=$(UHEAP_START) \
-				 -DUHEAP_INITIAL_SIZE=$(UHEAP_INITIAL_SIZE) \
-				 -DUHEAP_MAX_SIZE=$(UHEAP_MAX_SIZE) \
+				 -DUSER_STACK_TOP=$(USER_STACK_TOP) \
+				 -DUSER_STACK_SIZE=$(USER_STACK_SIZE) \
+				 -DARGS_MAX_LEN=$(ARGS_MAX_LEN) \
+				 -DENVS_MAX_LEN=$(ENVS_MAX_LEN) \
 
 CFLAGS = -ffreestanding -O0 -Wall -Wextra -g -MMD -MP
 LDFLAGS = -nostdlib
@@ -79,7 +84,7 @@ $(BIN_DIR)libc.a: $(LIBC_OBJ)
 # kernel
 $(OBJ_DIR)kernel/%.o: kernel/src/%.c
 	mkdir -p $$(dirname $@)
-	$(CC) $(CFLAGS) $(KERNEL_PARAMS) $(CFLAGS) -o $@ $(C_INCLUDES) -c $<
+	$(CC) $(CFLAGS) $(KERNEL_PARAMS) -o $@ $(C_INCLUDES) -c $<
 $(OBJ_DIR)kernel/%.asm.o: kernel/src/%.asm
 	mkdir -p $$(dirname $@)
 	$(AS) $(ASFLAGS) -o $@ $<

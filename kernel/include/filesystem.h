@@ -13,13 +13,11 @@
 #include <sys/filesystem.h>
 #include <semaphore.h>
 
-#define MAX_FILE 128
-
 // this must be a multiply of 4 and is larger than 5
 #define RAMFS_DATANODE_SIZE 512
 
 // should be a multiple of RAMFS_DATANODE_SIZE
-#define RAMFS_PIPE_SIZE (RAMFS_DATANODE_SIZE * 1)
+#define RAMFS_PIPE_SIZE (RAMFS_DATANODE_SIZE * 4)
 
 typedef enum {
     FS_EMPTY,

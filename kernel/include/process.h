@@ -6,17 +6,6 @@
 #include <mem.h>
 #include <system.h>
 
-// how many ticks a process will run before got switch to others
-#define PROCESS_ALIVE_TICKS 4
-
-// TODO: move these to .env
-#define DEFAULT_EFLAGS 0x202
-#define KERNEL_STACK_SIZE (8 * 1024)
-#define USER_STACK_SIZE (64 * 1024)
-
-#define ARGS_MAX_LEN 512
-#define ENVS_MAX_LEN 1024
-
 enum PROCESS_STATE {
     PROCESS_STATE_READY,
     PROCESS_STATE_ACTIVE,
