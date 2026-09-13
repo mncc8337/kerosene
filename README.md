@@ -10,6 +10,7 @@ A WIP hobby x86 monolithic OS.
 - support blocking I/O
 - user processes and memory space isolation between them
 - various syscalls to interact with the virtual filesystem and the scheduler
+
 see [features.md](features.md) for more.
 ## Build and run
 ### Prerequisite
