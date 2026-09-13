@@ -16,7 +16,7 @@ void stack_trace(stackframe_t* stk) {
         asm("movl %%ebp, %0" : "=r"(stk));
 
     for(unsigned frame = 0; stk && frame < MAX_FRAMES; frame++) {
-        if(!vmmngr_to_physical_addr(NULL, (virtual_addr_t)stk)) {
+        if(!vmmngr_to_physical_addr(NULL, (vaddr_t)stk)) {
             kprintf("unmapped EBP address: 0x%x\n", stk);
             return;
         }

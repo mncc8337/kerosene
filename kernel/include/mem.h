@@ -14,8 +14,8 @@ typedef enum {
 
 typedef uint32_t pde_t;
 typedef uint32_t pte_t;
-typedef uint32_t physical_addr_t;
-typedef uint32_t virtual_addr_t;
+typedef uint32_t paddr_t;
+typedef uint32_t vaddr_t;
 
 #define MMNGR_PAGE_SIZE 4096
 
@@ -95,25 +95,25 @@ void pmmngr_update_usage();
 size_t pmmngr_get_size();
 size_t pmmngr_get_used_size();
 size_t pmmngr_get_free_size();
-void pmmngr_init_region(physical_addr_t base, size_t size);
-void pmmngr_deinit_region(physical_addr_t base, size_t size);
-physical_addr_t pmmngr_alloc_block();
-physical_addr_t pmmngr_alloc_multi_block(size_t cnt);
-void pmmngr_free_block(physical_addr_t addr);
-void pmmngr_free_multi_block(physical_addr_t addr, size_t cnt);
+void pmmngr_init_region(paddr_t base, size_t size);
+void pmmngr_deinit_region(paddr_t base, size_t size);
+paddr_t pmmngr_alloc_block();
+paddr_t pmmngr_alloc_multi_block(size_t cnt);
+void pmmngr_free_block(paddr_t addr);
+void pmmngr_free_multi_block(paddr_t addr, size_t cnt);
 void pmmngr_init(size_t size);
 
 // vmmngr.c
 page_directory_t* vmmngr_get_page_directory();
-physical_addr_t vmmngr_to_physical_addr(page_directory_t* page_directory, virtual_addr_t virt);
-MEM_ERR vmmngr_map(const page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags);
-void vmmngr_unmap(const page_directory_t* page_directory, virtual_addr_t virt);
+paddr_t vmmngr_to_physical_addr(page_directory_t* page_directory, vaddr_t virt);
+MEM_ERR vmmngr_map(const page_directory_t* page_directory, paddr_t phys, vaddr_t virt, unsigned flags);
+void vmmngr_unmap(const page_directory_t* page_directory, vaddr_t virt);
 MEM_ERR vmmngr_alloc_page(pte_t* pte);
 void vmmngr_free_page(pte_t* pte);
 page_directory_t* vmmngr_alloc_page_directory();
 void vmmngr_free_page_directory(page_directory_t* page_directory);
 void vmmngr_switch_page_directory(const page_directory_t* dir);
-void vmmngr_flush_tlb_entry(virtual_addr_t addr);
+void vmmngr_flush_tlb_entry(vaddr_t addr);
 void vmmngr_flush_tlb();
 void vmmngr_init();
 

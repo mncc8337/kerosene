@@ -6,7 +6,7 @@
 
 static page_directory_t* current_page_directory = 0;
 
-static void page_entry_set_frame(uint32_t* pe, physical_addr_t addr) {
+static void page_entry_set_frame(uint32_t* pe, paddr_t addr) {
     *pe = (*pe & ~PAGE_FRAME_BITS) | addr;
 }
 static void page_entry_add_attrib(uint32_t* pe, uint16_t attrib) {
@@ -20,7 +20,7 @@ static void map_temporary_pd(const page_directory_t* pd) {
     // manual mapping for efficiency
     page_table_t* pt = PAGE_TABLE_ADDR(PAGE_DIRECTORY_INDEX(VMMNGR_TEMP_PD));
     pte_t* pte = PAGE_TABLE_LOOKUP(pt, VMMNGR_TEMP_PD);
-    *pte = (physical_addr_t)pd | PTE_PRESENT | PTE_WRITABLE;
+    *pte = (paddr_t)pd | PTE_PRESENT | PTE_WRITABLE;
     vmmngr_flush_tlb_entry(VMMNGR_TEMP_PD);
 }
 
@@ -31,7 +31,7 @@ static void unmap_temporary_pd() {
     vmmngr_flush_tlb_entry(VMMNGR_TEMP_PD);
 }
 
-static void map_temporary_pt(physical_addr_t phys) {
+static void map_temporary_pt(paddr_t phys) {
     pte_t* pte = PAGE_TABLE_LOOKUP(PAGE_TABLE_ADDR(PAGE_DIRECTORY_INDEX(VMMNGR_TEMP_TABLE)), VMMNGR_TEMP_TABLE);
     *pte = phys | PTE_PRESENT | PTE_WRITABLE;
     vmmngr_flush_tlb_entry(VMMNGR_TEMP_TABLE);
@@ -48,7 +48,7 @@ page_directory_t* vmmngr_get_page_directory() {
     return current_page_directory;
 }
 
-physical_addr_t vmmngr_to_physical_addr(page_directory_t* page_directory, virtual_addr_t virt) {
+paddr_t vmmngr_to_physical_addr(page_directory_t* page_directory, vaddr_t virt) {
     bool mapped_temp_table = false;
 
     uint32_t eflags;
@@ -72,7 +72,7 @@ physical_addr_t vmmngr_to_physical_addr(page_directory_t* page_directory, virtua
     // map the page table to access it if the pd is inactive
     page_table_t* table_to_modify;
     if(page_directory) {
-        physical_addr_t phys = (*pde) & PAGE_FRAME_BITS;
+        paddr_t phys = (*pde) & PAGE_FRAME_BITS;
         map_temporary_pt(phys);
         table_to_modify = (page_table_t*)VMMNGR_TEMP_TABLE;
         mapped_temp_table = true;
@@ -98,10 +98,10 @@ clean:
     if(not_present)
         return 0;
 
-    return (physical_addr_t)(*pte & PAGE_FRAME_BITS);
+    return (paddr_t)(*pte & PAGE_FRAME_BITS);
 }
 
-MEM_ERR vmmngr_map(const page_directory_t* page_directory, physical_addr_t phys, virtual_addr_t virt, unsigned flags) {
+MEM_ERR vmmngr_map(const page_directory_t* page_directory, paddr_t phys, vaddr_t virt, unsigned flags) {
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
 
@@ -120,7 +120,7 @@ MEM_ERR vmmngr_map(const page_directory_t* page_directory, physical_addr_t phys,
     bool new_table = false;
     // if the page table is not present then allocate it
     if(!(*pde & PDE_PRESENT)) {
-        physical_addr_t new_phys = pmmngr_alloc_block();
+        paddr_t new_phys = pmmngr_alloc_block();
         if(!new_phys) {
             if(page_directory)
                 unmap_temporary_pd();
@@ -144,7 +144,7 @@ MEM_ERR vmmngr_map(const page_directory_t* page_directory, physical_addr_t phys,
     } else {
         if(page_directory) {
             // pd is inactive, so we must map the table temporarily
-            physical_addr_t existing_phys = (*pde) & PAGE_FRAME_BITS;
+            paddr_t existing_phys = (*pde) & PAGE_FRAME_BITS;
             map_temporary_pt(existing_phys);
             mapped_temp_table = true;
             table_to_modify = (page_table_t*)VMMNGR_TEMP_TABLE;
@@ -174,7 +174,7 @@ MEM_ERR vmmngr_map(const page_directory_t* page_directory, physical_addr_t phys,
     return ERR_MEM_SUCCESS;
 }
 
-void vmmngr_unmap(const page_directory_t* page_directory, virtual_addr_t virt) {
+void vmmngr_unmap(const page_directory_t* page_directory, vaddr_t virt) {
     uint32_t eflags;
     asm volatile("pushf; pop %0; cli" : "=r"(eflags));
 
@@ -193,7 +193,7 @@ void vmmngr_unmap(const page_directory_t* page_directory, virtual_addr_t virt) {
     // map the page table to access it if the pd is inactive
     page_table_t* table_to_modify;
     if(page_directory) {
-        physical_addr_t phys = (*pde) & PAGE_FRAME_BITS;
+        paddr_t phys = (*pde) & PAGE_FRAME_BITS;
         map_temporary_pt(phys);
         table_to_modify = (page_table_t*)VMMNGR_TEMP_TABLE;
         mapped_temp_table = true;
@@ -220,7 +220,7 @@ clean:
 }
 
 MEM_ERR vmmngr_alloc_page(pte_t* pte) {
-    physical_addr_t p = pmmngr_alloc_block();
+    paddr_t p = pmmngr_alloc_block();
     if(!p) return ERR_MEM_OOM;
 
     page_entry_set_frame(pte, p);
@@ -230,7 +230,7 @@ MEM_ERR vmmngr_alloc_page(pte_t* pte) {
 }
 
 void vmmngr_free_page(pte_t* pte) {
-    physical_addr_t p = (physical_addr_t)(*pte & PAGE_FRAME_BITS);
+    paddr_t p = (paddr_t)(*pte & PAGE_FRAME_BITS);
     if(p) pmmngr_free_block(p);
 
     page_entry_del_attrib(pte, PTE_PRESENT);
@@ -261,7 +261,7 @@ page_directory_t* vmmngr_alloc_page_directory() {
     // this also map itself to VMMNGR_PD (0xfffff000)
     pde_t* final_pde = &virt_pd->entry[1023];
     page_entry_add_attrib(final_pde, PDE_PRESENT | PDE_WRITABLE);
-    page_entry_set_frame(final_pde, (physical_addr_t)pd);
+    page_entry_set_frame(final_pde, (paddr_t)pd);
 
     unmap_temporary_pd();
     asm volatile("push %0; popf" : : "r"(eflags));
@@ -281,13 +281,13 @@ void vmmngr_free_page_directory(page_directory_t* page_directory) {
         if(i * MMNGR_PAGE_SIZE * 1024 >= KERNEL_START) break;
 
         if(virt_pd->entry[i] == 0) continue;
-        physical_addr_t phys_table = (virt_pd->entry[i] & PAGE_FRAME_BITS);
+        paddr_t phys_table = (virt_pd->entry[i] & PAGE_FRAME_BITS);
         map_temporary_pt(phys_table);
         page_table_t* virt_table = (page_table_t*)VMMNGR_TEMP_TABLE;
 
         // free memory to map that page table
         for(int j = 0; j < 1024; j++) {
-            physical_addr_t frame = virt_table->entry[j] & PAGE_FRAME_BITS;
+            paddr_t frame = virt_table->entry[j] & PAGE_FRAME_BITS;
             if(frame)
                 pmmngr_free_block(frame);
         }
@@ -297,7 +297,7 @@ void vmmngr_free_page_directory(page_directory_t* page_directory) {
         unmap_temporary_pt();
     }
 
-    pmmngr_free_block((physical_addr_t)page_directory);
+    pmmngr_free_block((paddr_t)page_directory);
 
     unmap_temporary_pd();
     asm volatile("push %0; popf" : : "r"(eflags));
@@ -310,7 +310,7 @@ void vmmngr_switch_page_directory(const page_directory_t* dir) {
     asm volatile("mov %0, %%cr3" : : "r" (dir));
 }
 
-void vmmngr_flush_tlb_entry(virtual_addr_t addr) {
+void vmmngr_flush_tlb_entry(vaddr_t addr) {
     asm volatile("invlpg %0" : : "m" (*(char*)addr) : "memory");
 }
 

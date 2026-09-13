@@ -151,7 +151,7 @@ process_t* process_new(
 
         // alloc/map the stack
         size_t physical_blocks = USER_STACK_SIZE / MMNGR_PAGE_SIZE;
-        physical_addr_t phys = pmmngr_alloc_multi_block(physical_blocks);
+        paddr_t phys = pmmngr_alloc_multi_block(physical_blocks);
         if(!phys) {
             clean_up = true;
             goto clean_up;
@@ -209,7 +209,7 @@ process_t* process_new(
     // so we shift it by sizeof(virtual_addr_t) to safely contain
     // the stack within the allocated block
     // and set stack_top to 0 for the backtracer to return gracefully
-    uint32_t stack_top = proc->stack_addr + stack_size - sizeof(virtual_addr_t);
+    uint32_t stack_top = proc->stack_addr + stack_size - sizeof(vaddr_t);
     *(uint32_t*)stack_top = 0;
 
     // fake pushing default register states

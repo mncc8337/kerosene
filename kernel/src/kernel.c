@@ -63,7 +63,7 @@ void mem_init(void* mmap_addr, uint32_t mmap_length) {
 }
 
 void video_init(multiboot_info_t* mbd) {
-    virtual_addr_t video_addr = 0;
+    vaddr_t video_addr = 0;
     unsigned video_width = 0;
     unsigned video_height = 0;
     unsigned video_pitch = 0;

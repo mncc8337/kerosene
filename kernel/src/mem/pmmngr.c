@@ -106,7 +106,7 @@ size_t pmmngr_get_free_size() {
     return (total_block - used_block) * MMNGR_PAGE_SIZE;
 }
 
-void pmmngr_init_region(physical_addr_t base, size_t size) {
+void pmmngr_init_region(paddr_t base, size_t size) {
     int start = base / MMNGR_PAGE_SIZE;
     int block = size / MMNGR_PAGE_SIZE;
 
@@ -116,7 +116,7 @@ void pmmngr_init_region(physical_addr_t base, size_t size) {
     set_bit(0); 
 }
 
-void pmmngr_deinit_region(physical_addr_t base, size_t size) {
+void pmmngr_deinit_region(paddr_t base, size_t size) {
     int start = base / MMNGR_PAGE_SIZE;
     int block = size / MMNGR_PAGE_SIZE;
 
@@ -124,19 +124,19 @@ void pmmngr_deinit_region(physical_addr_t base, size_t size) {
         set_bit(start++);
 }
 
-physical_addr_t pmmngr_alloc_block() {
+paddr_t pmmngr_alloc_block() {
     if(total_block == used_block) return 0;
     int frame = find_first_free_block();
     if(frame == -1) return 0;
 
     set_bit(frame);
 
-    physical_addr_t base = frame * MMNGR_PAGE_SIZE;
+    paddr_t base = frame * MMNGR_PAGE_SIZE;
     used_block++;
 
     return base;
 }
-physical_addr_t pmmngr_alloc_multi_block(size_t cnt) {
+paddr_t pmmngr_alloc_multi_block(size_t cnt) {
     if(used_block + cnt > total_block) return 0;
     int frame = find_first_free(cnt);
     if(frame == -1) return 0;
@@ -144,12 +144,12 @@ physical_addr_t pmmngr_alloc_multi_block(size_t cnt) {
     for(uint32_t i = 0; i < cnt; i++)
         set_bit(frame + i);
 
-    physical_addr_t addr = frame * MMNGR_PAGE_SIZE;
+    paddr_t addr = frame * MMNGR_PAGE_SIZE;
     used_block += cnt;
 
     return addr;
 }
-void pmmngr_free_block(physical_addr_t addr) {
+void pmmngr_free_block(paddr_t addr) {
     int frame = addr / MMNGR_PAGE_SIZE;
 
     if(frame == 0) return;
@@ -159,7 +159,7 @@ void pmmngr_free_block(physical_addr_t addr) {
         used_block--;
     }
 }
-void pmmngr_free_multi_block(physical_addr_t addr, size_t cnt) {
+void pmmngr_free_multi_block(paddr_t addr, size_t cnt) {
     int frame = addr / MMNGR_PAGE_SIZE;
 
     if(frame == 0) return;
