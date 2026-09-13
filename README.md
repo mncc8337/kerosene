@@ -11,7 +11,7 @@ A WIP hobby x86 monolithic OS.
 - user processes and memory space isolation between them
 - various syscalls to interact with the virtual filesystem and the scheduler
 
-see [features.md](features.md) for more.
+see [features.md](docs/features.md) for more.
 ## Build and run
 ### Prerequisite
 - a [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors.
