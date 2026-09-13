@@ -1,16 +1,19 @@
 # Kerosene
 A WIP hobby x86 monolithic OS.
 ## Features
-- PS/2 keyboard driver
 - basic framebuffer video driver
-- PIT
+- PS/2 keyboard driver
+- RTC clock
 - ATA PIO mode
-- FAT32 filesystem
-- ramfs filesystem
-- virtual filesystem
+- support FAT32 filesystem
+- round-robin scheduler
+- support blocking I/O
+- user processes and memory space isolation between them
+- various syscalls to interact with the virtual filesystem and the scheduler
+see [features.md](features.md) for more.
 ## Build and run
 ### Prerequisite
-- A [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors.
+- a [GCC cross compiler](https://wiki.osdev.org/GCC_Cross-Compiler). although preinstalled GCC on linux will compile it just fine, the osdev wiki said we should use a cross compiler to avoid any unexpected errors.
     + if you are lazy to install one, use `make all NO_CROSS_COMPILER=1` to compile using linux GCC.
     + if you have cross compiling tools then please check and correct the `CROSS_COMPILER_LOC` in `.env`
 - nasm
@@ -20,26 +23,17 @@ A WIP hobby x86 monolithic OS.
 ### Build and run
 > [!Note]
 > - This project is only built and tested on a linux machine (arch btw). Maybe on Windows with WSL or other OS will build and run just fine, though it is not guaranteed.
-> - some scripts in `script/` will need sudo privilege to setup loopback device for the hard disk image.
+> - `script/gendiskimage.sh` needs sudo privilege to format and install GRUB to the disk image.
 
-make sure to source enviroment vars before doing anything. makefile and shell scripts depend heavily on them.
+make sure to source enviroment vars before doing anything. shell scripts depend heavily on them. you don't need to do this if running `make` though.
 ```sh
 cp example.env .env
 export $(grep -v '^#' .env | xargs)
-```
-#### build
-```sh
 chmod +x script/*.sh
-make all
 ```
-#### run
-```sh
-make run
-```
-#### make iso
-```sh
-./script/geniso.sh
-```
+- build: `make all`
+- run: `make run` or `./script/run.sh`
+- make iso: `./script/geniso.sh`
 #### edit the fs files
 - first mount the disk device
 ```sh
@@ -61,86 +55,6 @@ You can either make an iso `./script/geniso.sh` and burn it to an usb or use `su
 > [!Caution]
 > - I am not responsible for any damage caused to your machine by the OS. Try this with your own risk!
 > - I do not test the runability of the OS on every commits so don't expect it to run normaly. Also i do not own many pc to test properly so it maybe only works on my pc.
-## Progress
-### Kernel stuffs
-- [x] load GDT in the kernel
-- [x] load IDT in the kernel
-- [x] handle exception interrupts
-- [x] handle interrupts send by PIC
-- [x] higher half kernel
-- [ ] multiprocessor support
-### Hardware drivers
-- PS/2
-    + PS/2 keyboard driver
-        + [x] get key scancode
-        + [x] translate scancode to keycode
-        + [x] LED indicating
-    + [ ] PS/2 mouse driver
-- memory manager
-    + physical memory manager
-        + [x] bitmap allocator
-    + [x] virtual memory manager
-    + heap
-        + [x] first-fit allocator
-- ATA
-    + [x] PIO mode
-    + [ ] SATA
-- [x] CMOS and RTC: get datetime
-- [ ] APCI
-- counter
-    + PIT
-        + [x] generate ticks
-        + [x] PC speaker beep beep boop boop
-    + [ ] APIC
-    + [ ] HPET
-- video
-    + [x] vga
-    + framebuffer
-        + [x] plot pixel
-        + [x] render psf fonts
-- USB
-    + [ ] keyboard
-    + [ ] mouse
-- [ ] sound
-- [ ] networking
-### Filesystem
-- [x] MBR support
-- [ ] GPT support
-- fs
-    + [x] FAT32
-    + [ ] ext2
-    + [x] ramfs
-- vfs
-    + [x] node tree
-    + [x] find node in tree
-    + [x] unused node clean up
-    + [ ] symlink
-    + [ ] permission
-### Userland
-- [x] TSS setup
-- [x] enter usermode
-- syscall
-    + [x] putchar() and variants
-    + [x] current time
-    + [x] terminate process
-    + [x] sleep()
-    + vfs
-        + [x] open file
-        + [x] close file
-        + [x] read file
-        + [x] write file
-        + [x] file seek
-        + [ ] remove file
-        + [ ] mkdir
-        + [ ] remove dir
-        + [ ] dir iteration
-- scheduler
-    + [x] load process
-    + [x] load and save process state
-    + [x] basic process scheduling (round robin)
-    + [x] process terminate
-    + [x] spinlock
-- [x] load and run ELF files
 ## Learning resources
 > [!Tip]
 > Anything related to osdev can be found on [the osdev wiki](http://wiki.osdev.org/Expanded_Main_Page)
