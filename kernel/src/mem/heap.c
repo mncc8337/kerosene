@@ -95,8 +95,17 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
         if(page_align) {
             uint32_t addr = (uint32_t)header + sizeof(heap_header_t);
             size_t new_size = reg_size;
-            if(addr % MMNGR_PAGE_SIZE > 0)
-                new_size += MMNGR_PAGE_SIZE - addr % MMNGR_PAGE_SIZE;
+            if(addr % MMNGR_PAGE_SIZE > 0) {
+                uint32_t offset = MMNGR_PAGE_SIZE - addr % MMNGR_PAGE_SIZE;
+
+                // if there is no prev region to merge with the excessive bytes
+                // and the excessive bytes are not large enough to create a new region
+                // then just skip
+                if(offset < sizeof(heap_header_t) + MIN_REGION_SIZE && header->prev == NULL)
+                    goto next_header;
+
+                new_size += offset;
+            }
 
             if(header->size >= new_size) break;
         } else if(header->size >= reg_size) break;
@@ -105,15 +114,30 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
         final_header = header;
         header = HEAP_NEXT_HEADER(header);
     }
-    if((uint32_t)header >= heap->end) {
-        // new memory region should start at the end
-        header = (heap_header_t*)heap->end;
 
+    // expand the heap if no suitable region is found
+    if((uint32_t)header >= heap->end) {
         // ensure that we have enough memory after expanding
         unsigned needed_size = 0;
-        if(final_header->magic == HEAP_USED) needed_size = size + sizeof(heap_header_t);
-        else needed_size = size - final_header->size;
+        uint32_t potential_addr;
+        if(final_header->magic == HEAP_USED) {
+            // create a new region at heap->end
+            needed_size = size + sizeof(heap_header_t);
+            potential_addr = heap->end + sizeof(heap_header_t);
+        } else {
+            // expand the last header by size - final_header->size
+            // final_header->size must be smaller than size since the slot finder code above
+            // skip this region
+            needed_size = size - final_header->size;
+            potential_addr = (uint32_t)final_header + sizeof(heap_header_t);
+        }
 
+        // accounting for page aligning padding
+        if(page_align && potential_addr % MMNGR_PAGE_SIZE > 0) {
+            needed_size += MMNGR_PAGE_SIZE - potential_addr % MMNGR_PAGE_SIZE;
+        }
+
+        // round up needed_size
         if(needed_size % MMNGR_PAGE_SIZE > 0)
             needed_size += MMNGR_PAGE_SIZE - needed_size % MMNGR_PAGE_SIZE;
 
@@ -207,23 +231,21 @@ void heap_free(heap_t* heap, void* addr) {
     }
 
     // merge with previous region
-    bool prev_merged = false;
-    if(prevh && prevh->magic == HEAP_FREE) {
+    bool merge_prev = prevh && prevh->magic == HEAP_FREE;
+    if(merge_prev) {
         prevh->size += header->size + sizeof(heap_header_t);
 
         // update next header
         heap_header_t* n = HEAP_NEXT_HEADER(prevh);
         if((uint32_t)n < heap->end) n->prev = prevh;
-
-        prev_merged = true;
     }
 
     // since the next region can only merged into the current region
     // and the current region can only merged into the prev region
     // then the result region can only be the prev region (if merged) or the current region
-    heap_header_t* result_region = (prev_merged) ? prevh : header;
+    heap_header_t* result_region = (merge_prev) ? prevh : header;
 
-    if((uint32_t)HEAP_NEXT_HEADER(result_region) == heap->end) {
+    if((uint32_t)HEAP_NEXT_HEADER(result_region) >= heap->end) {
         // we have merged the final region of the heap into the current region
         // that mean we can contract if possible
         size_t total_size = heap->end - (uint32_t)heap;
