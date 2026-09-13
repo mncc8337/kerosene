@@ -10,7 +10,7 @@
 
 heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags) {
     // map heap
-    physical_addr_t phys = (physical_addr_t)pmmngr_alloc_multi_block(size / MMNGR_PAGE_SIZE);
+    physical_addr_t phys = pmmngr_alloc_multi_block(size / MMNGR_PAGE_SIZE);
     if(!phys) return 0;
     int f = PTE_PRESENT;
     if(!(flags & HEAP_SUPERVISOR)) f |= PTE_USER;
@@ -37,7 +37,7 @@ heap_t* heap_new(uint32_t start, uint32_t size, size_t max_size, uint8_t flags) 
 bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header) {
     if(heap->end + page_count * MMNGR_PAGE_SIZE > heap->max_addr) return true;
 
-    physical_addr_t new_page = (physical_addr_t)pmmngr_alloc_multi_block(page_count);
+    physical_addr_t new_page = pmmngr_alloc_multi_block(page_count);
     if(!new_page) return true;
 
     int flags = PTE_PRESENT;

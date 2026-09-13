@@ -84,7 +84,7 @@ static ELF_ERR _elf_load(fs_node_t* node, void* addr, page_directory_t* pd, uint
         flags |= PTE_USER;
 
     // TODO: check and apply flags for each section
-    physical_addr_t phys = (physical_addr_t)pmmngr_alloc_multi_block(required_pages);
+    physical_addr_t phys = pmmngr_alloc_multi_block(required_pages);
     if(!phys) return ERR_ELF_OOM;
     for(unsigned i = 0; i < required_pages; i++) {
         MEM_ERR mem_err = vmmngr_map(pd, phys + i * MMNGR_PAGE_SIZE, minaddr + i * MMNGR_PAGE_SIZE, flags);

@@ -120,7 +120,7 @@ MEM_ERR vmmngr_map(const page_directory_t* page_directory, physical_addr_t phys,
     bool new_table = false;
     // if the page table is not present then allocate it
     if(!(*pde & PDE_PRESENT)) {
-        physical_addr_t new_phys = (physical_addr_t)pmmngr_alloc_block();
+        physical_addr_t new_phys = pmmngr_alloc_block();
         if(!new_phys) {
             if(page_directory)
                 unmap_temporary_pd();
@@ -220,10 +220,10 @@ clean:
 }
 
 MEM_ERR vmmngr_alloc_page(pte_t* pte) {
-    void* p = pmmngr_alloc_block();
+    physical_addr_t p = pmmngr_alloc_block();
     if(!p) return ERR_MEM_OOM;
 
-    page_entry_set_frame(pte, (physical_addr_t)p);
+    page_entry_set_frame(pte, p);
     page_entry_add_attrib(pte, PTE_PRESENT);
 
     return ERR_MEM_SUCCESS;

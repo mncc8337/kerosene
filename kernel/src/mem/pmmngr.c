@@ -124,22 +124,22 @@ void pmmngr_deinit_region(physical_addr_t base, size_t size) {
         set_bit(start++);
 }
 
-void* pmmngr_alloc_block() {
-    if(total_block == used_block) return NULL;
+physical_addr_t pmmngr_alloc_block() {
+    if(total_block == used_block) return 0;
     int frame = find_first_free_block();
-    if(frame == -1) return NULL;
+    if(frame == -1) return 0;
 
     set_bit(frame);
 
     physical_addr_t base = frame * MMNGR_PAGE_SIZE;
     used_block++;
 
-    return (void*)base;
+    return base;
 }
-void* pmmngr_alloc_multi_block(size_t cnt) {
-    if(used_block + cnt > total_block) return NULL;
+physical_addr_t pmmngr_alloc_multi_block(size_t cnt) {
+    if(used_block + cnt > total_block) return 0;
     int frame = find_first_free(cnt);
-    if(frame == -1) return NULL;
+    if(frame == -1) return 0;
 
     for(uint32_t i = 0; i < cnt; i++)
         set_bit(frame + i);
@@ -147,7 +147,7 @@ void* pmmngr_alloc_multi_block(size_t cnt) {
     physical_addr_t addr = frame * MMNGR_PAGE_SIZE;
     used_block += cnt;
 
-    return (void*)addr;
+    return addr;
 }
 void pmmngr_free_block(physical_addr_t addr) {
     int frame = addr / MMNGR_PAGE_SIZE;

@@ -151,7 +151,7 @@ process_t* process_new(
 
         // alloc/map the stack
         size_t physical_blocks = USER_STACK_SIZE / MMNGR_PAGE_SIZE;
-        physical_addr_t phys = (physical_addr_t)pmmngr_alloc_multi_block(physical_blocks);
+        physical_addr_t phys = pmmngr_alloc_multi_block(physical_blocks);
         if(!phys) {
             clean_up = true;
             goto clean_up;

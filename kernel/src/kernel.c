@@ -378,7 +378,7 @@ void kmain() {
             "/bin/keroshell",
             true,
             "/bin/keroshell\0",
-            "PWD=/\0PING=PONG\0",
+            "PWD=/\0PATH=/bin\0PING=PONG\0",
             true,
             vfs_get_stdin(),
             vfs_get_stdout(),
