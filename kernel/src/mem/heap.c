@@ -1,5 +1,6 @@
 #include <mem.h>
 #include <spinlock.h>
+#include <stdint.h>
 
 // heap implementation using first-fit algorithm
 // allocating complexity is O(n)
@@ -63,7 +64,7 @@ bool heap_expand(heap_t* heap, size_t page_count, heap_header_t* last_header) {
     return false;
 }
 
-// contract heap, please ensure that the last_header size is larger that page_count * MMNGR_PAGE_SIZE + MIN_REGION_SIZE
+// contract heap, caller must ensure that the last_header size is larger that page_count * MMNGR_PAGE_SIZE + MIN_REGION_SIZE
 void heap_contract(heap_t* heap, size_t page_count, heap_header_t* last_header) {
     // recalculate page_count if it is overshoot min_size
     int remain_size = (heap->end - page_count * MMNGR_PAGE_SIZE) - (uint32_t)heap;
@@ -133,7 +134,7 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
         page_aligned_addr += offset;
     }
 
-    size_t spare_bytes = header->size - size - sizeof(heap_header_t);
+    size_t spare_bytes = header->size - temp_size - sizeof(heap_header_t);
     // only split into 2 regions if the remain size is sufficient
     if(spare_bytes >= MIN_REGION_SIZE) {
         heap_header_t* newh = (heap_header_t*)((void*)header + sizeof(heap_header_t) + temp_size);
@@ -145,34 +146,38 @@ void* heap_alloc(heap_t* heap, size_t size, bool page_align) {
         heap_header_t* n = HEAP_NEXT_HEADER(newh);
         if((uint32_t)n < heap->end) n->prev = newh;
 
-        header->size = size;
+        header->size = temp_size;
     }
     header->magic = HEAP_USED;
 
     if(page_align) {
         heap_header_t* newh = (heap_header_t*)(page_aligned_addr - sizeof(heap_header_t));
-        newh->magic = HEAP_USED;
-        newh->size = size;
-        header->magic = HEAP_FREE;
-
-        // update next header
-        heap_header_t* n = HEAP_NEXT_HEADER(newh);
-        if((uint32_t)n < heap->end) n->prev = newh;
-
-        // only split if headers are not overlap and size is larger than minimum
         uint32_t diff = (uint32_t)newh - (uint32_t)header;
-        if(diff >= sizeof(heap_header_t) + MIN_REGION_SIZE) {
-            header->size = diff - sizeof(heap_header_t);
-            newh->prev = header;
-        } else {
-            // merge the excess bytes to previous region, used or not used
-            heap_header_t* prevh = header->prev;
-            prevh->size += diff;
-            newh->prev = prevh;
-        }
 
-        // swap to return
-        header = newh;
+        if(diff > 0) {
+            // only set if newh and header is different
+            newh->magic = HEAP_USED;
+            newh->size = size;
+            header->magic = HEAP_FREE;
+
+            // update next header
+            heap_header_t* n = HEAP_NEXT_HEADER(newh);
+            if((uint32_t)n < heap->end) n->prev = newh;
+
+            // only split if headers are not overlap and size is larger than minimum
+            if(diff >= sizeof(heap_header_t) + MIN_REGION_SIZE) {
+                header->size = diff - sizeof(heap_header_t);
+                newh->prev = header;
+            } else {
+                // merge the excess bytes to previous region, used or not used
+                heap_header_t* prevh = header->prev;
+                prevh->size += diff;
+                newh->prev = prevh;
+            }
+
+            // swap to return
+            header = newh;
+        }
     }
 
     spinlock_release(&heap->lock);
@@ -202,33 +207,33 @@ void heap_free(heap_t* heap, void* addr) {
     }
 
     // merge with previous region
+    bool prev_merged = false;
     if(prevh && prevh->magic == HEAP_FREE) {
         prevh->size += header->size + sizeof(heap_header_t);
 
         // update next header
         heap_header_t* n = HEAP_NEXT_HEADER(prevh);
         if((uint32_t)n < heap->end) n->prev = prevh;
+
+        prev_merged = true;
     }
 
-    // find last header
-    heap_header_t* last_header = HEAP_FIRST_HEADER(heap);
-    heap_header_t* next_header = HEAP_NEXT_HEADER(last_header);
-    while((uint32_t)next_header < heap->end) {
-        last_header = next_header;
-        next_header = HEAP_NEXT_HEADER(last_header);
-    }
+    // since the next region can only merged into the current region
+    // and the current region can only merged into the prev region
+    // then the result region can only be the prev region (if merged) or the current region
+    heap_header_t* result_region = (prev_merged) ? prevh : header;
 
-    if(last_header->magic == HEAP_FREE) {
+    if((uint32_t)HEAP_NEXT_HEADER(result_region) == heap->end) {
+        // we have merged the final region of the heap into the current region
+        // that mean we can contract if possible
         size_t total_size = heap->end - (uint32_t)heap;
         size_t ideal_size = (total_size * 2 / 5) / MMNGR_PAGE_SIZE;
 
         // contract heap if freesize is larger than FREE_RATIO
         // also ensure that after contracting, the final region will have at least the size of MIN_REGION_SIZE
-        if(
-            ideal_size > 0
-            && (last_header->size - (ideal_size * MMNGR_PAGE_SIZE)) >= MIN_REGION_SIZE
-        ) {
-            heap_contract(heap, ideal_size, last_header);
+        size_t contracted_free_size = result_region->size - (ideal_size * MMNGR_PAGE_SIZE); 
+        if(ideal_size > 0 && contracted_free_size >= MIN_REGION_SIZE) {
+            heap_contract(heap, ideal_size, result_region);
         }
     }
 
